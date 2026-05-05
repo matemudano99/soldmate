@@ -40,6 +40,9 @@ public class User {
     @Column(name = "last_name")
     private String lastName;
 
+    @Column(name = "avatar_url")
+    private String avatarUrl;
+
     // OWNER: dueño del negocio (acceso total)
     // STAFF: camarero, cocinero (acceso limitado)
     @Enumerated(EnumType.STRING)

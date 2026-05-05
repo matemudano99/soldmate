@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { X } from "lucide-react";
+import { incidentsApi, suppliersApi, type IncidentResponse, type SupplierResponse } from "app/lib/api";
 
 type ModalShellProps = {
   title: string;
@@ -64,24 +65,112 @@ function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
 }
 
 export type CreateIncidentPayload = { title: string; description: string; priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" };
-export function CreateIncidentModal({ onClose, onCreate }: { onClose: () => void; onCreate: (payload: CreateIncidentPayload) => void }) {
+
+type CreateIncidentModalProps = {
+  onClose: () => void;
+  /** Si hay JWT, se guarda en el backend (Supabase Storage si adjuntas imagen). */
+  authToken?: string | null;
+  /** Tras crear correctamente en API (p. ej. invalidar lista o navegar). */
+  onSuccess?: () => void | Promise<void>;
+  /** Sin `authToken`: solo notifica al padre (modo mock / demos). */
+  onCreate?: (payload: CreateIncidentPayload) => void;
+  /** Edición: PUT sin cambiar foto desde este modal. */
+  editIncidentId?: number | null;
+  initialIncident?: IncidentResponse | null;
+};
+
+export function CreateIncidentModal({
+  onClose,
+  onCreate,
+  onSuccess,
+  authToken,
+  editIncidentId,
+  initialIncident,
+}: CreateIncidentModalProps) {
+  const isEdit = Boolean(editIncidentId);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<CreateIncidentPayload["priority"]>("MEDIUM");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialIncident) {
+      setTitle(initialIncident.title);
+      setDescription(initialIncident.description ?? "");
+      setPriority(initialIncident.priority);
+      setPhotoFile(null);
+      setSubmitError(null);
+    }
+  }, [initialIncident]);
+
+  const previewUrl = useMemo(() => (photoFile ? URL.createObjectURL(photoFile) : null), [photoFile]);
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+    const payload: CreateIncidentPayload = {
+      title: title.trim(),
+      description: description.trim(),
+      priority,
+    };
+
+    if (authToken) {
+      setSubmitError(null);
+      setSubmitting(true);
+      try {
+        if (isEdit && editIncidentId) {
+          await incidentsApi.update(authToken, editIncidentId, payload);
+        } else if (photoFile) {
+          await incidentsApi.createWithPhoto(authToken, payload, photoFile);
+        } else {
+          await incidentsApi.create(authToken, payload);
+        }
+        await onSuccess?.();
+        if (!isEdit) {
+          setTitle("");
+          setDescription("");
+          setPriority("MEDIUM");
+          setPhotoFile(null);
+        }
+        onClose();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Error al guardar la incidencia";
+        setSubmitError(msg);
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    onCreate?.(payload);
+    onClose();
+  };
 
   return (
     <ModalShell
-      title="Nueva incidencia"
-      subtitle="Registra una avería o problema operativo"
+      title={isEdit ? "Editar incidencia" : "Nueva incidencia"}
+      subtitle={
+        isEdit
+          ? "Título, descripción y prioridad (la foto no se cambia aquí)"
+          : authToken
+            ? "Se sube a Supabase si adjuntas foto (máx. 5 MB, solo imágenes)"
+            : "Registra una avería o problema operativo"
+      }
       onClose={onClose}
-      submitLabel="Crear incidencia"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!title.trim()) return;
-        onCreate({ title: title.trim(), description: description.trim(), priority });
-        onClose();
-      }}
+      submitLabel={isEdit ? "Guardar cambios" : photoFile ? "Crear con foto" : "Crear incidencia"}
+      submitting={submitting}
+      onSubmit={handleSubmit}
     >
+      {submitError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{submitError}</div>
+      )}
       <div>
         <Label>Título *</Label>
         <Input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="Ej: Nevera no enfría" />
@@ -93,39 +182,136 @@ export function CreateIncidentModal({ onClose, onCreate }: { onClose: () => void
       <div>
         <Label>Prioridad</Label>
         <select value={priority} onChange={(e) => setPriority(e.target.value as CreateIncidentPayload["priority"])} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-[#1e2040] outline-none focus:border-[#4f6ef7]">
-          {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((p) => <option key={p}>{p}</option>)}
+          {(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).map((p) => (
+            <option key={p} value={p}>
+              {p === "LOW" ? "Baja" : p === "MEDIUM" ? "Media" : p === "HIGH" ? "Alta" : "Crítica"}
+            </option>
+          ))}
         </select>
       </div>
+      {authToken && !isEdit ? (
+        <div>
+          <Label>Foto (opcional)</Label>
+          <input
+            type="file"
+            accept="image/*"
+            className="w-full text-xs text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-[#eef1f8] file:px-3 file:py-2 file:font-semibold file:text-[#4f6ef7]"
+            onChange={(ev) => {
+              setPhotoFile(ev.target.files?.[0] ?? null);
+              setSubmitError(null);
+            }}
+          />
+          {previewUrl ? (
+            <img src={previewUrl} alt="" className="mt-2 max-h-36 w-full rounded-xl border border-gray-100 object-contain bg-gray-50" />
+          ) : null}
+        </div>
+      ) : null}
     </ModalShell>
   );
 }
 
-export type CreateSupplierPayload = { name: string; category: string; phone: string; email: string };
-export function CreateSupplierModal({ onClose, onCreate }: { onClose: () => void; onCreate: (payload: CreateSupplierPayload) => void }) {
-  const [form, setForm] = useState<CreateSupplierPayload>({ name: "", category: "", phone: "", email: "" });
+export type CreateSupplierPayload = {
+  name: string;
+  category: string;
+  phone: string;
+  email: string;
+  contactPerson: string;
+  notes: string;
+};
+
+type CreateSupplierModalProps = {
+  onClose: () => void;
+  onCreate?: (payload: CreateSupplierPayload) => void;
+  onSuccess?: () => void | Promise<void>;
+  authToken?: string | null;
+  /** Si viene con `id`, se hace PUT; si no, POST. */
+  initial?: SupplierResponse | null;
+};
+
+function emptySupplierForm(): CreateSupplierPayload {
+  return { name: "", category: "", phone: "", email: "", contactPerson: "", notes: "" };
+}
+
+function supplierToForm(s: SupplierResponse): CreateSupplierPayload {
+  return {
+    name: s.name,
+    category: s.category ?? "",
+    phone: s.contactPhone ?? "",
+    email: s.contactEmail ?? "",
+    contactPerson: s.contactPerson ?? "",
+    notes: s.notes ?? "",
+  };
+}
+
+export function CreateSupplierModal({ onClose, onCreate, onSuccess, authToken, initial }: CreateSupplierModalProps) {
+  const [form, setForm] = useState<CreateSupplierPayload>(emptySupplierForm());
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const isEdit = Boolean(initial?.id);
+
+  useEffect(() => {
+    if (initial) setForm(supplierToForm(initial));
+    else setForm(emptySupplierForm());
+    setSubmitError(null);
+  }, [initial]);
+
   const set = (k: keyof CreateSupplierPayload, v: string) => setForm((s) => ({ ...s, [k]: v }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim()) return;
+    const payload = { ...form, name: form.name.trim() };
+
+    if (authToken) {
+      setSubmitError(null);
+      setSubmitting(true);
+      try {
+        const body = {
+          name: payload.name,
+          contactEmail: payload.email.trim() || "",
+          contactPhone: payload.phone.trim() || null,
+          contactPerson: payload.contactPerson.trim() || null,
+          category: payload.category.trim() || null,
+          notes: payload.notes.trim() || null,
+        };
+        if (isEdit && initial?.id) await suppliersApi.update(authToken, initial.id, body);
+        else await suppliersApi.create(authToken, body);
+        await onSuccess?.();
+        onClose();
+      } catch (err: unknown) {
+        setSubmitError(err instanceof Error ? err.message : "Error al guardar");
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    onCreate?.(payload);
+    onClose();
+  };
 
   return (
     <ModalShell
-      title="Nuevo proveedor"
-      subtitle="Añade un proveedor al sistema"
+      title={isEdit ? "Editar proveedor" : "Nuevo proveedor"}
+      subtitle={authToken ? "Se guarda en el API (solo OWNER puede crear/editar)" : "Añade un proveedor al sistema"}
       onClose={onClose}
-      submitLabel="Crear proveedor"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!form.name.trim()) return;
-        onCreate({ ...form, name: form.name.trim() });
-        onClose();
-      }}
+      submitLabel={isEdit ? "Guardar" : "Crear proveedor"}
+      submitting={submitting}
+      onSubmit={handleSubmit}
     >
+      {submitError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{submitError}</div>
+      ) : null}
       <div className="grid grid-cols-2 gap-3">
         <div><Label>Nombre *</Label><Input value={form.name} onChange={(e) => set("name", e.target.value)} required /></div>
         <div><Label>Categoría</Label><Input value={form.category} onChange={(e) => set("category", e.target.value)} /></div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div><Label>Teléfono</Label><Input value={form.phone} onChange={(e) => set("phone", e.target.value)} /></div>
-        <div><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} /></div>
+        <div><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="opcional" /></div>
       </div>
+      <div><Label>Persona de contacto</Label><Input value={form.contactPerson} onChange={(e) => set("contactPerson", e.target.value)} /></div>
+      <div><Label>Notas</Label><Textarea value={form.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Observaciones internas…" /></div>
     </ModalShell>
   );
 }

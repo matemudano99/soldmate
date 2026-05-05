@@ -7,8 +7,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -30,16 +28,12 @@ import java.util.List;
 @RequestMapping("/api/v1/incidents")
 public class IncidentController {
 
-    private final IncidentService   incidentService;
-    private final IncidentRepository incidentRepository;
-    private final JwtUtil           jwtUtil;
+    private final IncidentService incidentService;
+    private final JwtUtil         jwtUtil;
 
-    public IncidentController(IncidentService incidentService,
-                              IncidentRepository incidentRepository,
-                              JwtUtil jwtUtil) {
-        this.incidentService    = incidentService;
-        this.incidentRepository = incidentRepository;
-        this.jwtUtil            = jwtUtil;
+    public IncidentController(IncidentService incidentService, JwtUtil jwtUtil) {
+        this.incidentService = incidentService;
+        this.jwtUtil         = jwtUtil;
     }
 
     // ─── Formato de fecha para la respuesta JSON ──────────────────────────────
@@ -142,6 +136,21 @@ public class IncidentController {
     }
 
     /**
+     * GET /api/v1/incidents/{id}
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<IncidentResponse> getIncident(
+        @RequestHeader("Authorization") String authHeader,
+        @PathVariable Long id
+    ) {
+        Long companyId = extractCompanyId(authHeader);
+        return incidentService.getByCompanyAndId(companyId, id)
+            .map(IncidentResponse::from)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
      * POST /api/v1/incidents
      * Crea una incidencia sin foto (JSON).
      */
@@ -207,6 +216,10 @@ public class IncidentController {
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body("Error al subir la imagen: " + e.getMessage());
+        } catch (RuntimeException e) {
+            // p. ej. error HTTP de Supabase (403 RLS, bucket inexistente, clave inválida)
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body("Almacenamiento: " + e.getMessage());
         }
     }
 

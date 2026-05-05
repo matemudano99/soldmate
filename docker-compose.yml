@@ -11,7 +11,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      # Debe coincidir con POSTGRES_USER del contenedor (p. ej. si cambias DB_USER en .env)
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,15 +27,23 @@ services:
     ports:
       - "28080:8080"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://soldmate-db:5432/${DB_NAME:-soldmate}
-      - SPRING_DATASOURCE_USERNAME=${DB_USER:-postgres}
-      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-postgres}
+      # Postgres: local (soldmate-db) por defecto; Supabase vía .env (pooler session suele ir mejor en Docker que db.<ref>.supabase.co)
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL:-jdbc:postgresql://soldmate-db:5432/${DB_NAME:-soldmate}}
+      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME:-${DB_USER:-postgres}}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD:-${DB_PASSWORD:-postgres}}
       - SOLDMATE_JWT_SECRET=${JWT_SECRET:-cambia-esto-por-una-clave-muy-larga-min-32-chars}
       - SOLDMATE_SUPABASE_URL=${SUPABASE_URL}
       - SOLDMATE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SOLDMATE_SUPABASE_BUCKET=${SUPABASE_STORAGE_BUCKET:-incidents}
     depends_on:
       db:
         condition: service_healthy
+        required: false
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
     networks:
       - soldmate-net
 

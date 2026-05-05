@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Sparkles, ArrowRight, Shield, Zap, BarChart2 } from "lucide-react";
-import { authApi } from "app/lib/api";
+import { authApi, describeNetworkError } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
 const FEATURES = [
@@ -33,8 +33,8 @@ export default function LoginPage() {
       const data = await authApi.login(e, p);
       storeLogin(data);
       router.push("/dashboard");
-    } catch (err: any) {
-      setError(err.message ?? "Error de conexión. ¿Está el servidor activo?");
+    } catch (err: unknown) {
+      setError(describeNetworkError(err));
     } finally {
       setLoading(false);
     }

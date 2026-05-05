@@ -6,19 +6,21 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, CreditCard, BarChart2,
   FileText, Calendar, HelpCircle, Power, ChevronDown,
-  Sparkles, Wrench, Truck,
+  Sparkles, Wrench, Truck, Package, Activity,
 } from "lucide-react";
 import { useAuthStore } from "app/lib/store";
 
 const NAV_MAIN = [
-  { href: "/dashboard",  label: "Dashboard",   Icon: LayoutDashboard },
+  { href: "/dashboard",  label: "Dashboard",    Icon: LayoutDashboard },
+  { href: "/inventory",  label: "Inventario",   Icon: Package         },
+  { href: "/activity",   label: "Actividad",    Icon: Activity        },
   { href: "/people",     label: "People",       Icon: Users           },
   { href: "/incidents",  label: "Incidencias",  Icon: Wrench          },
   { href: "/suppliers",  label: "Proveedores",  Icon: Truck           },
   { href: "/finances",   label: "Finances",     Icon: CreditCard      },
   { href: "/stats",      label: "Statistics",   Icon: BarChart2       },
   { href: "/documents",  label: "Documents",    Icon: FileText        },
-  { href: "/calendar",   label: "Calendar",     Icon: Calendar        },
+  { href: "/calendar",   label: "Calendario",   Icon: Calendar        },
 ] as const;
 
 export function WebErpNavbar() {
@@ -53,13 +55,6 @@ export function WebErpNavbar() {
         <span className="font-bold text-[#1e2040] text-base tracking-tight">Soldmate</span>
         <ChevronDown size={12} className="text-gray-300 ml-auto" />
       </Link>
-
-      {/* Request for */}
-      <div className="px-4 mb-5">
-        <button className="w-full bg-[#4f6ef7] text-white text-sm font-semibold rounded-xl py-2.5 shadow-[0_4px_12px_rgba(79,110,247,0.30)] hover:bg-[#3d5ae0] transition-colors">
-          + Nuevo registro
-        </button>
-      </div>
 
       {/* Nav */}
       <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">

@@ -67,6 +67,11 @@ public class IncidentService {
         return incidentRepository.findByCompanyIdAndStatusOrderByCreatedAtDesc(companyId, status);
     }
 
+    @Transactional(readOnly = true)
+    public Optional<Incident> getByCompanyAndId(Long companyId, Long incidentId) {
+        return incidentRepository.findByIdAndCompanyId(incidentId, companyId);
+    }
+
     // ─── Creación ────────────────────────────────────────────────────────────
 
     /**
@@ -173,20 +178,26 @@ public class IncidentService {
      * Usamos HttpClient (Java 11+) para hacer la petición REST a Supabase.
      * La API de Supabase Storage sigue el estándar S3.
      *
-     * Ruta en el bucket: incidents/{companyId}/{uuid}.jpg
-     * Esto organiza las fotos por empresa y evita colisiones de nombre.
+     * Ruta dentro del bucket (nombre en {@code application.properties}): {@code {companyId}/{uuid}.jpg}
      */
     private String uploadToSupabase(MultipartFile photo, Long companyId)
             throws IOException {
 
-        // Nombre único para evitar sobreescrituras
-        String fileName = String.format("incidents/%d/%s.jpg",
-            companyId, UUID.randomUUID());
+        String baseUrl = normalizeSupabaseProjectUrl(supabaseUrl);
+        if (baseUrl.isBlank()) {
+            throw new RuntimeException(
+                "SOLDMATE_SUPABASE_URL / SUPABASE_URL vacía o inválida. Usa la raíz del proyecto, p. ej. https://xxxx.supabase.co"
+            );
+        }
 
-        // URL del endpoint de Supabase Storage
+        // Nombre único dentro del bucket (sin prefijo duplicado del nombre del bucket)
+        String objectPath = String.format("%d/%s.jpg", companyId, UUID.randomUUID());
+
+        // POST {SUPABASE_PROJECT}/storage/v1/object/{bucket}/{path}
+        // Si SUPABASE_URL incluye /rest/v1, PostgREST responde PGRST125 ("Invalid path").
         String uploadUrl = String.format(
             "%s/storage/v1/object/%s/%s",
-            supabaseUrl, supabaseBucket, fileName
+            baseUrl, supabaseBucket, objectPath
         );
 
         HttpClient client = HttpClient.newHttpClient();
@@ -194,6 +205,8 @@ public class IncidentService {
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(uploadUrl))
             .header("Authorization", "Bearer " + supabaseAnonKey)
+            // Supabase exige `apikey` en casi todas las peticiones al API; sin él suele fallar la subida.
+            .header("apikey", supabaseAnonKey)
             .header("Content-Type", photo.getContentType() != null
                 ? photo.getContentType() : "image/jpeg")
             // BodyPublishers.ofByteArray convierte el archivo a bytes para enviarlo
@@ -218,7 +231,32 @@ public class IncidentService {
         // Devolvemos la URL pública de la imagen
         return String.format(
             "%s/storage/v1/object/public/%s/%s",
-            supabaseUrl, supabaseBucket, fileName
+            baseUrl, supabaseBucket, objectPath
         );
+    }
+
+    /**
+     * La URL del proyecto debe ser la raíz (https://xxx.supabase.co), no /rest/v1 ni /storage/v1.
+     */
+    private static String normalizeSupabaseProjectUrl(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "";
+        }
+        String u = raw.trim();
+        while (u.endsWith("/")) {
+            u = u.substring(0, u.length() - 1);
+        }
+        String[] mistakenSuffixes = {
+            "/rest/v1", "/graphql/v1", "/auth/v1", "/storage/v1",
+        };
+        for (String suffix : mistakenSuffixes) {
+            if (u.endsWith(suffix)) {
+                u = u.substring(0, u.length() - suffix.length());
+                while (u.endsWith("/")) {
+                    u = u.substring(0, u.length() - 1);
+                }
+            }
+        }
+        return u;
     }
 }

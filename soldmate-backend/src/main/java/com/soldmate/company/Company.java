@@ -27,6 +27,30 @@ public class Company {
     @Column(nullable = false)
     private String name;
 
+    @Column(name = "business_phone")
+    private String businessPhone;
+
+    @Column(name = "business_email")
+    private String businessEmail;
+
+    @Column(name = "address_line")
+    private String addressLine;
+
+    private String city;
+
+    @Column(name = "postal_code")
+    private String postalCode;
+
+    @Column
+    private String timezone = "Europe/Madrid";
+
+    private Double latitude;
+
+    private Double longitude;
+
+    @Column(name = "opening_hours_json", columnDefinition = "TEXT")
+    private String openingHoursJson;
+
     // NIF o CIF de la empresa (ej: "B12345678")
     @Column(name = "tax_id")
     private String taxId;

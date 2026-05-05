@@ -4,8 +4,8 @@ import com.soldmate.auth.JwtUtil;
 import com.soldmate.company.Company;
 import com.soldmate.company.CompanyRepository;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,6 +18,7 @@ import java.util.List;
  *
  * GET    /api/v1/suppliers              → lista proveedores activos
  * GET    /api/v1/suppliers?category=X  → filtra por categoría
+ * GET    /api/v1/suppliers/{id}        → detalle de un proveedor
  * POST   /api/v1/suppliers             → crea proveedor (OWNER)
  * PUT    /api/v1/suppliers/{id}        → actualiza proveedor (OWNER)
  * DELETE /api/v1/suppliers/{id}        → desactiva proveedor (OWNER)
@@ -60,7 +61,8 @@ public class SupplierController {
 
     public record CreateSupplierRequest(
         @NotBlank String name,
-        @Email String contactEmail,
+        @Pattern(regexp = "^$|^[\\w.+-]+@[\\w.-]+\\.[A-Za-z]{2,}$", message = "Email inválido")
+        String contactEmail,
         String contactPhone,
         String contactPerson,
         String category,
@@ -86,6 +88,20 @@ public class SupplierController {
         );
     }
 
+    /** GET /api/v1/suppliers/{id} */
+    @GetMapping("/{id}")
+    public ResponseEntity<SupplierResponse> getSupplier(
+        @RequestHeader("Authorization") String authHeader,
+        @PathVariable Long id
+    ) {
+        Long companyId = extractCompanyId(authHeader);
+        return supplierRepository.findByIdAndCompanyId(id, companyId)
+            .filter(Supplier::isActive)
+            .map(SupplierResponse::from)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
+    }
+
     /** POST /api/v1/suppliers — solo OWNER */
     @PostMapping
     @PreAuthorize("hasRole('OWNER')")
@@ -100,11 +116,11 @@ public class SupplierController {
 
         Supplier supplier = new Supplier();
         supplier.setName(req.name().trim());
-        supplier.setContactEmail(req.contactEmail());
-        supplier.setContactPhone(req.contactPhone());
-        supplier.setContactPerson(req.contactPerson());
-        supplier.setCategory(req.category());
-        supplier.setNotes(req.notes());
+        supplier.setContactEmail(blankToNull(req.contactEmail()));
+        supplier.setContactPhone(blankToNull(req.contactPhone()));
+        supplier.setContactPerson(blankToNull(req.contactPerson()));
+        supplier.setCategory(blankToNull(req.category()));
+        supplier.setNotes(blankToNull(req.notes()));
         supplier.setCompany(company);
 
         supplierRepository.save(supplier);
@@ -129,11 +145,11 @@ public class SupplierController {
         if (supplier == null) return ResponseEntity.notFound().build();
 
         supplier.setName(req.name().trim());
-        supplier.setContactEmail(req.contactEmail());
-        supplier.setContactPhone(req.contactPhone());
-        supplier.setContactPerson(req.contactPerson());
-        supplier.setCategory(req.category());
-        supplier.setNotes(req.notes());
+        supplier.setContactEmail(blankToNull(req.contactEmail()));
+        supplier.setContactPhone(blankToNull(req.contactPhone()));
+        supplier.setContactPerson(blankToNull(req.contactPerson()));
+        supplier.setCategory(blankToNull(req.category()));
+        supplier.setNotes(blankToNull(req.notes()));
 
         supplierRepository.save(supplier);
 
@@ -164,5 +180,10 @@ public class SupplierController {
 
     private Long extractCompanyId(String h) {
         return jwtUtil.extractCompanyId(h.substring(7));
+    }
+
+    private static String blankToNull(String s) {
+        if (s == null || s.isBlank()) return null;
+        return s.trim();
     }
 }

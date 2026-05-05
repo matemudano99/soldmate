@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Sparkles, ArrowRight, Check, Building2, User, Mail, Lock } from "lucide-react";
-import { authApi } from "app/lib/api";
+import { authApi, describeNetworkError } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
 type Step = 1 | 2;
@@ -60,8 +60,8 @@ export default function RegisterPage() {
       });
       storeLogin(data);
       router.push("/dashboard");
-    } catch (err: any) {
-      setError(err.message ?? "Error al crear la cuenta. Verifica los datos.");
+    } catch (err: unknown) {
+      setError(describeNetworkError(err));
       setLoading(false);
     }
   };

@@ -137,7 +137,7 @@ export function NewIncidentScreen() {
         await incidentsApi.createWithPhoto(
           token!,
           { title: title.trim(), description: description.trim(), priority },
-          photoUri
+          { uri: photoUri, name: "incident.jpg", type: "image/jpeg" }
         );
       } else {
         // Sin foto: JSON normal

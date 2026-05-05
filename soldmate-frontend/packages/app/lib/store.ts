@@ -22,6 +22,7 @@ interface AuthState {
   companyId: number | null;
   firstName: string | null;
   lastName: string | null;
+  avatarUrl: string | null;
 
   // ¿El usuario está autenticado?
   isAuthenticated: boolean;
@@ -31,7 +32,7 @@ interface AuthState {
   // Acciones (funciones que modifican el estado)
   login: (data: AuthResponse) => void;
   logout: () => void;
-  setProfile: (data: Pick<AuthResponse, "firstName" | "lastName">) => void;
+  setProfile: (data: Pick<AuthResponse, "firstName" | "lastName" | "avatarUrl">) => void;
   toggleEditMode: () => void;
   setEditMode: (value: boolean) => void;
 }
@@ -63,6 +64,7 @@ export const useAuthStore = create<AuthState>()(
   companyId: null,
   firstName: null,
   lastName: null,
+  avatarUrl: null,
   isAuthenticated: false,
   editMode: false,
 
@@ -78,6 +80,7 @@ export const useAuthStore = create<AuthState>()(
       companyId: data.companyId ?? null,
       firstName: data.firstName ?? null,
       lastName: data.lastName ?? null,
+      avatarUrl: data.avatarUrl ?? null,
       isAuthenticated: true,
       editMode: false,
     });
@@ -94,6 +97,7 @@ export const useAuthStore = create<AuthState>()(
       companyId: null,
       firstName: null,
       lastName: null,
+      avatarUrl: null,
       isAuthenticated: false,
       editMode: false,
     });
@@ -102,6 +106,7 @@ export const useAuthStore = create<AuthState>()(
     set({
       firstName: data.firstName ?? null,
       lastName: data.lastName ?? null,
+      avatarUrl: data.avatarUrl ?? null,
     }),
   toggleEditMode: () =>
     set((s) => ({
