@@ -43,7 +43,8 @@ public class SchemaMigrationRunner implements ApplicationRunner {
             new MigrationStep("003", "Add data integrity constraints for core tables", this::addDataIntegrityConstraints),
             new MigrationStep("004", "Create planning and analytics tables", this::createPlanningTables),
             new MigrationStep("005", "Add profile and business metadata columns", this::addBusinessMetadataColumns),
-            new MigrationStep("006", "Add suppliers type segmentation", this::addSupplierTypeColumn)
+            new MigrationStep("006", "Add suppliers type segmentation", this::addSupplierTypeColumn),
+            new MigrationStep("007", "Harden tenant indexes for high-traffic queries", this::addTenantIsolationIndexes)
         );
 
         for (MigrationStep step : steps) {
@@ -199,6 +200,14 @@ public class SchemaMigrationRunner implements ApplicationRunner {
     private void addSupplierTypeColumn() {
         jdbcTemplate.execute("ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS supplier_type VARCHAR(32) DEFAULT 'SUPPLIER'");
         jdbcTemplate.execute("UPDATE suppliers SET supplier_type='SUPPLIER' WHERE supplier_type IS NULL");
+    }
+
+    private void addTenantIsolationIndexes() {
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_users_company_role ON users(company_id, role)");
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_contacts_company_active ON contacts(company_id, active)");
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_contacts_company_created_at ON contacts(company_id, created_at DESC)");
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_calendar_events_company_created_at ON calendar_events(company_id, created_at DESC)");
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_products_company_name ON products(company_id, name)");
     }
 
     private void addConstraintIfMissing(String constraintName, String addConstraintSql) {

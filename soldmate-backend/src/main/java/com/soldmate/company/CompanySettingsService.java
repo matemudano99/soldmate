@@ -117,13 +117,8 @@ public class CompanySettingsService {
      */
     public CompanySetting updateSetting(Long companyId, Long settingId,
                                         String value, String label) {
-        CompanySetting setting = settingRepository.findById(settingId)
+        CompanySetting setting = settingRepository.findByIdAndCompanyId(settingId, companyId)
             .orElseThrow(() -> new RuntimeException("Ajuste no encontrado"));
-
-        // Verificamos que el ajuste pertenece a la empresa del usuario (seguridad)
-        if (!setting.getCompany().getId().equals(companyId)) {
-            throw new RuntimeException("No tienes permiso para modificar este ajuste");
-        }
 
         setting.setValue(value);
         if (label != null && !label.isBlank()) {
@@ -137,12 +132,8 @@ public class CompanySettingsService {
 
     /** Desactiva un ajuste (no lo borra físicamente de la BD). */
     public void deactivateSetting(Long companyId, Long settingId) {
-        CompanySetting setting = settingRepository.findById(settingId)
+        CompanySetting setting = settingRepository.findByIdAndCompanyId(settingId, companyId)
             .orElseThrow(() -> new RuntimeException("Ajuste no encontrado"));
-
-        if (!setting.getCompany().getId().equals(companyId)) {
-            throw new RuntimeException("No tienes permiso para eliminar este ajuste");
-        }
 
         setting.setActive(false);
         settingRepository.save(setting);

@@ -19,4 +19,7 @@ public interface CompanySettingRepository extends JpaRepository<CompanySetting, 
 
     /** Busca un ajuste concreto por empresa y clave. */
     Optional<CompanySetting> findByCompanyIdAndKey(Long companyId, String key);
+
+    /** Busca por ID garantizando pertenencia al tenant. */
+    Optional<CompanySetting> findByIdAndCompanyId(Long id, Long companyId);
 }
