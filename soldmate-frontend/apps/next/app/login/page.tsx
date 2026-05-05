@@ -40,8 +40,8 @@ export default function LoginPage() {
     }
   };
 
-  const handleSubmit = (ev: React.FormEvent) => {
-    ev.preventDefault();
+  const handleSubmit = (ev?: React.FormEvent) => {
+    ev?.preventDefault();
     doLogin(email, password);
   };
 
@@ -119,7 +119,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form action="#" method="dialog" onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1.5">Email</label>
               <input
@@ -168,7 +168,8 @@ export default function LoginPage() {
             </div>
 
             <button
-              type="submit"
+              type="button"
+              onClick={() => handleSubmit()}
               disabled={loading}
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#4f6ef7] text-white font-semibold py-3 text-sm shadow-[0_4px_15px_rgba(79,110,247,0.35)] hover:bg-[#3d5ae0] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
             >
