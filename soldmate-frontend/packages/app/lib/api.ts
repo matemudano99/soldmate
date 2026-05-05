@@ -29,7 +29,7 @@ export function describeNetworkError(err: unknown): string {
 export interface AuthResponse {
   token: string;
   email: string;
-  role: "OWNER" | "STAFF";
+  role: "OWNER" | "MANAGER" | "EMPLOYEE" | "STAFF";
   tier: "FREE" | "PREMIUM";
   companyId: number;
   firstName: string | null;
@@ -78,6 +78,7 @@ export interface SupplierResponse {
   contactPerson: string | null;
   category: string | null;
   notes: string | null;
+  type?: "SUPPLIER" | "CONTACT";
 }
 
 export interface SupplierInput {
@@ -87,6 +88,7 @@ export interface SupplierInput {
   contactPerson?: string | null;
   category?: string | null;
   notes?: string | null;
+  type?: "SUPPLIER" | "CONTACT";
 }
 
 export interface RegisterRequest {
@@ -140,6 +142,23 @@ export interface ContactStats {
   active: number;
   inactive: number;
   avgProgress: number;
+}
+
+export interface UserListResponse {
+  id: number;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  fullName: string | null;
+  role: "OWNER" | "MANAGER" | "EMPLOYEE" | "STAFF";
+  avatarUrl: string | null;
+}
+
+export interface UserUpsertInput {
+  fullName: string;
+  email: string;
+  role: "OWNER" | "MANAGER" | "EMPLOYEE" | "STAFF";
+  avatarUrl?: string | null;
 }
 
 export interface DashboardWeeklyPoint {
@@ -374,11 +393,11 @@ export const inventoryApi = {
 // ─── Proveedores ─────────────────────────────────────────────────────────────
 
 export const suppliersApi = {
-  getAll: async (token: string, category?: string): Promise<SupplierResponse[]> => {
-    const q =
-      category && category.trim() !== ""
-        ? `?category=${encodeURIComponent(category.trim())}`
-        : "";
+  getAll: async (token: string, category?: string, type?: "SUPPLIER" | "CONTACT"): Promise<SupplierResponse[]> => {
+    const params = new URLSearchParams();
+    if (category && category.trim() !== "") params.set("category", category.trim());
+    if (type) params.set("type", type);
+    const q = params.size > 0 ? `?${params.toString()}` : "";
     const res = await authFetch(`/api/v1/suppliers${q}`, token);
     return handleResponse<SupplierResponse[]>(res);
   },
@@ -454,6 +473,34 @@ export const contactsApi = {
 
   remove: async (token: string, id: number): Promise<void> => {
     const res = await authFetch(`/api/v1/contacts/${id}`, token, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const text = await res.text();
+      throw new Error(text || `Error ${res.status}`);
+    }
+  },
+};
+
+export const usersApi = {
+  getAll: async (token: string): Promise<UserListResponse[]> => {
+    const res = await authFetch("/api/v1/users", token);
+    return handleResponse<UserListResponse[]>(res);
+  },
+  create: async (token: string, payload: UserUpsertInput): Promise<UserListResponse> => {
+    const res = await authFetch("/api/v1/users", token, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<UserListResponse>(res);
+  },
+  update: async (token: string, id: number, payload: UserUpsertInput): Promise<UserListResponse> => {
+    const res = await authFetch(`/api/v1/users/${id}`, token, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<UserListResponse>(res);
+  },
+  remove: async (token: string, id: number): Promise<void> => {
+    const res = await authFetch(`/api/v1/users/${id}`, token, { method: "DELETE" });
     if (!res.ok && res.status !== 204) {
       const text = await res.text();
       throw new Error(text || `Error ${res.status}`);

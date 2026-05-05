@@ -17,6 +17,7 @@ export function UserProfileMenu() {
   const lastName = useAuthStore((s) => s.lastName);
   const email = useAuthStore((s) => s.email);
   const role = useAuthStore((s) => s.role);
+  const avatarUrl = useAuthStore((s) => s.avatarUrl);
 
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -24,6 +25,11 @@ export function UserProfileMenu() {
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
   const displayName = fullName || email || "Usuario";
   const initials = ((firstName?.[0] ?? "") + (lastName?.[0] ?? "")).toUpperCase() || "U";
+  const roleLabel =
+    role === "OWNER" ? "Owner" :
+    role === "MANAGER" ? "Manager" :
+    role === "EMPLOYEE" || role === "STAFF" ? "Employee" :
+    "Usuario";
 
   useEffect(() => {
     function handleOutsideClick(event: MouseEvent) {
@@ -49,9 +55,17 @@ export function UserProfileMenu() {
         className="flex items-center gap-2 rounded-xl bg-white border border-gray-100 px-2 py-1.5 shadow-sm hover:bg-gray-50 transition-colors"
       >
         <div className="relative">
-          <div className="w-8 h-8 rounded-full ring-2 ring-white shadow-sm bg-[#4f6ef7] text-white text-[11px] font-semibold flex items-center justify-center">
-            {initials}
-          </div>
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={displayName}
+              className="w-8 h-8 rounded-full ring-2 ring-white shadow-sm object-cover"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-full ring-2 ring-white shadow-sm bg-[#4f6ef7] text-white text-[11px] font-semibold flex items-center justify-center">
+              {initials}
+            </div>
+          )}
           <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-white" />
         </div>
         <ChevronDown size={14} className={`text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -62,7 +76,7 @@ export function UserProfileMenu() {
           <div className="px-4 py-3.5 border-b border-gray-50">
             <p className="text-sm font-semibold text-[#1e2040] truncate">{displayName}</p>
             <p className="text-xs text-gray-400 truncate">{email ?? "Sin email"}</p>
-            <p className="text-[10px] text-gray-400 mt-0.5">{role === "OWNER" ? "Owner" : "Staff"}</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">{roleLabel}</p>
           </div>
 
           <div className="py-1.5">

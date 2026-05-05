@@ -42,7 +42,13 @@ public class Supplier {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "supplier_type", nullable = false)
+    private SupplierType supplierType = SupplierType.SUPPLIER;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "company_id", nullable = false)
     private Company company;
+
+    public enum SupplierType { SUPPLIER, CONTACT }
 }

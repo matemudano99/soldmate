@@ -14,12 +14,12 @@ const NAV_MAIN = [
   { href: "/dashboard",  label: "Dashboard",    Icon: LayoutDashboard },
   { href: "/inventory",  label: "Inventario",   Icon: Package         },
   { href: "/activity",   label: "Actividad",    Icon: Activity        },
-  { href: "/people",     label: "People",       Icon: Users           },
+  { href: "/people",     label: "Usuarios",     Icon: Users           },
   { href: "/incidents",  label: "Incidencias",  Icon: Wrench          },
   { href: "/suppliers",  label: "Proveedores",  Icon: Truck           },
-  { href: "/finances",   label: "Finances",     Icon: CreditCard      },
-  { href: "/stats",      label: "Statistics",   Icon: BarChart2       },
-  { href: "/documents",  label: "Documents",    Icon: FileText        },
+  { href: "/finances",   label: "Finanzas",     Icon: CreditCard      },
+  { href: "/stats",      label: "Estadisticas",   Icon: BarChart2       },
+  { href: "/documents",  label: "Documentos",    Icon: FileText        },
   { href: "/calendar",   label: "Calendario",   Icon: Calendar        },
 ] as const;
 
@@ -34,6 +34,11 @@ export function WebErpNavbar() {
 
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
   const displayName = fullName || email || "Usuario";
+  const roleLabel =
+    role === "OWNER" ? "Owner" :
+    role === "MANAGER" ? "Manager" :
+    role === "EMPLOYEE" || role === "STAFF" ? "Employee" :
+    "Usuario";
 
   const handleLogout = () => {
     logout();
@@ -46,7 +51,7 @@ export function WebErpNavbar() {
   }
 
   return (
-    <aside className="w-[220px] flex-shrink-0 bg-white h-screen flex flex-col border-r border-gray-100 shadow-[2px_0_20px_rgba(149,157,165,0.06)]">
+    <aside className="sticky top-0 w-[220px] flex-shrink-0 bg-white h-screen flex flex-col border-r border-gray-100 shadow-[2px_0_20px_rgba(149,157,165,0.06)]">
       {/* Logo */}
       <Link href="/dashboard" className="px-5 pt-6 pb-5 flex items-center gap-2 hover:opacity-90 transition-opacity">
         <div className="w-9 h-9 bg-[#4f6ef7] rounded-xl flex items-center justify-center shadow-[0_4px_12px_rgba(79,110,247,0.35)]">
@@ -108,7 +113,7 @@ export function WebErpNavbar() {
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-[#1e2040] truncate">{displayName}</p>
             <p className="text-[10px] text-gray-400">
-              {role === "OWNER" ? "Owner" : "Staff"}
+              {roleLabel}
             </p>
           </div>
         </div>

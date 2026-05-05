@@ -226,6 +226,8 @@ type CreateSupplierModalProps = {
   authToken?: string | null;
   /** Si viene con `id`, se hace PUT; si no, POST. */
   initial?: SupplierResponse | null;
+  mode?: "SUPPLIER" | "CONTACT";
+  contactOptions?: string[];
 };
 
 function emptySupplierForm(): CreateSupplierPayload {
@@ -243,7 +245,9 @@ function supplierToForm(s: SupplierResponse): CreateSupplierPayload {
   };
 }
 
-export function CreateSupplierModal({ onClose, onCreate, onSuccess, authToken, initial }: CreateSupplierModalProps) {
+export function CreateSupplierModal({
+  onClose, onCreate, onSuccess, authToken, initial, mode = "SUPPLIER", contactOptions = [],
+}: CreateSupplierModalProps) {
   const [form, setForm] = useState<CreateSupplierPayload>(emptySupplierForm());
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -273,6 +277,7 @@ export function CreateSupplierModal({ onClose, onCreate, onSuccess, authToken, i
           contactPerson: payload.contactPerson.trim() || null,
           category: payload.category.trim() || null,
           notes: payload.notes.trim() || null,
+          type: mode,
         };
         if (isEdit && initial?.id) await suppliersApi.update(authToken, initial.id, body);
         else await suppliersApi.create(authToken, body);
@@ -292,10 +297,10 @@ export function CreateSupplierModal({ onClose, onCreate, onSuccess, authToken, i
 
   return (
     <ModalShell
-      title={isEdit ? "Editar proveedor" : "Nuevo proveedor"}
-      subtitle={authToken ? "Se guarda en el API (solo OWNER puede crear/editar)" : "Añade un proveedor al sistema"}
+      title={isEdit ? (mode === "CONTACT" ? "Editar contacto" : "Editar proveedor") : (mode === "CONTACT" ? "Nuevo contacto" : "Nuevo proveedor")}
+      subtitle={authToken ? "Se guarda en el API (solo OWNER puede crear/editar)" : "Añade un registro al sistema"}
       onClose={onClose}
-      submitLabel={isEdit ? "Guardar" : "Crear proveedor"}
+      submitLabel={isEdit ? "Guardar" : (mode === "CONTACT" ? "Crear contacto" : "Crear proveedor")}
       submitting={submitting}
       onSubmit={handleSubmit}
     >
@@ -310,7 +315,21 @@ export function CreateSupplierModal({ onClose, onCreate, onSuccess, authToken, i
         <div><Label>Teléfono</Label><Input value={form.phone} onChange={(e) => set("phone", e.target.value)} /></div>
         <div><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="opcional" /></div>
       </div>
-      <div><Label>Persona de contacto</Label><Input value={form.contactPerson} onChange={(e) => set("contactPerson", e.target.value)} /></div>
+      <div>
+        <Label>Persona de contacto</Label>
+        {contactOptions.length > 0 ? (
+          <select
+            value={form.contactPerson}
+            onChange={(e) => set("contactPerson", e.target.value)}
+            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-[#1e2040] outline-none focus:border-[#4f6ef7]"
+          >
+            <option value="">Seleccionar contacto</option>
+            {contactOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        ) : (
+          <Input value={form.contactPerson} onChange={(e) => set("contactPerson", e.target.value)} />
+        )}
+      </div>
       <div><Label>Notas</Label><Textarea value={form.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Observaciones internas…" /></div>
     </ModalShell>
   );
@@ -327,10 +346,10 @@ export function CreatePersonModal({
 
   return (
     <ModalShell
-      title="Añadir persona"
-      subtitle="Completa los datos del nuevo miembro"
+      title="Añadir usuario"
+      subtitle="Completa los datos de acceso del nuevo usuario"
       onClose={onClose}
-      submitLabel="Añadir"
+      submitLabel="Crear usuario"
       onSubmit={(e) => {
         e.preventDefault();
         if (!form.name.trim()) return;
@@ -348,7 +367,7 @@ export function CreatePersonModal({
         </div>
       </div>
       <div><Label>Cargo / Rol</Label><Input value={form.role} onChange={(e) => set("role", e.target.value)} /></div>
-      <div><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} /></div>
+      <div><Label>Email *</Label><Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} required /></div>
       <div className="grid grid-cols-2 gap-3">
         <div><Label>Teléfono</Label><Input value={form.phone} onChange={(e) => set("phone", e.target.value)} /></div>
         <div><Label>Ubicación</Label><Input value={form.location} onChange={(e) => set("location", e.target.value)} /></div>

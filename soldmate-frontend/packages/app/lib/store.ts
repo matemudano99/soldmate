@@ -17,7 +17,7 @@ interface AuthState {
   // Datos del usuario autenticado (null si no ha iniciado sesión)
   token: string | null;
   email: string | null;
-  role: "OWNER" | "STAFF" | null;
+  role: "OWNER" | "MANAGER" | "EMPLOYEE" | "STAFF" | null;
   tier: "FREE" | "PREMIUM" | null;
   companyId: number | null;
   firstName: string | null;

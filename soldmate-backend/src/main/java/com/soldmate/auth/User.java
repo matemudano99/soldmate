@@ -44,10 +44,12 @@ public class User {
     private String avatarUrl;
 
     // OWNER: dueño del negocio (acceso total)
-    // STAFF: camarero, cocinero (acceso limitado)
+    // MANAGER: encargado/supervisor (gestión operativa)
+    // EMPLOYEE: operario base (acceso limitado)
+    // STAFF: rol legado (compatibilidad con datos antiguos)
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Role role = Role.STAFF;
+    private Role role = Role.EMPLOYEE;
 
     // ManyToOne: muchos usuarios pertenecen a una empresa
     // FetchType.LAZY: no carga la empresa hasta que se acceda a ella (más eficiente)
@@ -56,6 +58,6 @@ public class User {
     private Company company;
 
     public enum Role {
-        OWNER, STAFF
+        OWNER, MANAGER, EMPLOYEE, STAFF
     }
 }

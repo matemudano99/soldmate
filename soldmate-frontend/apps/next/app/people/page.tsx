@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { WebErpNavbar } from "../components/web-erp-navbar";
-import { contactsApi, type ContactResponse, type ContactInput } from "app/lib/api";
+import { usersApi, type UserListResponse, type UserUpsertInput } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 import { UserProfileMenu } from "../components/user-profile-menu";
 import { CreatePersonModal } from "../components/create-modals";
@@ -34,42 +34,37 @@ interface Employee {
 
 // ─── API ↔ UI mappers ─────────────────────────────────────────────────────────
 
-function mapContact(c: ContactResponse): Employee {
+function mapUser(u: UserListResponse): Employee {
+  const name = (u.fullName && u.fullName.trim()) || [u.firstName, u.lastName].filter(Boolean).join(" ").trim() || u.email;
   return {
-    id:         c.id,
-    name:       c.fullName,
-    email:      c.email      ?? "",
-    role:       c.role       ?? "",
-    department: c.department ?? "Design",
-    progress:   c.progress,
-    online:     c.active,
-    avatar:     c.avatarUrl  ?? null,
-    phone:      c.phone      ?? "",
-    location:   c.location   ?? "",
-    projects:   c.projects
-      ? c.projects.split(",").map((s) => s.trim()).filter(Boolean)
-      : [],
-    joinDate:   c.joinDate   ?? "",
-    rating:     c.rating     ?? 4.0,
+    id: u.id,
+    name,
+    email: u.email ?? "",
+    role: u.role ?? "EMPLOYEE",
+    department: "Operations",
+    progress: 0,
+    online: true,
+    avatar: u.avatarUrl ?? null,
+    phone: "",
+    location: "",
+    projects: [],
+    joinDate: "",
+    rating: 4.0,
   };
 }
 
-function employeeToInput(e: Omit<Employee, "id"> | Omit<Employee, "id" | "rating">): ContactInput {
-  const emp = e as Employee;
+function employeeToUserInput(e: Omit<Employee, "id"> | Omit<Employee, "id" | "rating">): UserUpsertInput {
+  const role = (e.role || "EMPLOYEE").toUpperCase();
+  const mappedRole: UserUpsertInput["role"] =
+    role === "OWNER" ? "OWNER" :
+    role === "MANAGER" ? "MANAGER" :
+    role === "STAFF" || role === "EMPLOYEE" ? "EMPLOYEE" :
+    "EMPLOYEE";
   return {
-    fullName:   emp.name,
-    email:      emp.email    || null,
-    phone:      emp.phone    || null,
-    role:       emp.role     || null,
-    department: emp.department || null,
-    location:   emp.location || null,
-    progress:   emp.progress,
-    active:     emp.online,
-    projects:   Array.isArray(emp.projects) && emp.projects.length > 0
-      ? emp.projects.join(",")
-      : null,
-    joinDate:   emp.joinDate || null,
-    rating:     (emp as Employee).rating ?? 4.0,
+    fullName: e.name.trim(),
+    email: e.email.trim(),
+    role: mappedRole,
+    avatarUrl: e.avatar ?? null,
   };
 }
 
@@ -640,30 +635,30 @@ export default function PeoplePage() {
   const [viewMode,   setViewMode]   = useState<"grid" | "list">("grid");
   const [showModal,  setShowModal]  = useState(false);
 
-  // ─── React Query: fetch contacts ───────────────────────────────────────────
-  const { data: contacts = [], isLoading, isError, refetch } = useQuery({
-    queryKey: ["contacts"],
-    queryFn:  () => contactsApi.getAll(token!),
-    enabled:  !!token,
+  // ─── React Query: fetch users ───────────────────────────────────────────────
+  const { data: users = [], isLoading, isError, refetch } = useQuery({
+    queryKey: ["users"],
+    queryFn: () => usersApi.getAll(token!),
+    enabled: !!token,
   });
 
-  const employees = useMemo(() => contacts.map(mapContact), [contacts]);
+  const employees = useMemo(() => users.map(mapUser), [users]);
 
   // ─── Mutations ─────────────────────────────────────────────────────────────
   const createMutation = useMutation({
-    mutationFn: (data: ContactInput) => contactsApi.create(token!, data),
-    onSuccess:  () => queryClient.invalidateQueries({ queryKey: ["contacts"] }),
+    mutationFn: (data: UserUpsertInput) => usersApi.create(token!, data),
+    onSuccess:  () => queryClient.invalidateQueries({ queryKey: ["users"] }),
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: ContactInput }) =>
-      contactsApi.update(token!, id, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["contacts"] }),
+    mutationFn: ({ id, data }: { id: number; data: UserUpsertInput }) =>
+      usersApi.update(token!, id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => contactsApi.remove(token!, id),
-    onSuccess:  () => queryClient.invalidateQueries({ queryKey: ["contacts"] }),
+    mutationFn: (id: number) => usersApi.remove(token!, id),
+    onSuccess:  () => queryClient.invalidateQueries({ queryKey: ["users"] }),
   });
 
   // ─── Derived state ─────────────────────────────────────────────────────────
@@ -687,11 +682,11 @@ export default function PeoplePage() {
   }, [employees, search, activeDept, sortBy]);
 
   const addEmployee = (data: Omit<Employee, "id" | "rating">) => {
-    createMutation.mutate(employeeToInput(data));
+    createMutation.mutate(employeeToUserInput(data));
   };
 
   const updateEmployee = (updated: Employee) => {
-    updateMutation.mutate({ id: updated.id, data: employeeToInput(updated) });
+    updateMutation.mutate({ id: updated.id, data: employeeToUserInput(updated) });
   };
 
   const deleteEmployee = (id: number) => {
@@ -720,7 +715,7 @@ export default function PeoplePage() {
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3 text-gray-400">
             <Loader2 size={32} className="animate-spin text-[#4f6ef7]" />
-            <p className="text-sm">Cargando contactos...</p>
+            <p className="text-sm">Cargando usuarios...</p>
           </div>
         </div>
       </div>
@@ -768,7 +763,7 @@ export default function PeoplePage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full bg-white border border-gray-100 rounded-xl pl-10 pr-4 py-2.5 text-sm placeholder:text-gray-400 shadow-sm outline-none focus:border-[#4f6ef7] transition-colors"
-              placeholder="Buscar personas..."
+              placeholder="Buscar usuarios..."
             />
             {search && (
               <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -786,16 +781,16 @@ export default function PeoplePage() {
           {/* Title + actions */}
           <div className="flex items-end justify-between mb-5">
             <div>
-              <h1 className="text-3xl font-bold text-[#1e2040]">People</h1>
+              <h1 className="text-3xl font-bold text-[#1e2040]">Usuarios</h1>
               <p className="text-sm text-gray-400 mt-0.5">
-                {teamStats.total} personas · {teamStats.online} activas ahora · {teamStats.avgProgress}% progreso medio
+                {teamStats.total} usuarios · {teamStats.online} activos ahora · {teamStats.avgProgress}% progreso medio
               </p>
             </div>
             <button
               onClick={() => setShowModal(true)}
               className="flex items-center gap-2 bg-[#4f6ef7] text-white rounded-xl px-4 py-2.5 text-sm font-semibold shadow-[0_4px_12px_rgba(79,110,247,0.30)] hover:bg-[#3d5ae0] transition-all"
             >
-              <Plus size={15} /> Añadir persona
+              <Plus size={15} /> Añadir usuario
             </button>
           </div>
 

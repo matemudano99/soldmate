@@ -42,7 +42,8 @@ public class SchemaMigrationRunner implements ApplicationRunner {
             new MigrationStep("002", "Add performance indexes for core ERP queries", this::addPerformanceIndexes),
             new MigrationStep("003", "Add data integrity constraints for core tables", this::addDataIntegrityConstraints),
             new MigrationStep("004", "Create planning and analytics tables", this::createPlanningTables),
-            new MigrationStep("005", "Add profile and business metadata columns", this::addBusinessMetadataColumns)
+            new MigrationStep("005", "Add profile and business metadata columns", this::addBusinessMetadataColumns),
+            new MigrationStep("006", "Add suppliers type segmentation", this::addSupplierTypeColumn)
         );
 
         for (MigrationStep step : steps) {
@@ -193,6 +194,11 @@ public class SchemaMigrationRunner implements ApplicationRunner {
         jdbcTemplate.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION");
         jdbcTemplate.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION");
         jdbcTemplate.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS opening_hours_json TEXT");
+    }
+
+    private void addSupplierTypeColumn() {
+        jdbcTemplate.execute("ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS supplier_type VARCHAR(32) DEFAULT 'SUPPLIER'");
+        jdbcTemplate.execute("UPDATE suppliers SET supplier_type='SUPPLIER' WHERE supplier_type IS NULL");
     }
 
     private void addConstraintIfMissing(String constraintName, String addConstraintSql) {

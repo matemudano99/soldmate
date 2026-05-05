@@ -48,13 +48,14 @@ public class SupplierController {
         String contactPhone,
         String contactPerson,
         String category,
-        String notes
+        String notes,
+        String type
     ) {
         public static SupplierResponse from(Supplier s) {
             return new SupplierResponse(
                 s.getId(), s.getName(), s.getContactEmail(),
                 s.getContactPhone(), s.getContactPerson(),
-                s.getCategory(), s.getNotes()
+                s.getCategory(), s.getNotes(), s.getSupplierType().name()
             );
         }
     }
@@ -66,7 +67,8 @@ public class SupplierController {
         String contactPhone,
         String contactPerson,
         String category,
-        String notes
+        String notes,
+        Supplier.SupplierType type
     ) {}
 
     // ─── Endpoints ───────────────────────────────────────────────────────────
@@ -75,13 +77,21 @@ public class SupplierController {
     @GetMapping
     public ResponseEntity<List<SupplierResponse>> getSuppliers(
         @RequestHeader("Authorization") String authHeader,
-        @RequestParam(required = false) String category
+        @RequestParam(required = false) String category,
+        @RequestParam(required = false) Supplier.SupplierType type
     ) {
         Long companyId = extractCompanyId(authHeader);
 
-        List<Supplier> suppliers = category != null && !category.isBlank()
-            ? supplierRepository.findByCompanyIdAndCategoryAndActiveTrue(companyId, category)
-            : supplierRepository.findByCompanyIdAndActiveTrue(companyId);
+        List<Supplier> suppliers;
+        if (category != null && !category.isBlank() && type != null) {
+            suppliers = supplierRepository.findByCompanyIdAndCategoryAndSupplierTypeAndActiveTrue(companyId, category, type);
+        } else if (category != null && !category.isBlank()) {
+            suppliers = supplierRepository.findByCompanyIdAndCategoryAndActiveTrue(companyId, category);
+        } else if (type != null) {
+            suppliers = supplierRepository.findByCompanyIdAndSupplierTypeAndActiveTrue(companyId, type);
+        } else {
+            suppliers = supplierRepository.findByCompanyIdAndActiveTrue(companyId);
+        }
 
         return ResponseEntity.ok(
             suppliers.stream().map(SupplierResponse::from).toList()
@@ -121,6 +131,7 @@ public class SupplierController {
         supplier.setContactPerson(blankToNull(req.contactPerson()));
         supplier.setCategory(blankToNull(req.category()));
         supplier.setNotes(blankToNull(req.notes()));
+        supplier.setSupplierType(req.type() != null ? req.type() : Supplier.SupplierType.SUPPLIER);
         supplier.setCompany(company);
 
         supplierRepository.save(supplier);
@@ -150,6 +161,7 @@ public class SupplierController {
         supplier.setContactPerson(blankToNull(req.contactPerson()));
         supplier.setCategory(blankToNull(req.category()));
         supplier.setNotes(blankToNull(req.notes()));
+        supplier.setSupplierType(req.type() != null ? req.type() : supplier.getSupplierType());
 
         supplierRepository.save(supplier);
 

@@ -11,7 +11,9 @@ import java.util.Optional;
 public interface SupplierRepository extends JpaRepository<Supplier, Long> {
 
     List<Supplier>     findByCompanyIdAndActiveTrue(Long companyId);
+    List<Supplier>     findByCompanyIdAndSupplierTypeAndActiveTrue(Long companyId, Supplier.SupplierType supplierType);
     List<Supplier>     findByCompanyIdAndCategoryAndActiveTrue(Long companyId, String category);
+    List<Supplier>     findByCompanyIdAndCategoryAndSupplierTypeAndActiveTrue(Long companyId, String category, Supplier.SupplierType supplierType);
     Optional<Supplier> findByIdAndCompanyId(Long id, Long companyId);
     Optional<Supplier> findByCompanyIdAndNameIgnoreCase(Long companyId, String name);
 }

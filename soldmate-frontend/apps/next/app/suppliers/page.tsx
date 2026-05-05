@@ -16,6 +16,7 @@ export default function SuppliersPage() {
   const [authReady, setAuthReady] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<SupplierResponse | null>(null);
+  const [section, setSection] = useState<"suppliers" | "contacts">("suppliers");
 
   useEffect(() => {
     if (useAuthStore.persist.hasHydrated()) {
@@ -26,8 +27,13 @@ export default function SuppliersPage() {
   }, []);
 
   const query = useQuery({
-    queryKey: ["suppliers", token],
-    queryFn: () => suppliersApi.getAll(token!),
+    queryKey: ["suppliers", token, section],
+    queryFn: () => suppliersApi.getAll(token!, undefined, section === "suppliers" ? "SUPPLIER" : "CONTACT"),
+    enabled: authReady && !!token,
+  });
+  const contactsQuery = useQuery({
+    queryKey: ["supplier-contacts", token],
+    queryFn: () => suppliersApi.getAll(token!, undefined, "CONTACT"),
     enabled: authReady && !!token,
   });
 
@@ -52,13 +58,32 @@ export default function SuppliersPage() {
   };
 
   const suppliers = query.data ?? [];
+  const contactOptions = (contactsQuery.data ?? []).map((c) => c.name).filter(Boolean);
 
   return (
     <div className="flex min-h-screen bg-[#eef1f8]">
       <WebErpNavbar />
       <main className="flex-1 p-6 overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
-          <h1 className="text-2xl font-bold text-[#1e2040]">Proveedores</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-[#1e2040]">Proveedores</h1>
+            <div className="mt-2 inline-flex rounded-xl border border-gray-200 bg-white p-1">
+              <button
+                type="button"
+                onClick={() => setSection("suppliers")}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg ${section === "suppliers" ? "bg-[#4f6ef7] text-white" : "text-gray-500"}`}
+              >
+                Proveedores
+              </button>
+              <button
+                type="button"
+                onClick={() => setSection("contacts")}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg ${section === "contacts" ? "bg-[#4f6ef7] text-white" : "text-gray-500"}`}
+              >
+                Contactos
+              </button>
+            </div>
+          </div>
           {isOwner ? (
             <button
               type="button"
@@ -66,7 +91,7 @@ export default function SuppliersPage() {
               className="inline-flex items-center gap-2 rounded-xl bg-[#4f6ef7] text-white px-4 py-2.5 text-sm font-semibold hover:bg-[#3d5ae0]"
             >
               <Plus size={14} />
-              Nuevo proveedor
+              {section === "suppliers" ? "Nuevo proveedor" : "Nuevo contacto"}
             </button>
           ) : null}
         </div>
@@ -143,6 +168,12 @@ export default function SuppliersPage() {
                   {s.contactPerson ? (
                     <p className="text-xs text-gray-500 mb-2">{s.contactPerson}</p>
                   ) : null}
+                  <p className="text-xs text-gray-500 mb-2">
+                    {s.notes?.trim() ||
+                      (section === "contacts"
+                        ? "Contacto asociado al proveedor para coordinación operativa."
+                        : "Proveedor de suministros para la operación del negocio.")}
+                  </p>
                   <div className="space-y-1.5 mt-auto">
                     {s.contactPhone ? (
                       <div className="flex items-center gap-2">
@@ -168,7 +199,12 @@ export default function SuppliersPage() {
             onClose={closeModal}
             authToken={token}
             initial={editing}
-            onSuccess={() => qc.invalidateQueries({ queryKey: ["suppliers"] })}
+            onSuccess={() => {
+              qc.invalidateQueries({ queryKey: ["suppliers"] });
+              qc.invalidateQueries({ queryKey: ["supplier-contacts"] });
+            }}
+            mode={section === "suppliers" ? "SUPPLIER" : "CONTACT"}
+            contactOptions={section === "suppliers" ? contactOptions : []}
           />
         ) : null}
       </main>

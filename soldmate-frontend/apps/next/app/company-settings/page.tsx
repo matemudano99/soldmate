@@ -59,6 +59,11 @@ export default function CompanySettingsPage() {
     longitude: -3.7038,
     openingHours: DEFAULT_OPENING_HOURS,
   });
+  const roleLabel =
+    role === "OWNER" ? "Owner" :
+    role === "MANAGER" ? "Manager" :
+    role === "EMPLOYEE" || role === "STAFF" ? "Employee" :
+    "Usuario";
 
   useEffect(() => {
     setFirstName(firstNameFromStore ?? "");
@@ -208,7 +213,7 @@ export default function CompanySettingsPage() {
                 </div>
                 <div className="rounded-xl border border-gray-100 bg-[#f8f9fc] p-4">
                   <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1">Rol</p>
-                  <p className="text-[#1e2040] font-semibold text-sm">{role === "OWNER" ? "Owner" : "Staff"}</p>
+                  <p className="text-[#1e2040] font-semibold text-sm">{roleLabel}</p>
                 </div>
               </div>
 

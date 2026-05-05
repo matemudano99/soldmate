@@ -15,7 +15,7 @@ import java.util.Date;
  * En el payload guardamos claims (datos del usuario):
  *   sub       → email del usuario
  *   companyId → empresa a la que pertenece
- *   role      → OWNER o STAFF
+ *   role      → OWNER, MANAGER o EMPLOYEE
  *   tier      → FREE o PREMIUM
  */
 @Component

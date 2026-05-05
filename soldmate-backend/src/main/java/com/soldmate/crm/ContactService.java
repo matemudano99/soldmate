@@ -1,11 +1,15 @@
 package com.soldmate.crm;
 
+import com.soldmate.auth.User;
+import com.soldmate.auth.UserRepository;
 import com.soldmate.company.Company;
 import com.soldmate.company.CompanyRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @Transactional
@@ -13,11 +17,17 @@ public class ContactService {
 
     private final ContactRepository contactRepository;
     private final CompanyRepository companyRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public ContactService(ContactRepository contactRepository,
-                          CompanyRepository companyRepository) {
+                          CompanyRepository companyRepository,
+                          UserRepository userRepository,
+                          PasswordEncoder passwordEncoder) {
         this.contactRepository = contactRepository;
         this.companyRepository = companyRepository;
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     // ─── Lectura ─────────────────────────────────────────────────────────────
@@ -40,6 +50,7 @@ public class ContactService {
         Contact contact = new Contact();
         contact.setCompany(company);
         applyRequest(contact, req);
+        maybeCreateUserForContact(company, req);
 
         return contactRepository.save(contact);
     }
@@ -100,4 +111,35 @@ public class ContactService {
         Double rating,
         String projects
     ) {}
+
+    private void maybeCreateUserForContact(Company company, ContactRequest req) {
+        if (req.email() == null || req.email().isBlank()) return;
+
+        String email = req.email().toLowerCase().trim();
+        if (userRepository.existsByEmail(email)) return;
+
+        String[] nameParts = req.fullName() != null ? req.fullName().trim().split("\\s+", 2) : new String[0];
+        String firstName = nameParts.length > 0 ? nameParts[0] : "Empleado";
+        String lastName = nameParts.length > 1 ? nameParts[1] : "";
+
+        User user = new User();
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode("ChangeMe!" + UUID.randomUUID().toString().substring(0, 8)));
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        user.setCompany(company);
+        user.setRole(resolveRole(req.role()));
+        userRepository.save(user);
+    }
+
+    private User.Role resolveRole(String rawRole) {
+        if (rawRole == null || rawRole.isBlank()) return User.Role.EMPLOYEE;
+        String normalized = rawRole.trim().toUpperCase();
+        return switch (normalized) {
+            case "OWNER" -> User.Role.OWNER;
+            case "MANAGER", "ENCARGADO" -> User.Role.MANAGER;
+            case "EMPLOYEE", "STAFF", "EMPLEADO" -> User.Role.EMPLOYEE;
+            default -> User.Role.EMPLOYEE;
+        };
+    }
 }
