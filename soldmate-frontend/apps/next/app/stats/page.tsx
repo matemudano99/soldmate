@@ -6,7 +6,7 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
 import { Users, ShoppingCart, Star, Activity } from "lucide-react";
-import { WebErpNavbar } from "../shared/ui";
+import { AppTopHeader, WebErpNavbar } from "../shared/ui";
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
@@ -85,7 +85,9 @@ export default function StatsPage() {
     <div className="flex min-h-screen bg-[#eef1f8] text-[#1e2040]">
       <WebErpNavbar />
 
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="flex-1 overflow-y-auto pb-6">
+        <AppTopHeader />
+        <div className="px-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>

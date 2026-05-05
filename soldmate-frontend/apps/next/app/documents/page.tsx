@@ -5,7 +5,7 @@ import {
   FileText, FileSpreadsheet, Image, File, Upload,
   Search, Download, Eye, MoreVertical, ChevronRight,
 } from "lucide-react";
-import { UploadDocumentModal, WebErpNavbar } from "../shared/ui";
+import { AppTopHeader, UploadDocumentModal, WebErpNavbar } from "../shared/ui";
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
@@ -69,7 +69,9 @@ export default function DocumentsPage() {
     <div className="flex min-h-screen bg-[#eef1f8] text-[#1e2040]">
       <WebErpNavbar />
 
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="flex-1 overflow-y-auto pb-6">
+        <AppTopHeader />
+        <div className="px-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>

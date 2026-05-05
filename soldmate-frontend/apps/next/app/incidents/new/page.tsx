@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { WebErpNavbar } from "../../components/web-erp-navbar";
 import { CreateIncidentModal } from "../../components/create-modals";
+import { AppTopHeader } from "../../shared/ui";
 import { useAuthStore } from "app/lib/store";
 
 export default function NewIncidentPage() {
@@ -29,12 +30,15 @@ export default function NewIncidentPage() {
   return (
     <div className="flex min-h-screen bg-[#eef1f8]">
       <WebErpNavbar />
-      <main className="flex-1 p-6 overflow-y-auto">
+      <main className="flex-1 pb-6 overflow-y-auto">
+        <AppTopHeader />
+        <div className="px-6">
         <h1 className="text-2xl font-bold text-[#1e2040] mb-2">Nueva incidencia</h1>
         <p className="text-sm text-gray-500 mb-5 max-w-lg">
           Completa el formulario. Si eliges una imagen, el backend la sube al bucket <code className="text-xs bg-gray-100 px-1 rounded">incidents</code> en
           Supabase y guarda la URL pública en la incidencia.
         </p>
+        </div>
       </main>
       {authReady && token ? (
         <CreateIncidentModal

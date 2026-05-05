@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Mail, Phone, Tag, Plus, Pencil, Trash2 } from "lucide-react";
-import { CreateSupplierModal, WebErpNavbar } from "../shared/ui";
+import { AppTopHeader, CreateSupplierModal, WebErpNavbar } from "../shared/ui";
 import { suppliersApi, type SupplierResponse } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
@@ -62,7 +62,9 @@ export default function SuppliersPage() {
   return (
     <div className="flex min-h-screen bg-[#eef1f8]">
       <WebErpNavbar />
-      <main className="flex-1 p-6 overflow-y-auto">
+      <main className="flex-1 pb-6 overflow-y-auto">
+        <AppTopHeader />
+        <div className="px-6">
         <div className="flex items-center justify-between mb-5">
           <div>
             <h1 className="text-2xl font-bold text-[#1e2040]">Proveedores</h1>
@@ -206,6 +208,7 @@ export default function SuppliersPage() {
             contactOptions={section === "suppliers" ? contactOptions : []}
           />
         ) : null}
+        </div>
       </main>
     </div>
   );

@@ -3,6 +3,7 @@
 import React from "react";
 import { SectionCard } from "../components/web-ui";
 import { WebErpNavbar } from "../components/web-erp-navbar";
+import { AppTopHeader } from "../shared/ui";
 import { AlertTriangle, Clock, CheckCircle, LifeBuoy, Mail, Phone } from "lucide-react";
 import { alertsApi, describeNetworkError, type AlertResponse } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
@@ -38,7 +39,9 @@ export default function AlertsPage() {
   return (
     <div className="flex min-h-screen bg-[#eef1f8]">
       <WebErpNavbar />
-      <main className="flex-1 p-6 overflow-y-auto">
+      <main className="flex-1 pb-6 overflow-y-auto">
+        <AppTopHeader />
+        <div className="px-6">
         <h1 className="text-2xl font-bold text-[#1e2040] mb-5">Support</h1>
         <div className="max-w-4xl grid gap-4 lg:grid-cols-[1.5fr_1fr]">
           <SectionCard title="Alertas recientes" subtitle="Estado operativo">
@@ -86,6 +89,7 @@ export default function AlertsPage() {
               </div>
             </div>
           </SectionCard>
+        </div>
         </div>
       </main>
     </div>

@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Package, ChevronLeft, AlertTriangle, Minus, Plus, Trash2, Save, X } from "lucide-react";
-import { WebErpNavbar } from "../shared/ui";
+import { AppTopHeader, WebErpNavbar } from "../shared/ui";
 import { inventoryApi, type ProductResponse } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
@@ -83,7 +83,9 @@ export default function InventoryPage() {
   return (
     <div className="flex min-h-screen bg-[#eef1f8] text-[#1e2040]">
       <WebErpNavbar />
-      <main className="flex-1 p-6 overflow-y-auto">
+      <main className="flex-1 pb-6 overflow-y-auto">
+        <AppTopHeader />
+        <div className="px-6">
         <div className="flex items-center gap-3 mb-2">
           <Link
             href="/dashboard"
@@ -195,6 +197,7 @@ export default function InventoryPage() {
             )}
           </div>
         )}
+        </div>
       </main>
     </div>
   );

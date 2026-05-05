@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, CreditCard, BarChart2,
-  FileText, Calendar, Power, ChevronDown,
+  FileText, Calendar, Power, ChevronDown, PanelLeftClose, PanelLeftOpen, X,
   Sparkles, Wrench, Truck, Package, Activity,
 } from "lucide-react";
 import { useAuthStore } from "app/lib/store";
@@ -25,6 +25,8 @@ const NAV_MAIN = [
 ] as const;
 
 export function WebErpNavbar() {
+  const [collapsed, setCollapsed] = React.useState(false);
+  const [mobileOpen, setMobileOpen] = React.useState(false);
   const pathname = usePathname() ?? "/";
   const router = useRouter();
   const logout = useAuthStore((s) => s.logout);
@@ -51,26 +53,71 @@ export function WebErpNavbar() {
     return pathname === href || pathname.startsWith(href + "/");
   }
 
+  const collapseLabel = collapsed ? "Expandir menu" : "Colapsar menu";
+
   return (
-    <aside className="sticky top-0 w-[220px] flex-shrink-0 bg-white h-screen flex flex-col border-r border-gray-100 shadow-[2px_0_20px_rgba(149,157,165,0.06)]">
+    <>
+      {mobileOpen ? (
+        <button
+          type="button"
+          aria-label="Cerrar menu"
+          onClick={() => setMobileOpen(false)}
+          className="md:hidden fixed inset-0 z-40 bg-black/30"
+        />
+      ) : null}
+
+      <button
+        type="button"
+        onClick={() => setMobileOpen((v) => !v)}
+        className="md:hidden fixed top-4 left-4 z-50 inline-flex items-center justify-center w-11 h-11 rounded-xl border border-gray-200 bg-white text-[#1e2040] shadow-[0_8px_24px_rgba(15,23,42,0.14)]"
+        title={mobileOpen ? "Cerrar menu" : "Abrir menu"}
+      >
+        {mobileOpen ? <X size={18} /> : <PanelLeftOpen size={18} />}
+      </button>
+
+      <div className={`hidden md:block flex-shrink-0 transition-all ${collapsed ? "w-[76px]" : "w-[220px]"}`} />
+
+      <aside
+        className={`fixed md:sticky top-0 left-0 z-50 md:z-20 h-screen bg-white flex flex-col border-r border-gray-100 shadow-[2px_0_20px_rgba(149,157,165,0.10)] transition-all duration-200 ${
+          collapsed ? "w-[76px]" : "w-[220px]"
+        } ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+      >
       {/* Logo */}
-      <Link href="/dashboard" className="px-5 pt-6 pb-5 flex items-center gap-2 hover:opacity-90 transition-opacity">
-        <div className="w-9 h-9 bg-[#4f6ef7] rounded-xl flex items-center justify-center shadow-[0_4px_12px_rgba(79,110,247,0.35)]">
-          <Sparkles size={17} color="white" />
+      <div className={`px-4 pt-5 pb-4 flex items-center ${collapsed ? "justify-center" : "gap-2"}`}>
+        <Link href="/dashboard" className={`flex items-center hover:opacity-90 transition-opacity ${collapsed ? "justify-center" : "gap-2 flex-1"}`}>
+          <div className="w-9 h-9 bg-[#4f6ef7] rounded-xl flex items-center justify-center shadow-[0_4px_12px_rgba(79,110,247,0.35)]">
+            <Sparkles size={17} color="white" />
+          </div>
+          {!collapsed ? (
+            <span className="font-bold text-[#1e2040] text-base tracking-tight">Soldmate</span>
+          ) : null}
+        </Link>
+        <button
+          type="button"
+          onClick={() => setCollapsed((v) => !v)}
+          title={collapseLabel}
+          className={`hidden md:inline-flex w-8 h-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 ${collapsed ? "ml-0" : "ml-auto"}`}
+        >
+          {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+        </button>
+      </div>
+
+      {!collapsed ? (
+        <div className="px-4 pb-2">
+          <div className="h-px bg-gray-100" />
         </div>
-        <span className="font-bold text-[#1e2040] text-base tracking-tight">Soldmate</span>
-        <ChevronDown size={12} className="text-gray-300 ml-auto" />
-      </Link>
+      ) : null}
 
       {/* Nav */}
-      <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto pt-2">
         {NAV_MAIN.map(({ href, label, Icon }) => {
           const active = isActive(href);
           return (
             <Link
               key={href}
               href={href}
-              className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
+              onClick={() => setMobileOpen(false)}
+              className={`relative flex items-center ${collapsed ? "justify-center" : "gap-3"} px-3 py-2.5 rounded-xl transition-colors ${
                 active
                   ? "bg-[#f0f3ff] text-[#4f6ef7]"
                   : "text-[#9095a0] hover:bg-gray-50 hover:text-gray-600"
@@ -80,7 +127,7 @@ export function WebErpNavbar() {
                 <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-[#4f6ef7] rounded-r-full" />
               )}
               <Icon size={16} strokeWidth={active ? 2.2 : 1.8} />
-              <span className="text-sm font-medium">{label}</span>
+              {!collapsed ? <span className="text-sm font-medium">{label}</span> : null}
             </Link>
           );
         })}
@@ -88,9 +135,9 @@ export function WebErpNavbar() {
 
       {/* Bottom */}
       <div className="px-3 pb-5 pt-3 border-t border-gray-50 space-y-0.5">
-        <HelpCenterPopover />
+        {!collapsed ? <HelpCenterPopover /> : null}
 
-        <div className="pt-3 flex items-center gap-2 px-3">
+        <div className={`pt-3 flex items-center px-3 ${collapsed ? "justify-center" : "gap-2"}`}>
           <button
             onClick={handleLogout}
             title="Cerrar sesión"
@@ -98,14 +145,15 @@ export function WebErpNavbar() {
           >
             <Power size={14} />
           </button>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-[#1e2040] truncate">{displayName}</p>
-            <p className="text-[10px] text-gray-400">
-              {roleLabel}
-            </p>
-          </div>
+          {!collapsed ? (
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-[#1e2040] truncate">{displayName}</p>
+              <p className="text-[10px] text-gray-400">{roleLabel}</p>
+            </div>
+          ) : null}
         </div>
       </div>
     </aside>
+    </>
   );
 }

@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Activity, ChevronLeft, Wrench, Circle, Clock, CheckCircle2 } from "lucide-react";
-import { WebErpNavbar } from "../shared/ui";
+import { AppTopHeader, WebErpNavbar } from "../shared/ui";
 import { activityApi, type ActivityItemResponse } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
@@ -46,7 +46,9 @@ export default function ActivityPage() {
   return (
     <div className="flex min-h-screen bg-[#eef1f8] text-[#1e2040]">
       <WebErpNavbar />
-      <main className="flex-1 p-6 overflow-y-auto max-w-3xl">
+      <main className="flex-1 pb-6 overflow-y-auto max-w-3xl">
+        <AppTopHeader />
+        <div className="px-6">
         <div className="flex items-center gap-3 mb-2">
           <Link
             href="/dashboard"
@@ -141,6 +143,7 @@ export default function ActivityPage() {
             )}
           </div>
         )}
+        </div>
       </main>
     </div>
   );

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, ImageIcon, ExternalLink, Pencil, Trash2 } from "lucide-react";
 import { SectionCard } from "../components/web-ui";
-import { CreateIncidentModal, WebErpNavbar } from "../shared/ui";
+import { AppTopHeader, CreateIncidentModal, WebErpNavbar } from "../shared/ui";
 import { incidentsApi, type IncidentResponse, type IncidentStatus } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
@@ -79,7 +79,9 @@ export default function IncidentsPage() {
   return (
     <div className="flex min-h-screen bg-[#eef1f8]">
       <WebErpNavbar />
-      <main className="flex-1 p-6 overflow-y-auto">
+      <main className="flex-1 pb-6 overflow-y-auto">
+        <AppTopHeader />
+        <div className="px-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
           <h1 className="text-2xl font-bold text-[#1e2040]">Incidencias</h1>
           <Link
@@ -213,6 +215,7 @@ export default function IncidentsPage() {
             onSuccess={() => qc.invalidateQueries({ queryKey: ["incidents"] })}
           />
         ) : null}
+        </div>
       </main>
     </div>
   );

@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Plus, CloudRain, Wind, Thermometer, Loader2, Pencil, Trash2 } from "lucide-react";
 import { SectionCard } from "../components/web-ui";
-import { CreateCalendarTaskModal, WebErpNavbar } from "../shared/ui";
+import { AppTopHeader, CreateCalendarTaskModal, WebErpNavbar } from "../shared/ui";
 import { businessProfileApi, calendarApi, forecastApi, type CalendarEventResponse, type ForecastImpactDay } from "app/lib/api";
 import { describeNetworkError } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
@@ -166,7 +166,9 @@ export default function CalendarPage() {
   return (
     <div className="flex min-h-screen bg-[#eef1f8]">
       <WebErpNavbar />
-      <main className="flex-1 p-6 overflow-y-auto">
+      <main className="flex-1 pb-6 overflow-y-auto">
+        <AppTopHeader />
+        <div className="px-6">
         <div className="flex items-center justify-between mb-5">
           <h1 className="text-2xl font-bold text-[#1e2040]">Calendario</h1>
           <button onClick={() => setShowCreate(true)} className="inline-flex items-center gap-2 rounded-xl bg-[#4f6ef7] text-white px-4 py-2.5 text-sm font-semibold hover:bg-[#3d5ae0]">
@@ -349,6 +351,7 @@ export default function CalendarPage() {
             onCreate={handleSubmitEdit}
           />
         )}
+        </div>
       </main>
     </div>
   );
