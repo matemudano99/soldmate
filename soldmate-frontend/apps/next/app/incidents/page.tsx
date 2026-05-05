@@ -10,12 +10,6 @@ import { CreateIncidentModal } from "../components/create-modals";
 import { incidentsApi, type IncidentResponse, type IncidentStatus } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
-function statusLabel(s: IncidentResponse["status"]) {
-  if (s === "OPEN") return "Abierta";
-  if (s === "IN_PROGRESS") return "En curso";
-  return "Cerrada";
-}
-
 function priorityClass(p: IncidentResponse["priority"]) {
   if (p === "CRITICAL") return "bg-red-50 text-red-500";
   if (p === "HIGH") return "bg-orange-50 text-orange-500";
@@ -31,6 +25,12 @@ function priorityLabel(p: IncidentResponse["priority"]) {
     CRITICAL: "Crítica",
   };
   return map[p];
+}
+
+function statusSelectClass(s: IncidentResponse["status"]) {
+  if (s === "CLOSED") return "bg-green-50 text-green-600 border-green-100";
+  if (s === "IN_PROGRESS") return "bg-violet-50 text-violet-500 border-violet-100";
+  return "bg-gray-100 text-gray-500 border-gray-200";
 }
 
 const STATUS_FILTERS: { value: "ALL" | IncidentStatus; label: string }[] = [
@@ -157,23 +157,12 @@ export default function IncidentsPage() {
                           statusMut.mutate({ id: r.id, status: e.target.value as IncidentStatus })
                         }
                         disabled={statusMut.isPending}
-                        className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] font-medium text-[#1e2040] outline-none focus:border-[#4f6ef7] disabled:opacity-50"
+                        className={`rounded-full border px-2.5 py-1 text-xs font-semibold outline-none focus:border-[#4f6ef7] disabled:opacity-50 ${statusSelectClass(r.status)}`}
                       >
                         <option value="OPEN">Abierta</option>
                         <option value="IN_PROGRESS">En curso</option>
                         <option value="CLOSED">Cerrada</option>
                       </select>
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                          r.status === "CLOSED"
-                            ? "bg-green-50 text-green-600"
-                            : r.status === "IN_PROGRESS"
-                              ? "bg-violet-50 text-violet-500"
-                              : "bg-gray-100 text-gray-500"
-                        }`}
-                      >
-                        {statusLabel(r.status)}
-                      </span>
                       {r.photoUrl ? (
                         <a
                           href={r.photoUrl}
@@ -189,10 +178,10 @@ export default function IncidentsPage() {
                       <button
                         type="button"
                         onClick={() => setEditing(r)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] font-semibold text-gray-600 hover:bg-gray-50"
+                        title="Editar"
+                        className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white p-1.5 text-gray-600 hover:bg-gray-50"
                       >
                         <Pencil size={12} />
-                        Editar
                       </button>
                       {isOwner ? (
                         <button
@@ -202,10 +191,10 @@ export default function IncidentsPage() {
                             removeMut.mutate(r.id);
                           }}
                           disabled={removeMut.isPending}
-                          className="inline-flex items-center gap-1 rounded-lg border border-red-100 bg-red-50/80 px-2 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50"
+                          title="Eliminar"
+                          className="inline-flex items-center justify-center rounded-lg border border-red-100 bg-red-50/80 p-1.5 text-red-600 hover:bg-red-100 disabled:opacity-50"
                         >
                           <Trash2 size={12} />
-                          Eliminar
                         </button>
                       ) : null}
                     </div>
