@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Plus, CloudRain, Wind, Thermometer, Loader2 } from "lucide-react";
+import { Plus, CloudRain, Wind, Thermometer, Loader2, Pencil, Trash2 } from "lucide-react";
 import { SectionCard } from "../components/web-ui";
 import { CreateCalendarTaskModal, WebErpNavbar } from "../shared/ui";
 import { businessProfileApi, calendarApi, forecastApi, type CalendarEventResponse, type ForecastImpactDay } from "app/lib/api";
@@ -10,6 +10,15 @@ import { useAuthStore } from "app/lib/store";
 import { getRecommendedLowLoadDays } from "app/lib/weather";
 
 const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+const DAY_STYLES = [
+  { header: "text-blue-600", shell: "bg-blue-50 border-blue-200", task: "border-blue-200 text-blue-700" },
+  { header: "text-violet-600", shell: "bg-violet-50 border-violet-200", task: "border-violet-200 text-violet-700" },
+  { header: "text-emerald-600", shell: "bg-emerald-50 border-emerald-200", task: "border-emerald-200 text-emerald-700" },
+  { header: "text-amber-600", shell: "bg-amber-50 border-amber-200", task: "border-amber-200 text-amber-700" },
+  { header: "text-pink-600", shell: "bg-pink-50 border-pink-200", task: "border-pink-200 text-pink-700" },
+  { header: "text-cyan-600", shell: "bg-cyan-50 border-cyan-200", task: "border-cyan-200 text-cyan-700" },
+  { header: "text-indigo-600", shell: "bg-indigo-50 border-indigo-200", task: "border-indigo-200 text-indigo-700" },
+] as const;
 const EVENTS = [
   { day: "Mon", title: "Reunión equipo", time: "09:00", color: "bg-blue-50 border-blue-200 text-blue-700" },
   { day: "Wed", title: "Entrega informe", time: "12:00", color: "bg-violet-50 border-violet-200 text-violet-700" },
@@ -18,10 +27,24 @@ const EVENTS = [
 ];
 
 const CITY = { label: "negocio" };
+const RAIN_ALERT_MM = 1.0;
+const STRONG_WIND_KMH = 35;
 
 function formatTimelineDate(date: string): string {
   const d = new Date(`${date}T00:00:00`);
   return d.toLocaleDateString("es-ES", { weekday: "long", day: "2-digit", month: "2-digit" });
+}
+
+function isAdverseWeather(day: ForecastImpactDay): boolean {
+  return day.rain >= RAIN_ALERT_MM || day.wind >= STRONG_WIND_KMH;
+}
+
+function lowerSalesReason(day: ForecastImpactDay): string {
+  const reasons: string[] = [];
+  if (day.rain >= RAIN_ALERT_MM) reasons.push("lluvia prevista");
+  if (day.wind >= STRONG_WIND_KMH) reasons.push("viento intenso");
+  if (!reasons.length) return "Menor afluencia esperada por condiciones generales del día.";
+  return `Menor volumen de ventas esperado por ${reasons.join(" y ")}.`;
 }
 
 export default function CalendarPage() {
@@ -33,6 +56,7 @@ export default function CalendarPage() {
   const [loadingForecast, setLoadingForecast] = useState(true);
   const [forecastError, setForecastError] = useState<string | null>(null);
   const [eventsError, setEventsError] = useState<string | null>(null);
+  const [taskActionError, setTaskActionError] = useState<string | null>(null);
 
   const weekDates = useMemo(() => {
     const now = new Date();
@@ -48,11 +72,12 @@ export default function CalendarPage() {
   }, []);
 
   useEffect(() => {
-    if (!token) return;
+    const authToken = token;
+    if (!authToken) return;
     async function load() {
       try {
         setEventsError(null);
-        const loaded = await calendarApi.getAll(token, weekDates[0].iso, weekDates[6].iso);
+        const loaded = await calendarApi.getAll(authToken!, weekDates[0].iso, weekDates[6].iso);
         setEvents(loaded);
       } catch (error) {
         setEventsError(describeNetworkError(error));
@@ -71,9 +96,9 @@ export default function CalendarPage() {
       try {
         setLoadingForecast(true);
         setForecastError(null);
-        const business = await businessProfileApi.get(token);
+        const business = await businessProfileApi.get(authToken!);
         setBusinessCity(business.city || business.businessName || CITY.label);
-        const weather = await forecastApi.getImpact(token);
+        const weather = await forecastApi.getImpact(authToken!);
         setForecast(weather);
       } catch (error) {
         setForecastError(describeNetworkError(error));
@@ -90,12 +115,67 @@ export default function CalendarPage() {
   );
 
   const eventsByDate = useMemo(() => {
-    const map = new Map<string, CalendarEventResponse>();
+    const map = new Map<string, CalendarEventResponse[]>();
     for (const e of events) {
-      if (!map.has(e.eventDate)) map.set(e.eventDate, e);
+      const current = map.get(e.eventDate) ?? [];
+      current.push(e);
+      map.set(e.eventDate, current);
+    }
+    for (const [key, list] of map.entries()) {
+      list.sort((a, b) => (a.eventTime ?? "").localeCompare(b.eventTime ?? ""));
+      map.set(key, list);
     }
     return map;
   }, [events]);
+
+  async function handleDeleteTask(task: CalendarEventResponse) {
+    if (!confirm(`¿Eliminar la tarea "${task.title}"?`)) return;
+    setTaskActionError(null);
+    const prev = events;
+    setEvents((current) => current.filter((e) => e.id !== task.id));
+    if (!token) return;
+    try {
+      await calendarApi.remove(token, task.id);
+    } catch (error) {
+      setEvents(prev);
+      setTaskActionError(describeNetworkError(error));
+    }
+  }
+
+  async function handleEditTask(task: CalendarEventResponse) {
+    const nextTitle = window.prompt("Nuevo título", task.title)?.trim();
+    if (!nextTitle) return;
+    const currentTime = (task.eventTime ?? "09:00").slice(0, 5);
+    const nextTime = window.prompt("Nueva hora (HH:MM)", currentTime)?.trim();
+    if (!nextTime) return;
+    if (!/^\d{2}:\d{2}$/.test(nextTime)) {
+      setTaskActionError("Formato de hora inválido. Usa HH:MM (ej: 09:30).");
+      return;
+    }
+
+    setTaskActionError(null);
+    setEvents((current) =>
+      current.map((e) =>
+        e.id === task.id
+          ? { ...e, title: nextTitle, eventTime: `${nextTime}:00` }
+          : e,
+      ),
+    );
+
+    if (!token) {
+      setTaskActionError("Cambio guardado localmente. Inicia sesión para sincronizarlo.");
+      return;
+    }
+    try {
+      await calendarApi.update(token, task.id, {
+        title: nextTitle,
+        eventDate: task.eventDate,
+        eventTime: nextTime,
+      });
+    } catch (error) {
+      setTaskActionError(`${describeNetworkError(error)} · Cambio guardado localmente.`);
+    }
+  }
 
   return (
     <div className="flex min-h-screen bg-[#eef1f8]">
@@ -111,27 +191,51 @@ export default function CalendarPage() {
         <SectionCard title="Esta semana" subtitle="Mock data · frontend-first">
           <div className="grid grid-cols-7 gap-2">
             {weekDates.map((d) => {
-              const event = eventsByDate.get(d.iso);
+              const dayEvents = eventsByDate.get(d.iso) ?? [];
+              const style = DAY_STYLES[DAYS.indexOf(d.label)] ?? DAY_STYLES[0];
               return (
                 <div key={d.iso} className="flex flex-col gap-1.5">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider text-center">{d.label}</p>
-                  <div
-                    className={`rounded-xl p-2.5 min-h-[80px] border ${
-                      event ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-gray-50 border-gray-100"
-                    }`}
-                  >
-                    {event && (
-                      <>
-                        <p className="text-[9px] opacity-70">{(event.eventTime ?? "").slice(0, 5)}</p>
-                        <p className="text-[10px] font-semibold mt-1 leading-tight">{event.title}</p>
-                      </>
-                    )}
+                  <p className={`text-[10px] font-semibold uppercase tracking-wider text-center ${style.header}`}>{d.label}</p>
+                  <div className={`rounded-xl p-2.5 min-h-[120px] border ${dayEvents.length ? style.shell : "bg-gray-50 border-gray-100"}`}>
+                    {dayEvents.length ? (
+                      <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                        {dayEvents.map((event) => (
+                          <div key={event.id} className={`rounded-lg border bg-white/80 p-2 ${style.task}`}>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-[9px] opacity-70">{(event.eventTime ?? "").slice(0, 5)}</p>
+                                <p className="text-[10px] font-semibold mt-0.5 leading-tight">{event.title}</p>
+                              </div>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditTask(event)}
+                                  className="rounded-md p-1 hover:bg-white/70"
+                                  title="Editar tarea"
+                                >
+                                  <Pencil size={11} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteTask(event)}
+                                  className="rounded-md p-1 hover:bg-white/70"
+                                  title="Eliminar tarea"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               );
             })}
           </div>
           {eventsError && <p className="text-xs text-amber-600 mt-3">{eventsError}</p>}
+          {taskActionError && <p className="text-xs text-amber-600 mt-1">{taskActionError}</p>}
         </SectionCard>
         <div className="mt-4">
           <SectionCard
@@ -157,20 +261,25 @@ export default function CalendarPage() {
                 <div className="space-y-3">
                   {forecast.map((day) => {
                     const recommended = lowerLoadDates.has(day.date);
+                    const adverse = isAdverseWeather(day);
                     return (
                       <article
                         key={day.date}
                         className={`relative rounded-xl border p-3.5 ${
-                          recommended
-                            ? "border-emerald-200 bg-emerald-50"
-                            : "border-gray-100 bg-white"
+                          adverse
+                            ? "border-amber-200 bg-amber-50"
+                            : recommended
+                              ? "border-emerald-200 bg-emerald-50"
+                              : "border-gray-100 bg-white"
                         }`}
                       >
                         <span
                           className={`absolute -left-[18px] top-5 w-3.5 h-3.5 rounded-full border-2 ${
-                            recommended
-                              ? "bg-emerald-500 border-emerald-100"
-                              : "bg-[#4f6ef7] border-blue-100"
+                            adverse
+                              ? "bg-amber-500 border-amber-100"
+                              : recommended
+                                ? "bg-emerald-500 border-emerald-100"
+                                : "bg-[#4f6ef7] border-blue-100"
                           }`}
                         />
                         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
@@ -179,9 +288,11 @@ export default function CalendarPage() {
                           </p>
                           <span
                             className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                              recommended
-                                ? "bg-emerald-100 text-emerald-700"
-                                : "bg-blue-50 text-[#4f6ef7]"
+                              adverse
+                                ? "bg-amber-100 text-amber-700"
+                                : recommended
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-blue-50 text-[#4f6ef7]"
                             }`}
                           >
                             Índice carga: {day.impactScore}
@@ -199,6 +310,11 @@ export default function CalendarPage() {
                           </p>
                         </div>
                         <p className="mt-2 text-xs text-gray-600">{day.recommendation}</p>
+                        {(recommended || adverse) ? (
+                          <p className={`mt-1.5 text-xs font-medium ${adverse ? "text-amber-700" : "text-emerald-700"}`}>
+                            {lowerSalesReason(day)}
+                          </p>
+                        ) : null}
                       </article>
                     );
                   })}
@@ -211,7 +327,7 @@ export default function CalendarPage() {
           <CreateCalendarTaskModal
             onClose={() => setShowCreate(false)}
             days={DAYS}
-            onCreate={async (payload) => {
+            onCreate={async (payload: { day: string; time: string; title: string }) => {
               if (!token) return;
               const map: Record<string, number> = {
                 Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6,
