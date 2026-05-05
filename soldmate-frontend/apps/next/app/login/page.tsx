@@ -40,8 +40,7 @@ export default function LoginPage() {
     }
   };
 
-  const handleSubmit = (ev?: React.FormEvent) => {
-    ev?.preventDefault();
+  const handleSubmit = () => {
     doLogin(email, password);
   };
 
@@ -119,7 +118,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          <form action="#" method="dialog" onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1.5">Email</label>
               <input
@@ -127,6 +126,12 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSubmit();
+                  }
+                }}
                 placeholder="tu@empresa.com"
                 className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-[#1e2040] outline-none focus:border-[#4f6ef7] focus:ring-2 focus:ring-[#4f6ef7]/10 transition-all shadow-sm"
               />
@@ -145,6 +150,12 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleSubmit();
+                    }
+                  }}
                   placeholder="••••••••"
                   className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 pr-11 text-sm text-[#1e2040] outline-none focus:border-[#4f6ef7] focus:ring-2 focus:ring-[#4f6ef7]/10 transition-all shadow-sm"
                 />
@@ -169,7 +180,7 @@ export default function LoginPage() {
 
             <button
               type="button"
-              onClick={() => handleSubmit()}
+              onClick={handleSubmit}
               disabled={loading}
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#4f6ef7] text-white font-semibold py-3 text-sm shadow-[0_4px_15px_rgba(79,110,247,0.35)] hover:bg-[#3d5ae0] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
             >
@@ -185,7 +196,7 @@ export default function LoginPage() {
                 <>Iniciar sesión <ArrowRight size={15} /></>
               )}
             </button>
-          </form>
+          </div>
 
           <div className="my-6 flex items-center gap-3">
             <div className="flex-1 h-px bg-gray-100" />

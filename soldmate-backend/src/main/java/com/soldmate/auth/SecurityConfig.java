@@ -14,7 +14,11 @@ import org.springframework.http.HttpMethod;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.beans.factory.annotation.Value;
+
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * SecurityConfig: configuración central de Spring Security.
@@ -39,9 +43,14 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
+    private final String corsAllowedOrigins;
 
-    public SecurityConfig(JwtFilter jwtFilter) {
+    public SecurityConfig(
+        JwtFilter jwtFilter,
+        @Value("${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:23000,http://localhost:8082,http://localhost:8081,http://localhost:19006,exp://localhost:19000,https://matemudano99.github.io}") String corsAllowedOrigins
+    ) {
         this.jwtFilter = jwtFilter;
+        this.corsAllowedOrigins = corsAllowedOrigins;
     }
 
     @Bean
@@ -92,15 +101,12 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
-            "http://localhost:3000",                      // Next.js dev
-            "http://localhost:23000",                     // Frontend Docker
-            "http://localhost:8082",                      // Expo web
-            "http://localhost:8081",                      // Expo web fallback
-            "http://localhost:19006",                     // Expo web
-            "exp://localhost:19000",                      // Expo mobile
-            "https://matemudano99.github.io"              // GitHub Pages (producción)
-        ));
+        List<String> originPatterns = Arrays.stream(corsAllowedOrigins.split(","))
+            .map(String::trim)
+            .filter(s -> !s.isEmpty())
+            .collect(Collectors.toList());
+        // setAllowedOriginPatterns permite comodines tipo https://*.vercel.app
+        config.setAllowedOriginPatterns(originPatterns);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
