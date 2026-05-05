@@ -4,6 +4,7 @@ import com.soldmate.company.Company;
 import com.soldmate.company.CompanyRepository;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -63,7 +63,15 @@ public class UserController {
         }
     }
 
-    public record UpsertUserRequest(
+    public record CreateUserRequest(
+        @NotBlank String fullName,
+        @NotBlank @Email String email,
+        String role,
+        String avatarUrl,
+        @NotBlank @Size(min = 8, message = "Password must be at least 8 characters") String password
+    ) {}
+
+    public record UpdateUserRequest(
         @NotBlank String fullName,
         @NotBlank @Email String email,
         String role,
@@ -84,7 +92,7 @@ public class UserController {
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<UserResponse> createUser(
         @RequestHeader("Authorization") String authHeader,
-        @RequestBody UpsertUserRequest req
+        @RequestBody CreateUserRequest req
     ) {
         Long companyId = jwtUtil.extractCompanyId(authHeader.substring(7));
         Company company = companyRepository.findById(companyId).orElseThrow();
@@ -101,7 +109,7 @@ public class UserController {
         user.setLastName(names[1]);
         user.setAvatarUrl(blankToNull(req.avatarUrl()));
         user.setRole(resolveRole(req.role()));
-        user.setPassword(passwordEncoder.encode("ChangeMe!" + UUID.randomUUID().toString().substring(0, 8)));
+        user.setPassword(passwordEncoder.encode(req.password().trim()));
         userRepository.save(user);
         return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.from(user));
     }
@@ -111,7 +119,7 @@ public class UserController {
     public ResponseEntity<UserResponse> updateUser(
         @RequestHeader("Authorization") String authHeader,
         @PathVariable Long id,
-        @RequestBody UpsertUserRequest req
+        @RequestBody UpdateUserRequest req
     ) {
         Long companyId = jwtUtil.extractCompanyId(authHeader.substring(7));
         User user = userRepository.findByIdAndCompanyId(id, companyId).orElse(null);

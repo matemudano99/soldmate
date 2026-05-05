@@ -159,6 +159,7 @@ export interface UserUpsertInput {
   email: string;
   role: "OWNER" | "MANAGER" | "EMPLOYEE" | "STAFF";
   avatarUrl?: string | null;
+  password?: string;
 }
 
 export interface DashboardWeeklyPoint {

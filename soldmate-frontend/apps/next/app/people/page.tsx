@@ -51,7 +51,9 @@ function mapUser(u: UserListResponse): Employee {
   };
 }
 
-function employeeToUserInput(e: Omit<Employee, "id"> | Omit<Employee, "id" | "rating">): UserUpsertInput {
+function employeeToUserInput(
+  e: (Omit<Employee, "id"> | Omit<Employee, "id" | "rating">) & { password?: string },
+): UserUpsertInput {
   const role = (e.role || "EMPLOYEE").toUpperCase();
   const mappedRole: UserUpsertInput["role"] =
     role === "OWNER" ? "OWNER" :
@@ -63,6 +65,7 @@ function employeeToUserInput(e: Omit<Employee, "id"> | Omit<Employee, "id" | "ra
     email: e.email.trim(),
     role: mappedRole,
     avatarUrl: e.avatar ?? null,
+    ...(e.password ? { password: e.password } : {}),
   };
 }
 
@@ -931,6 +934,7 @@ export default function PeoplePage() {
             addEmployee({
               name: payload.name,
               email: payload.email,
+              password: payload.password,
               role: payload.role,
               department: payload.department,
               progress: 0,

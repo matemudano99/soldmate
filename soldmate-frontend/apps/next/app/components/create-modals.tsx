@@ -335,13 +335,13 @@ export function CreateSupplierModal({
   );
 }
 
-export type CreatePersonPayload = { name: string; department: string; role: string; email: string; phone: string; location: string; online: boolean };
+export type CreatePersonPayload = { name: string; department: string; role: string; email: string; password: string; phone: string; location: string; online: boolean };
 export function CreatePersonModal({
   onClose,
   onCreate,
   departments,
 }: { onClose: () => void; onCreate: (payload: CreatePersonPayload) => void; departments: string[] }) {
-  const [form, setForm] = useState<CreatePersonPayload>({ name: "", department: departments[0] ?? "Design", role: "", email: "", phone: "", location: "", online: true });
+  const [form, setForm] = useState<CreatePersonPayload>({ name: "", department: departments[0] ?? "Design", role: "", email: "", password: "", phone: "", location: "", online: true });
   const set = (k: keyof CreatePersonPayload, v: string | boolean) => setForm((s) => ({ ...s, [k]: v as never }));
 
   return (
@@ -368,6 +368,7 @@ export function CreatePersonModal({
       </div>
       <div><Label>Cargo / Rol</Label><Input value={form.role} onChange={(e) => set("role", e.target.value)} /></div>
       <div><Label>Email *</Label><Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} required /></div>
+      <div><Label>Contraseña *</Label><Input type="password" value={form.password} onChange={(e) => set("password", e.target.value)} minLength={8} required placeholder="Mínimo 8 caracteres" /></div>
       <div className="grid grid-cols-2 gap-3">
         <div><Label>Teléfono</Label><Input value={form.phone} onChange={(e) => set("phone", e.target.value)} /></div>
         <div><Label>Ubicación</Label><Input value={form.location} onChange={(e) => set("location", e.target.value)} /></div>
