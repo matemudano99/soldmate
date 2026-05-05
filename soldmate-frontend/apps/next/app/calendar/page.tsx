@@ -19,12 +19,6 @@ const DAY_STYLES = [
   { header: "text-cyan-600", shell: "bg-cyan-50 border-cyan-200", task: "border-cyan-200 text-cyan-700" },
   { header: "text-indigo-600", shell: "bg-indigo-50 border-indigo-200", task: "border-indigo-200 text-indigo-700" },
 ] as const;
-const EVENTS = [
-  { day: "Mon", title: "Reunión equipo", time: "09:00", color: "bg-blue-50 border-blue-200 text-blue-700" },
-  { day: "Wed", title: "Entrega informe", time: "12:00", color: "bg-violet-50 border-violet-200 text-violet-700" },
-  { day: "Thu", title: "Revisión stock", time: "16:00", color: "bg-amber-50 border-amber-200 text-amber-700" },
-  { day: "Fri", title: "Cierre semanal", time: "17:30", color: "bg-green-50 border-green-200 text-green-700" },
-];
 
 const CITY = { label: "negocio" };
 const RAIN_ALERT_MM = 1.0;
@@ -51,6 +45,7 @@ export default function CalendarPage() {
   const token = useAuthStore((s) => s.token);
   const [events, setEvents] = useState<CalendarEventResponse[]>([]);
   const [showCreate, setShowCreate] = useState(false);
+  const [editingTask, setEditingTask] = useState<CalendarEventResponse | null>(null);
   const [forecast, setForecast] = useState<ForecastImpactDay[]>([]);
   const [businessCity, setBusinessCity] = useState<string>(CITY.label);
   const [loadingForecast, setLoadingForecast] = useState(true);
@@ -81,17 +76,7 @@ export default function CalendarPage() {
         setEvents(loaded);
       } catch (error) {
         setEventsError(describeNetworkError(error));
-        // fallback local
-        setEvents(
-          EVENTS.map((e, idx) => ({
-            id: idx + 1,
-            title: e.title,
-            notes: null,
-            eventDate: weekDates[idx % weekDates.length].iso,
-            eventTime: `${e.time}:00`,
-            source: "MOCK",
-          })),
-        );
+        setEvents([]);
       }
       try {
         setLoadingForecast(true);
@@ -143,37 +128,38 @@ export default function CalendarPage() {
   }
 
   async function handleEditTask(task: CalendarEventResponse) {
-    const nextTitle = window.prompt("Nuevo título", task.title)?.trim();
-    if (!nextTitle) return;
-    const currentTime = (task.eventTime ?? "09:00").slice(0, 5);
-    const nextTime = window.prompt("Nueva hora (HH:MM)", currentTime)?.trim();
-    if (!nextTime) return;
-    if (!/^\d{2}:\d{2}$/.test(nextTime)) {
-      setTaskActionError("Formato de hora inválido. Usa HH:MM (ej: 09:30).");
-      return;
-    }
+    setEditingTask(task);
+  }
+
+  async function handleSubmitEdit(payload: { day: string; time: string; title: string }) {
+    if (!editingTask || !token) return;
+    const map: Record<string, number> = {
+      Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6,
+      Lun: 0, Mar: 1, Mié: 2, Jue: 3, Vie: 4, Sáb: 5, Dom: 6,
+    };
+    const idx = map[payload.day] ?? 0;
+    const nextDate = weekDates[idx]?.iso ?? editingTask.eventDate;
 
     setTaskActionError(null);
+    const prev = events;
     setEvents((current) =>
       current.map((e) =>
-        e.id === task.id
-          ? { ...e, title: nextTitle, eventTime: `${nextTime}:00` }
+        e.id === editingTask.id
+          ? { ...e, title: payload.title, eventDate: nextDate, eventTime: `${payload.time}:00` }
           : e,
       ),
     );
+    setEditingTask(null);
 
-    if (!token) {
-      setTaskActionError("Cambio guardado localmente. Inicia sesión para sincronizarlo.");
-      return;
-    }
     try {
-      await calendarApi.update(token, task.id, {
-        title: nextTitle,
-        eventDate: task.eventDate,
-        eventTime: nextTime,
+      await calendarApi.update(token, editingTask.id, {
+        title: payload.title,
+        eventDate: nextDate,
+        eventTime: payload.time,
       });
     } catch (error) {
-      setTaskActionError(`${describeNetworkError(error)} · Cambio guardado localmente.`);
+      setEvents(prev);
+      setTaskActionError(describeNetworkError(error));
     }
   }
 
@@ -188,7 +174,7 @@ export default function CalendarPage() {
             Crear tarea
           </button>
         </div>
-        <SectionCard title="Esta semana" subtitle="Mock data · frontend-first">
+        <SectionCard title="Esta semana" subtitle="Eventos reales del calendario">
           <div className="grid grid-cols-7 gap-2">
             {weekDates.map((d) => {
               const dayEvents = eventsByDate.get(d.iso) ?? [];
@@ -228,7 +214,9 @@ export default function CalendarPage() {
                           </div>
                         ))}
                       </div>
-                    ) : null}
+                    ) : (
+                      <p className="text-[10px] text-gray-400 text-center pt-6">Sin tareas</p>
+                    )}
                   </div>
                 </div>
               );
@@ -342,21 +330,23 @@ export default function CalendarPage() {
                   eventTime: payload.time,
                 });
                 setEvents((prev) => [...prev, created]);
-              } catch {
-                // fallback local sin bloquear el modal
-                setEvents((prev) => [
-                  ...prev,
-                  {
-                    id: Date.now(),
-                    title: payload.title,
-                    notes: null,
-                    eventDate: date,
-                    eventTime: `${payload.time}:00`,
-                    source: "LOCAL_FALLBACK",
-                  },
-                ]);
+              } catch (error) {
+                setTaskActionError(describeNetworkError(error));
               }
             }}
+          />
+        )}
+        {editingTask && (
+          <CreateCalendarTaskModal
+            onClose={() => setEditingTask(null)}
+            submitLabel="Guardar cambios"
+            days={DAYS}
+            initial={{
+              title: editingTask.title,
+              time: (editingTask.eventTime ?? "09:00").slice(0, 5),
+              day: weekDates.find((d) => d.iso === editingTask.eventDate)?.label ?? DAYS[0],
+            }}
+            onCreate={handleSubmitEdit}
           />
         )}
       </main>

@@ -5,13 +5,6 @@ import { AlertTriangle, Bell, CheckCircle, Clock, HelpCircle, LifeBuoy, Mail, Ph
 import { alertsApi, describeNetworkError, type AlertResponse } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
-const FALLBACK_ALERTS: AlertResponse[] = [
-  { text: "Stock crítico en bebidas", type: "critical", source: "mock" },
-  { text: "Incidencia abierta > 24h", type: "warning", source: "mock" },
-  { text: "3 tareas vencen hoy", type: "warning", source: "mock" },
-  { text: "Proveedor confirmado", type: "success", source: "mock" },
-];
-
 function useOutsideClose(ref: React.RefObject<HTMLDivElement | null>, onClose: () => void) {
   React.useEffect(() => {
     function onPointerDown(event: MouseEvent) {
@@ -26,7 +19,7 @@ function useOutsideClose(ref: React.RefObject<HTMLDivElement | null>, onClose: (
 export function AlertsBellPopover() {
   const token = useAuthStore((s) => s.token);
   const [open, setOpen] = React.useState(false);
-  const [alerts, setAlerts] = React.useState<AlertResponse[]>(FALLBACK_ALERTS);
+  const [alerts, setAlerts] = React.useState<AlertResponse[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const rootRef = React.useRef<HTMLDivElement>(null);
 
@@ -76,6 +69,9 @@ export function AlertsBellPopover() {
                 </div>
               );
             })}
+            {!alerts.length ? (
+              <p className="text-xs text-gray-500 px-1 py-2">No hay alertas recientes.</p>
+            ) : null}
           </div>
           {error ? <p className="text-xs text-amber-600 mt-2 px-1">{error}</p> : null}
         </div>

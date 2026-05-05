@@ -416,8 +416,24 @@ export function UploadDocumentModal({ onClose, onCreate }: { onClose: () => void
 }
 
 export type CreateCalendarTaskPayload = { day: string; time: string; title: string };
-export function CreateCalendarTaskModal({ onClose, onCreate, days }: { onClose: () => void; onCreate: (payload: CreateCalendarTaskPayload) => void; days: string[] }) {
-  const [form, setForm] = useState<CreateCalendarTaskPayload>({ day: days[0] ?? "Mon", time: "09:00", title: "" });
+export function CreateCalendarTaskModal({
+  onClose,
+  onCreate,
+  days,
+  initial,
+  submitLabel = "Crear tarea",
+}: {
+  onClose: () => void;
+  onCreate: (payload: CreateCalendarTaskPayload) => void;
+  days: string[];
+  initial?: Partial<CreateCalendarTaskPayload>;
+  submitLabel?: string;
+}) {
+  const [form, setForm] = useState<CreateCalendarTaskPayload>({
+    day: initial?.day ?? days[0] ?? "Mon",
+    time: initial?.time ?? "09:00",
+    title: initial?.title ?? "",
+  });
   const set = (k: keyof CreateCalendarTaskPayload, v: string) => setForm((s) => ({ ...s, [k]: v }));
 
   return (
@@ -425,7 +441,7 @@ export function CreateCalendarTaskModal({ onClose, onCreate, days }: { onClose: 
       title="Nueva tarea de calendario"
       subtitle="Programa una tarea o evento semanal"
       onClose={onClose}
-      submitLabel="Crear tarea"
+      submitLabel={submitLabel}
       onSubmit={(e) => {
         e.preventDefault();
         if (!form.title.trim()) return;
