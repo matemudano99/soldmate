@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, ImageIcon, ExternalLink, Pencil, Trash2 } from "lucide-react";
 import { SectionCard } from "../components/web-ui";
-import { WebErpNavbar } from "../components/web-erp-navbar";
-import { CreateIncidentModal } from "../components/create-modals";
+import { CreateIncidentModal, WebErpNavbar } from "../shared/ui";
 import { incidentsApi, type IncidentResponse, type IncidentStatus } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 

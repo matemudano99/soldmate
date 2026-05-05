@@ -6,7 +6,7 @@ import {
   Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import { TrendingUp, TrendingDown, DollarSign, Clock, MoreVertical, Download } from "lucide-react";
-import { WebErpNavbar } from "../components/web-erp-navbar";
+import { WebErpNavbar } from "../shared/ui";
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 

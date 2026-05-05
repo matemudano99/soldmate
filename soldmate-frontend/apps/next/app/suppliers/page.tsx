@@ -3,8 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Mail, Phone, Tag, Plus, Pencil, Trash2 } from "lucide-react";
-import { WebErpNavbar } from "../components/web-erp-navbar";
-import { CreateSupplierModal } from "../components/create-modals";
+import { CreateSupplierModal, WebErpNavbar } from "../shared/ui";
 import { suppliersApi, type SupplierResponse } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 

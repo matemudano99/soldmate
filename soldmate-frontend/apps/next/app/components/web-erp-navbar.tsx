@@ -5,10 +5,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, CreditCard, BarChart2,
-  FileText, Calendar, HelpCircle, Power, ChevronDown,
+  FileText, Calendar, Power, ChevronDown,
   Sparkles, Wrench, Truck, Package, Activity,
 } from "lucide-react";
 import { useAuthStore } from "app/lib/store";
+import { HelpCenterPopover } from "../shared/ui/alerts-help-popovers";
 
 const NAV_MAIN = [
   { href: "/dashboard",  label: "Dashboard",    Icon: LayoutDashboard },
@@ -87,20 +88,7 @@ export function WebErpNavbar() {
 
       {/* Bottom */}
       <div className="px-3 pb-5 pt-3 border-t border-gray-50 space-y-0.5">
-        <Link
-          href="/alerts"
-          className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
-            pathname === "/alerts"
-              ? "bg-[#f0f3ff] text-[#4f6ef7]"
-              : "text-[#9095a0] hover:bg-gray-50 hover:text-gray-600"
-          }`}
-        >
-          {pathname === "/alerts" && (
-            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-[#4f6ef7] rounded-r-full" />
-          )}
-          <HelpCircle size={16} strokeWidth={1.8} />
-          <span className="text-sm font-medium">Support</span>
-        </Link>
+        <HelpCenterPopover />
 
         <div className="pt-3 flex items-center gap-2 px-3">
           <button

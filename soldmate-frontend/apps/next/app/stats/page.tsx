@@ -6,7 +6,7 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
 import { Users, ShoppingCart, Star, Activity } from "lucide-react";
-import { WebErpNavbar } from "../components/web-erp-navbar";
+import { WebErpNavbar } from "../shared/ui";
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 

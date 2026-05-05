@@ -8,11 +8,9 @@ import {
   Star, TrendingUp, Loader2, AlertCircle,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { WebErpNavbar } from "../components/web-erp-navbar";
+import { CreatePersonModal, UserProfileMenu, WebErpNavbar } from "../shared/ui";
 import { usersApi, type UserListResponse, type UserUpsertInput } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
-import { UserProfileMenu } from "../components/user-profile-menu";
-import { CreatePersonModal } from "../components/create-modals";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

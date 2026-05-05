@@ -3,8 +3,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Package, ChevronLeft, AlertTriangle, Minus, Plus } from "lucide-react";
-import { WebErpNavbar } from "../components/web-erp-navbar";
+import { Loader2, Package, ChevronLeft, AlertTriangle, Minus, Plus, Trash2, Save, X } from "lucide-react";
+import { WebErpNavbar } from "../shared/ui";
 import { inventoryApi, type ProductResponse } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
@@ -17,6 +17,8 @@ const UNIT_LABEL: Record<ProductResponse["unit"], string> = {
 
 export default function InventoryPage() {
   const token = useAuthStore((s) => s.token);
+  const role = useAuthStore((s) => s.role);
+  const isOwner = role === "OWNER";
   const qc = useQueryClient();
   const [authReady, setAuthReady] = useState(false);
 
@@ -36,6 +38,41 @@ export default function InventoryPage() {
 
   const stockMut = useMutation({
     mutationFn: ({ id, delta }: { id: number; delta: number }) => inventoryApi.updateStock(token!, id, delta),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["inventory"] }),
+  });
+  const createMut = useMutation({
+    mutationFn: (payload: {
+      name: string;
+      currentStock: number;
+      minStock: number;
+      unit: "KG" | "L" | "UNIT" | "BOX";
+      category?: string | null;
+      vatRate?: number | null;
+    }) => inventoryApi.create(token!, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["inventory"] }),
+  });
+  const updateMut = useMutation({
+    mutationFn: (payload: {
+      id: number;
+      minStock: number;
+      currentStock: number;
+      name: string;
+      unit: "KG" | "L" | "UNIT" | "BOX";
+      category?: string | null;
+      vatRate?: number | null;
+    }) =>
+      inventoryApi.update(token!, payload.id, {
+        name: payload.name,
+        currentStock: payload.currentStock,
+        minStock: payload.minStock,
+        unit: payload.unit,
+        category: payload.category ?? null,
+        vatRate: payload.vatRate ?? null,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["inventory"] }),
+  });
+  const removeMut = useMutation({
+    mutationFn: (id: number) => inventoryApi.remove(token!, id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["inventory"] }),
   });
 
@@ -63,10 +100,17 @@ export default function InventoryPage() {
               Inventario
             </h1>
             <p className="text-sm text-gray-500 mt-1">
-              Productos de tu empresa · ajuste rápido de stock (±1). Desde el dashboard: bloque «Stock bajo» o KPI.
+              Productos de tu empresa · puedes agregar, eliminar y ajustar mínimos necesarios.
             </p>
           </div>
         </div>
+
+        {isOwner && authReady && !query.isLoading && (
+          <AddProductCard
+            onCreate={(payload) => createMut.mutate(payload)}
+            pending={createMut.isPending}
+          />
+        )}
 
         {!authReady && (
           <div className="flex items-center gap-2 text-sm text-gray-500 py-12">
@@ -104,7 +148,15 @@ export default function InventoryPage() {
                     <ProductRow
                       key={p.id}
                       product={p}
+                      canManage={isOwner}
                       onDelta={(id, d) => stockMut.mutate({ id, delta: d })}
+                      onUpdateMin={(id, minStock, currentStock, name, unit, category, vatRate) =>
+                        updateMut.mutate({ id, minStock, currentStock, name, unit, category, vatRate })
+                      }
+                      onRemove={(id, name) => {
+                        if (!confirm(`¿Eliminar el producto «${name}»?`)) return;
+                        removeMut.mutate(id);
+                      }}
                       pending={stockMut.isPending}
                     />
                   ))}
@@ -120,7 +172,15 @@ export default function InventoryPage() {
                     <ProductRow
                       key={p.id}
                       product={p}
+                      canManage={isOwner}
                       onDelta={(id, d) => stockMut.mutate({ id, delta: d })}
+                      onUpdateMin={(id, minStock, currentStock, name, unit, category, vatRate) =>
+                        updateMut.mutate({ id, minStock, currentStock, name, unit, category, vatRate })
+                      }
+                      onRemove={(id, name) => {
+                        if (!confirm(`¿Eliminar el producto «${name}»?`)) return;
+                        removeMut.mutate(id);
+                      }}
                       pending={stockMut.isPending}
                     />
                   ))}
@@ -140,15 +200,127 @@ export default function InventoryPage() {
   );
 }
 
+function AddProductCard({
+  onCreate,
+  pending,
+}: {
+  onCreate: (payload: {
+    name: string;
+    currentStock: number;
+    minStock: number;
+    unit: "KG" | "L" | "UNIT" | "BOX";
+    category?: string | null;
+    vatRate?: number | null;
+  }) => void;
+  pending: boolean;
+}) {
+  const [name, setName] = useState("");
+  const [currentStock, setCurrentStock] = useState("0");
+  const [minStock, setMinStock] = useState("10");
+  const [unit, setUnit] = useState<"KG" | "L" | "UNIT" | "BOX">("UNIT");
+  const [category, setCategory] = useState("");
+
+  return (
+    <div className="mb-6 bg-white rounded-2xl border border-gray-100 shadow-[0_2px_16px_rgba(149,157,165,0.10)] p-4">
+      <p className="text-sm font-semibold text-[#1e2040] mb-3">Agregar producto</p>
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Nombre"
+          className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
+        />
+        <input
+          value={currentStock}
+          onChange={(e) => setCurrentStock(e.target.value)}
+          type="number"
+          step="0.01"
+          placeholder="Stock actual"
+          className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
+        />
+        <input
+          value={minStock}
+          onChange={(e) => setMinStock(e.target.value)}
+          type="number"
+          step="0.01"
+          placeholder="Mínimo necesario"
+          className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
+        />
+        <select
+          value={unit}
+          onChange={(e) => setUnit(e.target.value as "KG" | "L" | "UNIT" | "BOX")}
+          className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
+        >
+          <option value="UNIT">ud</option>
+          <option value="KG">kg</option>
+          <option value="L">L</option>
+          <option value="BOX">cajas</option>
+        </select>
+        <input
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          placeholder="Categoría"
+          className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
+        />
+      </div>
+      <div className="mt-3">
+        <button
+          type="button"
+          disabled={pending || !name.trim()}
+          onClick={() => {
+            onCreate({
+              name: name.trim(),
+              currentStock: Number(currentStock || 0),
+              minStock: Number(minStock || 0),
+              unit,
+              category: category.trim() || null,
+              vatRate: 10,
+            });
+            setName("");
+            setCurrentStock("0");
+            setMinStock("10");
+            setCategory("");
+          }}
+          className="rounded-xl bg-[#4f6ef7] text-white px-4 py-2 text-sm font-semibold disabled:opacity-60"
+        >
+          {pending ? "Guardando..." : "Agregar"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ProductRow({
   product: p,
+  canManage,
   onDelta,
+  onUpdateMin,
+  onRemove,
   pending,
 }: {
   product: ProductResponse;
+  canManage: boolean;
   onDelta: (id: number, delta: number) => void;
+  onUpdateMin: (
+    id: number,
+    minStock: number,
+    currentStock: number,
+    name: string,
+    unit: "KG" | "L" | "UNIT" | "BOX",
+    category?: string | null,
+    vatRate?: number | null
+  ) => void;
+  onRemove: (id: number, name: string) => void;
   pending: boolean;
 }) {
+  const [editingMin, setEditingMin] = useState(false);
+  const [minDraft, setMinDraft] = useState(String(p.minStock));
+
+  useEffect(() => {
+    setMinDraft(String(p.minStock));
+    setEditingMin(false);
+  }, [p.minStock, p.id]);
+
   const pct = p.minStock > 0 ? Math.round((p.currentStock / p.minStock) * 100) : 100;
   return (
     <div className="px-4 sm:px-5 py-3.5 flex flex-col sm:flex-row sm:items-center gap-3 hover:bg-[#fafbff]">
@@ -170,9 +342,23 @@ function ProductRow({
         </div>
       </div>
       <div className="flex items-center gap-3 shrink-0">
-        <span className={`text-sm font-semibold tabular-nums ${p.lowStock ? "text-red-600" : "text-[#1e2040]"}`}>
-          {p.currentStock} / {p.minStock} {UNIT_LABEL[p.unit]}
-        </span>
+        {!editingMin ? (
+          <span className={`text-sm font-semibold tabular-nums ${p.lowStock ? "text-red-600" : "text-[#1e2040]"}`}>
+            {p.currentStock} / {p.minStock} {UNIT_LABEL[p.unit]}
+          </span>
+        ) : (
+          <div className="flex items-center gap-1">
+            <span className="text-sm font-semibold tabular-nums text-[#1e2040]">{p.currentStock} /</span>
+            <input
+              value={minDraft}
+              onChange={(e) => setMinDraft(e.target.value)}
+              type="number"
+              step="0.01"
+              className="w-20 rounded-lg border border-gray-200 px-2 py-1 text-xs"
+            />
+            <span className="text-xs text-gray-500">{UNIT_LABEL[p.unit]}</span>
+          </div>
+        )}
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -192,6 +378,64 @@ function ProductRow({
           >
             <Plus size={14} />
           </button>
+          {canManage && !editingMin && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => setEditingMin(true)}
+              className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              title="Editar mínimo"
+            >
+              <Save size={12} />
+            </button>
+          )}
+          {canManage && editingMin && (
+            <>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  onUpdateMin(
+                    p.id,
+                    Number(minDraft || p.minStock),
+                    Number(p.currentStock),
+                    p.name,
+                    p.unit,
+                    p.category,
+                    p.vatRate
+                  );
+                  setEditingMin(false);
+                }}
+                className="w-8 h-8 rounded-lg border border-emerald-200 bg-emerald-50 flex items-center justify-center text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                title="Guardar mínimo"
+              >
+                <Save size={12} />
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  setMinDraft(String(p.minStock));
+                  setEditingMin(false);
+                }}
+                className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                title="Cancelar"
+              >
+                <X size={12} />
+              </button>
+            </>
+          )}
+          {canManage && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => onRemove(p.id, p.name)}
+              className="w-8 h-8 rounded-lg border border-red-100 bg-red-50 flex items-center justify-center text-red-600 hover:bg-red-100 disabled:opacity-50"
+              title="Eliminar producto"
+            >
+              <Trash2 size={12} />
+            </button>
+          )}
         </div>
       </div>
     </div>

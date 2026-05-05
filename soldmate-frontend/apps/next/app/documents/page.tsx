@@ -5,8 +5,7 @@ import {
   FileText, FileSpreadsheet, Image, File, Upload,
   Search, Download, Eye, MoreVertical, ChevronRight,
 } from "lucide-react";
-import { WebErpNavbar } from "../components/web-erp-navbar";
-import { UploadDocumentModal } from "../components/create-modals";
+import { UploadDocumentModal, WebErpNavbar } from "../shared/ui";
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 

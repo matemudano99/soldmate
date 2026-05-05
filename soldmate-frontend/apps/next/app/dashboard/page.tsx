@@ -4,13 +4,12 @@ import React from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
   DollarSign, Wrench, Package, Users, TrendingUp,
-  Bell, Search, ChevronRight, Circle,
+  Search, ChevronRight, Circle,
   CheckCircle2, Clock, Activity, CloudRain,
 } from "lucide-react";
-import { WebErpNavbar } from "../components/web-erp-navbar";
+import { AlertsBellPopover, WebErpNavbar, UserProfileMenu } from "../shared/ui";
 import Link from "next/link";
 import { useAuthStore } from "app/lib/store";
-import { UserProfileMenu } from "../components/user-profile-menu";
 import {
   activityApi,
   businessProfileApi,
@@ -92,17 +91,18 @@ export default function DashboardPage() {
   const displayName = firstName || fullName || email?.split("@")[0] || "Usuario";
 
   React.useEffect(() => {
-    if (!token) return;
+    const authToken = token;
+    if (!authToken) return;
     async function load() {
       try {
         setError(null);
         const [summaryRes, weatherRes, predictionRes, productsRes, activityRes, businessRes] = await Promise.all([
-          dashboardApi.getSummary(token),
-          forecastApi.getImpact(token),
-          predictionsApi.getOperations(token),
-          inventoryApi.getAll(token),
-          activityApi.getAll(token),
-          businessProfileApi.get(token),
+          dashboardApi.getSummary(authToken!),
+          forecastApi.getImpact(authToken!),
+          predictionsApi.getOperations(authToken!),
+          inventoryApi.getAll(authToken!),
+          activityApi.getAll(authToken!),
+          businessProfileApi.get(authToken!),
         ]);
         setSummary(summaryRes);
         setWeatherImpact(getRecommendedLowLoadDays(weatherRes, 3));
@@ -177,14 +177,7 @@ export default function DashboardPage() {
                 placeholder="Buscar..."
               />
             </div>
-            <Link
-              href="/alerts"
-              className="relative p-2.5 rounded-xl bg-white border border-gray-100 shadow-sm hover:bg-gray-50"
-              title="Ver alertas"
-            >
-              <Bell size={16} className="text-gray-500" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-            </Link>
+            <AlertsBellPopover />
             <UserProfileMenu />
           </div>
         </header>

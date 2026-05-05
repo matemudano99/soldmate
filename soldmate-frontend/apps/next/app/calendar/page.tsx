@@ -3,8 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Plus, CloudRain, Wind, Thermometer, Loader2 } from "lucide-react";
 import { SectionCard } from "../components/web-ui";
-import { WebErpNavbar } from "../components/web-erp-navbar";
-import { CreateCalendarTaskModal } from "../components/create-modals";
+import { CreateCalendarTaskModal, WebErpNavbar } from "../shared/ui";
 import { businessProfileApi, calendarApi, forecastApi, type CalendarEventResponse, type ForecastImpactDay } from "app/lib/api";
 import { describeNetworkError } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";

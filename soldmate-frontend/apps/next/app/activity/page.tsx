@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Activity, ChevronLeft, Wrench, Circle, Clock, CheckCircle2 } from "lucide-react";
-import { WebErpNavbar } from "../components/web-erp-navbar";
+import { WebErpNavbar } from "../shared/ui";
 import { activityApi, type ActivityItemResponse } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
