@@ -34,6 +34,7 @@ public class IncidentService {
     private final IncidentRepository incidentRepository;
     private final UserRepository     userRepository;
     private final CompanyRepository  companyRepository;
+    private final com.soldmate.activity.ActivityLogger activityLogger;
 
     // Inyectamos los valores de Supabase desde application.properties
     @Value("${soldmate.supabase.url}")
@@ -47,10 +48,12 @@ public class IncidentService {
 
     public IncidentService(IncidentRepository incidentRepository,
                            UserRepository userRepository,
-                           CompanyRepository companyRepository) {
+                           CompanyRepository companyRepository,
+                           com.soldmate.activity.ActivityLogger activityLogger) {
         this.incidentRepository = incidentRepository;
         this.userRepository     = userRepository;
         this.companyRepository  = companyRepository;
+        this.activityLogger     = activityLogger;
     }
 
     // ─── Lectura ─────────────────────────────────────────────────────────────
@@ -100,7 +103,9 @@ public class IncidentService {
         incident.setCompany(company);
         incident.setReportedBy(user);
 
-        return incidentRepository.save(incident);
+        incident = incidentRepository.save(incident);
+        activityLogger.log(companyId, reportedBy, "INCIDENT", "CREADO", incident.getTitle());
+        return incident;
     }
 
     /**
@@ -135,7 +140,9 @@ public class IncidentService {
         incident.setCompany(company);
         incident.setReportedBy(user);
 
-        return incidentRepository.save(incident);
+        incident = incidentRepository.save(incident);
+        activityLogger.log(companyId, reportedBy, "INCIDENT", "CREADO", incident.getTitle());
+        return incident;
     }
 
     // ─── Actualización de estado ──────────────────────────────────────────────
@@ -149,7 +156,9 @@ public class IncidentService {
             .orElseThrow(() -> new RuntimeException("Incidencia no encontrada"));
 
         incident.setStatus(newStatus);
-        return incidentRepository.save(incident);
+        incident = incidentRepository.save(incident);
+        activityLogger.log(companyId, null, "INCIDENT", "MODIFICADO", incident.getTitle() + " (" + newStatus.name() + ")");
+        return incident;
     }
 
     public Incident updateIncident(Long companyId, Long incidentId,
@@ -161,13 +170,16 @@ public class IncidentService {
         incident.setTitle(title);
         incident.setDescription(description);
         incident.setPriority(priority);
-        return incidentRepository.save(incident);
+        incident = incidentRepository.save(incident);
+        activityLogger.log(companyId, null, "INCIDENT", "MODIFICADO", incident.getTitle());
+        return incident;
     }
 
     public void deleteIncident(Long companyId, Long incidentId) {
         Incident incident = incidentRepository.findByIdAndCompanyId(incidentId, companyId)
             .orElseThrow(() -> new RuntimeException("Incidencia no encontrada"));
         incidentRepository.delete(incident);
+        activityLogger.log(companyId, null, "INCIDENT", "ELIMINADO", incident.getTitle());
     }
 
     // ─── Supabase Storage ────────────────────────────────────────────────────

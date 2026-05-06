@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, CreditCard, BarChart2,
   FileText, Calendar, Power, ChevronDown, PanelLeftClose, PanelLeftOpen, X,
-  Sparkles, Wrench, Truck, Package, Activity,
+  Sparkles, Wrench, Truck, Package, Activity, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { useAuthStore } from "app/lib/store";
 import { HelpCenterPopover } from "../shared/ui/alerts-help-popovers";
@@ -26,6 +26,21 @@ const NAV_MAIN = [
 
 export function WebErpNavbar() {
   const [collapsed, setCollapsed] = React.useState(false);
+
+  React.useEffect(() => {
+    const saved = localStorage.getItem("sm_navbar_collapsed");
+    if (saved) {
+      setCollapsed(saved === "true");
+    }
+  }, []);
+
+  const toggleCollapse = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("sm_navbar_collapsed", String(next));
+      return next;
+    });
+  };
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const pathname = usePathname() ?? "/";
   const router = useRouter();
@@ -75,8 +90,6 @@ export function WebErpNavbar() {
         {mobileOpen ? <X size={18} /> : <PanelLeftOpen size={18} />}
       </button>
 
-      <div className={`hidden md:block flex-shrink-0 transition-all ${collapsed ? "w-[76px]" : "w-[220px]"}`} />
-
       <aside
         className={`fixed md:sticky top-0 left-0 z-50 md:z-20 h-screen bg-white flex flex-col border-r border-gray-100 shadow-[2px_0_20px_rgba(149,157,165,0.10)] transition-all duration-200 ${
           collapsed ? "w-[76px]" : "w-[220px]"
@@ -94,11 +107,11 @@ export function WebErpNavbar() {
         </Link>
         <button
           type="button"
-          onClick={() => setCollapsed((v) => !v)}
+          onClick={toggleCollapse}
           title={collapseLabel}
-          className={`hidden md:inline-flex w-8 h-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 ${collapsed ? "ml-0" : "ml-auto"}`}
+          className={`hidden md:inline-flex items-center justify-center text-gray-400 hover:text-[#1e2040] transition-colors ${collapsed ? "ml-0" : "ml-auto"}`}
         >
-          {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
         </button>
       </div>
 

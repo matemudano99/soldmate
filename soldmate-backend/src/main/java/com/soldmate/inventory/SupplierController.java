@@ -30,13 +30,16 @@ public class SupplierController {
     private final SupplierRepository supplierRepository;
     private final CompanyRepository  companyRepository;
     private final JwtUtil            jwtUtil;
+    private final com.soldmate.activity.ActivityLogger activityLogger;
 
     public SupplierController(SupplierRepository supplierRepository,
                               CompanyRepository companyRepository,
-                              JwtUtil jwtUtil) {
+                              JwtUtil jwtUtil,
+                              com.soldmate.activity.ActivityLogger activityLogger) {
         this.supplierRepository = supplierRepository;
         this.companyRepository  = companyRepository;
         this.jwtUtil            = jwtUtil;
+        this.activityLogger     = activityLogger;
     }
 
     // ─── DTOs ────────────────────────────────────────────────────────────────
@@ -135,6 +138,7 @@ public class SupplierController {
         supplier.setCompany(company);
 
         supplierRepository.save(supplier);
+        activityLogger.log(companyId, jwtUtil.extractEmail(authHeader.substring(7)), "SUPPLIER", "CREADO", supplier.getName());
 
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(SupplierResponse.from(supplier));
@@ -164,6 +168,7 @@ public class SupplierController {
         supplier.setSupplierType(req.type() != null ? req.type() : supplier.getSupplierType());
 
         supplierRepository.save(supplier);
+        activityLogger.log(companyId, jwtUtil.extractEmail(authHeader.substring(7)), "SUPPLIER", "MODIFICADO", supplier.getName());
 
         return ResponseEntity.ok(SupplierResponse.from(supplier));
     }
@@ -184,6 +189,7 @@ public class SupplierController {
 
         supplier.setActive(false);
         supplierRepository.save(supplier);
+        activityLogger.log(companyId, jwtUtil.extractEmail(authHeader.substring(7)), "SUPPLIER", "ELIMINADO", supplier.getName());
 
         return ResponseEntity.noContent().build();
     }

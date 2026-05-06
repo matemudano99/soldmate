@@ -29,15 +29,18 @@ public class UserController {
     private final CompanyRepository companyRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final com.soldmate.activity.ActivityLogger activityLogger;
 
     public UserController(UserRepository userRepository,
                           CompanyRepository companyRepository,
                           PasswordEncoder passwordEncoder,
-                          JwtUtil jwtUtil) {
+                          JwtUtil jwtUtil,
+                          com.soldmate.activity.ActivityLogger activityLogger) {
         this.userRepository = userRepository;
         this.companyRepository = companyRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
+        this.activityLogger = activityLogger;
     }
 
     public record UserResponse(
@@ -111,6 +114,9 @@ public class UserController {
         user.setRole(resolveRole(req.role()));
         user.setPassword(passwordEncoder.encode(req.password().trim()));
         userRepository.save(user);
+        
+        activityLogger.log(companyId, jwtUtil.extractEmail(authHeader.substring(7)), "USER", "CREADO", user.getEmail());
+        
         return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.from(user));
     }
 
@@ -131,6 +137,9 @@ public class UserController {
         user.setRole(resolveRole(req.role()));
         user.setAvatarUrl(blankToNull(req.avatarUrl()));
         userRepository.save(user);
+
+        activityLogger.log(companyId, jwtUtil.extractEmail(authHeader.substring(7)), "USER", "MODIFICADO", user.getEmail());
+
         return ResponseEntity.ok(UserResponse.from(user));
     }
 
@@ -144,6 +153,7 @@ public class UserController {
         User user = userRepository.findByIdAndCompanyId(id, companyId).orElse(null);
         if (user == null) return ResponseEntity.notFound().build();
         userRepository.delete(user);
+        activityLogger.log(companyId, jwtUtil.extractEmail(authHeader.substring(7)), "USER", "ELIMINADO", user.getEmail());
         return ResponseEntity.noContent().build();
     }
 

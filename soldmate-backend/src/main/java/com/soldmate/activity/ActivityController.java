@@ -33,19 +33,19 @@ import java.util.List;
 public class ActivityController {
 
     private final JwtUtil jwtUtil;
-    private final IncidentRepository incidentRepository;
+    private final ActivityLogRepository activityLogRepository;
 
-    public ActivityController(JwtUtil jwtUtil, IncidentRepository incidentRepository) {
+    public ActivityController(JwtUtil jwtUtil, ActivityLogRepository activityLogRepository) {
         this.jwtUtil = jwtUtil;
-        this.incidentRepository = incidentRepository;
+        this.activityLogRepository = activityLogRepository;
     }
 
     public record ActivityItemResponse(
         Long   id,
         String type,
         String title,
-        String status,
-        String priority,
+        String status,    // Map action here
+        String priority,  // Optional or map entity_type here if we want colors
         String createdAt,
         String actorName,
         String actorAvatarUrl,
@@ -61,7 +61,7 @@ public class ActivityController {
             return ResponseEntity.status(401).build();
         }
 
-        List<ActivityItemResponse> items = incidentRepository
+        List<ActivityItemResponse> items = activityLogRepository
             .findByCompanyIdOrderByCreatedAtDesc(companyId)
             .stream()
             .limit(60)
@@ -71,55 +71,35 @@ public class ActivityController {
         return ResponseEntity.ok(items);
     }
 
-    /**
-     * Extrae el companyId del JWT, ya sea del header Authorization o del SecurityContext
-     * (cuando el JwtFilter ya lo inyectó).
-     */
     private Long resolveCompanyId(String authHeader) {
-        // Opción 1: header explícito con "Bearer <token>"
         if (authHeader != null && authHeader.startsWith("Bearer ") && authHeader.length() > 7) {
-            try {
-                return jwtUtil.extractCompanyId(authHeader.substring(7));
-            } catch (Exception ignored) {
-                // token malformado → intentamos el SecurityContext
-            }
+            try { return jwtUtil.extractCompanyId(authHeader.substring(7)); } catch (Exception ignored) {}
         }
-        // Opción 2: el JwtFilter ya guardó el email en el SecurityContext;
-        // recuperamos el companyId parseando el mismo token del contexto.
-        // En este proyecto el SecurityContext almacena el email como "principal".
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getCredentials() instanceof String token) {
-            try {
-                return jwtUtil.extractCompanyId(token);
-            } catch (Exception ignored) {}
+            try { return jwtUtil.extractCompanyId(token); } catch (Exception ignored) {}
         }
         return null;
     }
 
-    private ActivityItemResponse toActivity(Incident i) {
-        String actorName   = "Usuario";
-        String actorEmail  = null;
-        String actorAvatar = null;
-
-        if (i.getReportedBy() != null) {
-            String first = i.getReportedBy().getFirstName();
-            String last  = i.getReportedBy().getLastName();
-            String full  = ((first != null ? first : "") + " " + (last != null ? last : "")).trim();
-            actorName  = full.isBlank() ? i.getReportedBy().getEmail() : full;
-            actorEmail = i.getReportedBy().getEmail();
-            actorAvatar = i.getReportedBy().getAvatarUrl();
+    private ActivityItemResponse toActivity(ActivityLog a) {
+        String avatarUrl = null;
+        if (a.getActor() != null) {
+            avatarUrl = a.getActor().getAvatarUrl();
         }
-
+        
+        // El frontend espera "type" = "INCIDENT", "DOCUMENT", etc. para el ícono.
+        // Espera "status" para el estado. Nosotros lo usaremos para la acción.
         return new ActivityItemResponse(
-            i.getId(),
-            "INCIDENT",
-            i.getTitle(),
-            i.getStatus().name(),
-            i.getPriority().name(),
-            i.getCreatedAt().toString(),
-            actorName,
-            actorAvatar,
-            actorEmail
+            a.getId(),
+            a.getEntityType(),
+            a.getTitle(),
+            a.getAction(),
+            "NORMAL", // Ya no dependemos de priority para logs genéricos
+            a.getCreatedAt().toString(),
+            a.getActorName(),
+            avatarUrl,
+            a.getActorEmail()
         );
     }
 }

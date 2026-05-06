@@ -21,13 +21,16 @@ public class CalendarController {
     private final JwtUtil jwtUtil;
     private final CompanyRepository companyRepository;
     private final CalendarEventRepository calendarEventRepository;
+    private final com.soldmate.activity.ActivityLogger activityLogger;
 
     public CalendarController(JwtUtil jwtUtil,
                               CompanyRepository companyRepository,
-                              CalendarEventRepository calendarEventRepository) {
+                              CalendarEventRepository calendarEventRepository,
+                              com.soldmate.activity.ActivityLogger activityLogger) {
         this.jwtUtil = jwtUtil;
         this.companyRepository = companyRepository;
         this.calendarEventRepository = calendarEventRepository;
+        this.activityLogger = activityLogger;
     }
 
     public record CalendarEventResponse(
@@ -94,8 +97,11 @@ public class CalendarController {
         event.setEventTime(parseTime(req.eventTime()));
         event.setSource("MANUAL");
 
+        event = calendarEventRepository.save(event);
+        activityLogger.log(companyId, jwtUtil.extractEmail(authHeader.substring(7)), "TASK", "CREADO", event.getTitle());
+
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(CalendarEventResponse.from(calendarEventRepository.save(event)));
+            .body(CalendarEventResponse.from(event));
     }
 
     @PutMapping("/{id}")
@@ -115,7 +121,10 @@ public class CalendarController {
         event.setEventDate(LocalDate.parse(req.eventDate()));
         event.setEventTime(parseTime(req.eventTime()));
 
-        return ResponseEntity.ok(CalendarEventResponse.from(calendarEventRepository.save(event)));
+        event = calendarEventRepository.save(event);
+        activityLogger.log(companyId, jwtUtil.extractEmail(authHeader.substring(7)), "TASK", "MODIFICADO", event.getTitle());
+
+        return ResponseEntity.ok(CalendarEventResponse.from(event));
     }
 
     @DeleteMapping("/{id}")
@@ -129,6 +138,7 @@ public class CalendarController {
             return ResponseEntity.notFound().build();
         }
         calendarEventRepository.delete(event);
+        activityLogger.log(companyId, jwtUtil.extractEmail(authHeader.substring(7)), "TASK", "ELIMINADO", event.getTitle());
         return ResponseEntity.noContent().build();
     }
 

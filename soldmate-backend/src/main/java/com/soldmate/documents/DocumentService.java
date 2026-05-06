@@ -34,6 +34,7 @@ public class DocumentService {
     private final DocumentCategoryRepository categoryRepository;
     private final UserRepository             userRepository;
     private final CompanyRepository          companyRepository;
+    private final com.soldmate.activity.ActivityLogger activityLogger;
 
     @Value("${soldmate.supabase.url}")
     private String supabaseUrl;
@@ -41,18 +42,20 @@ public class DocumentService {
     @Value("${soldmate.supabase.anon-key}")
     private String supabaseAnonKey;
 
-    /** Bucket dedicado a documentos (por defecto "documents"). */
-    @Value("${soldmate.supabase.documents-bucket:documents}")
+    /** Bucket compartido para ficheros (incidencias y documentos). */
+    @Value("${soldmate.supabase.bucket:incidents}")
     private String documentsBucket;
 
     public DocumentService(DocumentRepository documentRepository,
                            DocumentCategoryRepository categoryRepository,
                            UserRepository userRepository,
-                           CompanyRepository companyRepository) {
+                           CompanyRepository companyRepository,
+                           com.soldmate.activity.ActivityLogger activityLogger) {
         this.documentRepository = documentRepository;
         this.categoryRepository  = categoryRepository;
         this.userRepository      = userRepository;
         this.companyRepository   = companyRepository;
+        this.activityLogger      = activityLogger;
     }
 
     // ─── Documentos ──────────────────────────────────────────────────────────
@@ -112,7 +115,9 @@ public class DocumentService {
         doc.setUploadedBy(uploader);
         doc.setCompany(company);
 
-        return documentRepository.save(doc);
+        doc = documentRepository.save(doc);
+        activityLogger.log(companyId, uploaderEmail, "DOCUMENT", "CREADO", "Subido: " + doc.getName());
+        return doc;
     }
 
     /** Renombra o mueve de categoría un documento existente. */
@@ -122,7 +127,10 @@ public class DocumentService {
 
         if (name != null && !name.isBlank()) doc.setName(name.trim());
         doc.setCategory(category != null && !category.isBlank() ? category.trim() : null);
-        return documentRepository.save(doc);
+        doc = documentRepository.save(doc);
+        // Opcionalmente podemos usar un user genérico o extraer el usuario actual. En este caso enviaremos null para userEmail.
+        activityLogger.log(companyId, null, "DOCUMENT", "MODIFICADO", doc.getName());
+        return doc;
     }
 
     /** Elimina el registro de Postgres (el fichero en Supabase queda huérfano; bórralo desde el dashboard si es necesario). */
@@ -130,6 +138,7 @@ public class DocumentService {
         Document doc = documentRepository.findByIdAndCompanyId(documentId, companyId)
             .orElseThrow(() -> new RuntimeException("Documento no encontrado"));
         documentRepository.delete(doc);
+        activityLogger.log(companyId, null, "DOCUMENT", "ELIMINADO", doc.getName());
     }
 
     // ─── Estadísticas ─────────────────────────────────────────────────────────
@@ -163,7 +172,9 @@ public class DocumentService {
         cat.setName(name.trim());
         cat.setColor(color);
         cat.setCompany(company);
-        return categoryRepository.save(cat);
+        cat = categoryRepository.save(cat);
+        activityLogger.log(companyId, null, "DOCUMENT_CATEGORY", "CREADO", cat.getName());
+        return cat;
     }
 
     public DocumentCategory updateCategory(Long companyId, Long categoryId, String name, String color) {
@@ -171,13 +182,16 @@ public class DocumentService {
             .orElseThrow(() -> new RuntimeException("Categoría no encontrada"));
         if (name != null && !name.isBlank()) cat.setName(name.trim());
         if (color != null) cat.setColor(color);
-        return categoryRepository.save(cat);
+        cat = categoryRepository.save(cat);
+        activityLogger.log(companyId, null, "DOCUMENT_CATEGORY", "MODIFICADO", cat.getName());
+        return cat;
     }
 
     public void deleteCategory(Long companyId, Long categoryId) {
         DocumentCategory cat = categoryRepository.findByIdAndCompanyId(categoryId, companyId)
             .orElseThrow(() -> new RuntimeException("Categoría no encontrada"));
         categoryRepository.delete(cat);
+        activityLogger.log(companyId, null, "DOCUMENT_CATEGORY", "ELIMINADO", cat.getName());
     }
 
     // ─── Supabase Storage ─────────────────────────────────────────────────────
