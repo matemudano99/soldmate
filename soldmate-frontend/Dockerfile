@@ -29,7 +29,7 @@ ARG NEXT_PUBLIC_API_URL=http://localhost:28080
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
 COPY --from=builder /app/apps/next/next.config.mjs ./
-# COPY --from=builder /app/apps/next/public ./apps/next/public
+COPY --from=builder /app/apps/next/public ./apps/next/public
 COPY --from=builder /app/apps/next/.next/standalone ./
 COPY --from=builder /app/apps/next/.next/static ./apps/next/.next/static
 

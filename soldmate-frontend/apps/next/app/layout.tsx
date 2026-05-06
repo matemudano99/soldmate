@@ -36,6 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap"
           rel="stylesheet"
         />
+        <link rel="icon" href="/logo.png" />
       </head>
       <body style={{ fontFamily: "'Syne', sans-serif", margin: 0 }} className="antialiased">
         {/* QueryClientProvider: hace disponible React Query en toda la app */}

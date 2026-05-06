@@ -3,10 +3,11 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   LayoutDashboard, Users, CreditCard, BarChart2,
   FileText, Calendar, Power, ChevronDown, PanelLeftClose, PanelLeftOpen, X,
-  Sparkles, Wrench, Truck, Package, Activity, ChevronLeft, ChevronRight
+  Wrench, Truck, Package, Activity, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { useAuthStore } from "app/lib/store";
 import { HelpCenterPopover } from "../shared/ui/alerts-help-popovers";
@@ -97,22 +98,34 @@ export function WebErpNavbar() {
       >
       {/* Logo */}
       <div className={`px-4 pt-5 pb-4 flex items-center ${collapsed ? "justify-center" : "gap-2"}`}>
-        <Link href="/dashboard" className={`flex items-center hover:opacity-90 transition-opacity ${collapsed ? "justify-center" : "gap-2 flex-1"}`}>
-          <div className="w-9 h-9 bg-[#4f6ef7] rounded-xl flex items-center justify-center shadow-[0_4px_12px_rgba(79,110,247,0.35)]">
-            <Sparkles size={17} color="white" />
+        <Link 
+          href="/dashboard" 
+          onClick={(e) => {
+            if (collapsed) {
+              e.preventDefault();
+              toggleCollapse();
+            }
+          }}
+          title={collapsed ? "Expandir menú" : "Soldmate"}
+          className={`flex items-center hover:opacity-90 transition-opacity ${collapsed ? "justify-center" : "gap-2 flex-1"}`}
+        >
+          <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center shadow-[0_4px_12px_rgba(79,110,247,0.15)] hover:shadow-md transition-shadow overflow-hidden">
+            <Image src="/logo.png" alt="Soldmate" width={36} height={36} className="w-full h-full object-contain p-0.5" />
           </div>
           {!collapsed ? (
             <span className="font-bold text-[#1e2040] text-base tracking-tight">Soldmate</span>
           ) : null}
         </Link>
-        <button
-          type="button"
-          onClick={toggleCollapse}
-          title={collapseLabel}
-          className={`hidden md:inline-flex items-center justify-center text-gray-400 hover:text-[#1e2040] transition-colors ${collapsed ? "ml-0" : "ml-auto"}`}
-        >
-          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-        </button>
+        {!collapsed && (
+          <button
+            type="button"
+            onClick={toggleCollapse}
+            title={collapseLabel}
+            className="hidden md:inline-flex items-center justify-center text-gray-400 hover:text-[#1e2040] transition-colors ml-auto"
+          >
+            <ChevronLeft size={18} />
+          </button>
+        )}
       </div>
 
       {!collapsed ? (
