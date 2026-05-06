@@ -212,6 +212,7 @@ export default function FinancesPage() {
             ))}
           </div>
         </div>
+        </div>
       </main>
     </div>
   );

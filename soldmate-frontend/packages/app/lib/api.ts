@@ -675,3 +675,131 @@ export const activityApi = {
     return handleResponse<ActivityItemResponse[]>(res);
   },
 };
+
+// ─── Documentos ──────────────────────────────────────────────────────────────
+
+export interface DocumentResponse {
+  id: number;
+  name: string;
+  fileUrl: string;
+  mimeType: string | null;
+  fileSize: number | null;
+  /** Tipo normalizado: PDF | XLSX | IMG | DOCX | PPTX | ZIP | VIDEO | AUDIO | TXT | OTHER */
+  docType: string;
+  category: string | null;
+  createdAt: string;
+  uploaderName: string;
+  uploaderEmail: string | null;
+  uploaderAvatarUrl: string | null;
+}
+
+export interface DocumentStatsResponse {
+  totalDocuments: number;
+  totalSizeBytes: number;
+  totalSizeHuman: string;
+  newThisWeek: number;
+}
+
+export interface DocumentCategoryResponse {
+  id: number;
+  name: string;
+  color: string | null;
+}
+
+export const documentsApi = {
+  /** Lista documentos. Filtra por categoría si se proporciona. */
+  getAll: async (token: string, category?: string): Promise<DocumentResponse[]> => {
+    const q = category ? `?category=${encodeURIComponent(category)}` : "";
+    const res = await authFetch(`/api/v1/documents${q}`, token);
+    return handleResponse<DocumentResponse[]>(res);
+  },
+
+  getStats: async (token: string): Promise<DocumentStatsResponse> => {
+    const res = await authFetch("/api/v1/documents/stats", token);
+    return handleResponse<DocumentStatsResponse>(res);
+  },
+
+  /**
+   * Sube un fichero al backend (multipart/form-data).
+   * @param file   File nativo del navegador
+   * @param name   Nombre amigable (opcional; si no se da se usa el nombre del fichero)
+   * @param category Categoría (opcional)
+   */
+  upload: async (
+    token: string,
+    file: File,
+    name?: string,
+    category?: string
+  ): Promise<DocumentResponse> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (name)     formData.append("name",     name);
+    if (category) formData.append("category", category);
+
+    const res = await fetch(`${BASE_URL}/api/v1/documents/upload`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    return handleResponse<DocumentResponse>(res);
+  },
+
+  update: async (
+    token: string,
+    id: number,
+    data: { name?: string; category?: string }
+  ): Promise<DocumentResponse> => {
+    const res = await authFetch(`/api/v1/documents/${id}`, token, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+    return handleResponse<DocumentResponse>(res);
+  },
+
+  remove: async (token: string, id: number): Promise<void> => {
+    const res = await authFetch(`/api/v1/documents/${id}`, token, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const text = await res.text();
+      throw new Error(text || `Error ${res.status}`);
+    }
+  },
+
+  // ── Categorías ────────────────────────────────────────────────────────────
+
+  getCategories: async (token: string): Promise<DocumentCategoryResponse[]> => {
+    const res = await authFetch("/api/v1/documents/categories", token);
+    return handleResponse<DocumentCategoryResponse[]>(res);
+  },
+
+  createCategory: async (
+    token: string,
+    name: string,
+    color?: string
+  ): Promise<DocumentCategoryResponse> => {
+    const res = await authFetch("/api/v1/documents/categories", token, {
+      method: "POST",
+      body: JSON.stringify({ name, color }),
+    });
+    return handleResponse<DocumentCategoryResponse>(res);
+  },
+
+  updateCategory: async (
+    token: string,
+    id: number,
+    data: { name?: string; color?: string }
+  ): Promise<DocumentCategoryResponse> => {
+    const res = await authFetch(`/api/v1/documents/categories/${id}`, token, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+    return handleResponse<DocumentCategoryResponse>(res);
+  },
+
+  removeCategory: async (token: string, id: number): Promise<void> => {
+    const res = await authFetch(`/api/v1/documents/categories/${id}`, token, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const text = await res.text();
+      throw new Error(text || `Error ${res.status}`);
+    }
+  },
+};
