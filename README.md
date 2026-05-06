@@ -14,14 +14,16 @@ El sector hostelero requiere soluciones rápidas. Herramientas tradicionales com
 - **Bajo coste de entrada**: Despliegue en la nube accesible desde cualquier dispositivo, sin necesidad de hardware propietario.
 - **Todo en uno**: Gestión integral desde una única plataforma.
 
-## ✨ Características Principales
+## ✨ Características Principales y Módulos
 
-- 👥 **Gestión de Empleados y Accesos**: Sistema de roles (Propietario, Encargado, Empleado) para controlar quién ve qué, garantizando la privacidad del negocio.
-- 📦 **Inventario y Proveedores**: Control de stock y gestión completa de tu red de proveedores.
-- 🔧 **Gestión de Incidencias**: Reporte de averías con subida de fotos directamente desde el móvil.
-- 📄 **Gestor Documental**: Repositorio centralizado para facturas, contratos y licencias, categorizado y seguro.
-- 📈 **Panel Predictivo (Diferenciador)**: Integración con API meteorológica para cruzar el histórico de ventas con el clima, permitiendo ajustar compras de inventario y turnos de camareros basándose en el pronóstico del fin de semana.
-- ⚡ **Feed de Actividad en Tiempo Real**: Un historial de auditoría unificado que registra quién crea, modifica o elimina cualquier elemento del sistema.
+- 🔐 **Arquitectura Multi-Tenant (Seguridad Aislada)**: El núcleo del sistema asegura matemáticamente que los datos de cada restaurante estén completamente aislados mediante el uso de JWT seguro y restricciones a nivel de base de datos (`companyId`). Los usuarios jamás envían este ID en las peticiones, lo extrae el backend desde la firma encriptada del token.
+- 👥 **Gestión de Empleados y Accesos**: Sistema de Control de Acceso Basado en Roles (RBAC) con jerarquías (`OWNER`, `MANAGER`, `EMPLOYEE`) y rutas API protegidas.
+- 📦 **Inventario y Proveedores**: Control de stock e IVA por producto, y gestión completa de la red de proveedores (con borrado lógico, *soft delete*, para no perder historial).
+- 🔧 **Gestión de Incidencias**: Reporte de averías con ciclo de vida de estado (`OPEN`, `IN_PROGRESS`, `CLOSED`), prioridades y adjunto de imágenes directas desde el móvil.
+- 📄 **Gestor Documental Inteligente**: Repositorio centralizado para facturas y licencias. Sube ficheros a Supabase Storage con autodetección de tipo MIME (clasifica automáticamente si es PDF, Excel, Imagen, etc.) y calcula el almacenamiento total de la empresa.
+- 📅 **Agenda CRM**: Calendario integrado para gestionar turnos y recordatorios de la empresa.
+- ⚡ **Feed de Actividad Universal**: Un *Audit Log* (Historial) transversal que intercepta de manera transparente cualquier creación, modificación o borrado de productos, documentos, incidencias o usuarios, mostrándolo en una bonita línea de tiempo.
+- 📈 **Panel Predictivo (Diferenciador Post-MVP)**: Integración planificada con API meteorológica para cruzar el histórico de ventas con el clima, permitiendo ajustar compras de inventario y turnos de camareros basándose en el pronóstico del fin de semana.
 
 ## 💶 Modelo de Negocio (Proyectado)
 - **Plan Starter (29€ - 39€/mes)**: Gestión de inventario y empleados, panel de ventas básico. Ideal para cafeterías de barrio.
