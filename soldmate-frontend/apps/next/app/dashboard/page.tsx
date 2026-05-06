@@ -4,10 +4,10 @@ import React from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
   DollarSign, Wrench, Package, Users, TrendingUp,
-  Search, ChevronRight, Circle,
+  ChevronRight, Circle,
   CheckCircle2, Clock, Activity, CloudRain,
 } from "lucide-react";
-import { AlertsBellPopover, WebErpNavbar, UserProfileMenu } from "../shared/ui";
+import { WebErpNavbar, AppTopHeader } from "../shared/ui";
 import Link from "next/link";
 import { useAuthStore } from "app/lib/store";
 import {
@@ -75,9 +75,6 @@ function CustomTooltip({ active, payload, label }: any) {
 
 export default function DashboardPage() {
   const token = useAuthStore((s) => s.token);
-  const firstName = useAuthStore((s) => s.firstName);
-  const lastName = useAuthStore((s) => s.lastName);
-  const email = useAuthStore((s) => s.email);
   const [summary, setSummary] = React.useState<DashboardSummaryResponse | null>(null);
   const [predictions, setPredictions] = React.useState<PredictiveDay[]>([]);
   const [lowStockItems, setLowStockItems] = React.useState<ProductResponse[]>([]);
@@ -85,10 +82,7 @@ export default function DashboardPage() {
   const [businessProfile, setBusinessProfile] = React.useState<BusinessProfileResponse | null>(null);
   const [weatherImpact, setWeatherImpact] = React.useState<any[]>([]);
   const [error, setError] = React.useState<string | null>(null);
-  const today = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
-  const todayCap = today.charAt(0).toUpperCase() + today.slice(1);
-  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
-  const displayName = firstName || fullName || email?.split("@")[0] || "Usuario";
+  const [globalSearch, setGlobalSearch] = React.useState("");
 
   React.useEffect(() => {
     const authToken = token;
@@ -163,24 +157,10 @@ export default function DashboardPage() {
       <WebErpNavbar />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top bar */}
-        <header className="flex-shrink-0 px-7 py-4 flex items-center justify-between gap-4">
-          <div>
-            <p className="text-xs text-gray-400">{todayCap}</p>
-            <h1 className="text-xl font-bold text-[#1e2040]">Bienvenido, {displayName}</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="relative max-w-52 w-full hidden md:block">
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                className="w-full bg-white border border-gray-100 rounded-xl pl-9 pr-4 py-2 text-sm placeholder:text-gray-400 shadow-sm outline-none focus:border-[#4f6ef7] transition-colors"
-                placeholder="Buscar..."
-              />
-            </div>
-            <AlertsBellPopover />
-            <UserProfileMenu />
-          </div>
-        </header>
+        <AppTopHeader 
+          searchValue={globalSearch}
+          onSearchChange={setGlobalSearch}
+        />
 
         <main className="flex-1 overflow-y-auto px-7 pb-6 space-y-5">
           {error && <p className="text-xs text-amber-600">{error}</p>}

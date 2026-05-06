@@ -138,7 +138,11 @@ export default function DocumentsPage() {
       <WebErpNavbar />
 
       <main className="flex-1 overflow-y-auto pb-6">
-        <AppTopHeader />
+        <AppTopHeader 
+          searchValue={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Buscar documentos..."
+        />
         <div className="px-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">

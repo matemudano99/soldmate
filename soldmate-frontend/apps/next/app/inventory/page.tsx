@@ -21,6 +21,7 @@ export default function InventoryPage() {
   const isOwner = role === "OWNER";
   const qc = useQueryClient();
   const [authReady, setAuthReady] = useState(false);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     if (useAuthStore.persist.hasHydrated()) {
@@ -76,7 +77,15 @@ export default function InventoryPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["inventory"] }),
   });
 
-  const products = query.data ?? [];
+  const products = useMemo(() => {
+    let list = query.data ?? [];
+    if (search.trim()) {
+      const s = search.toLowerCase();
+      list = list.filter((p) => p.name.toLowerCase().includes(s) || p.category?.toLowerCase().includes(s));
+    }
+    return list;
+  }, [query.data, search]);
+
   const lowStock = useMemo(() => products.filter((p) => p.lowStock), [products]);
   const okStock = useMemo(() => products.filter((p) => !p.lowStock), [products]);
 
@@ -84,7 +93,11 @@ export default function InventoryPage() {
     <div className="flex min-h-screen bg-[#eef1f8] text-[#1e2040]">
       <WebErpNavbar />
       <main className="flex-1 pb-6 overflow-y-auto">
-        <AppTopHeader />
+        <AppTopHeader 
+          searchValue={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Buscar en inventario..."
+        />
         <div className="px-6">
         <div className="flex items-center gap-3 mb-2">
           <Link

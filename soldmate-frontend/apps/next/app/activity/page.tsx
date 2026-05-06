@@ -45,9 +45,20 @@ function typeName(type: string): string {
   }
 }
 
+const FILTERS = [
+  { id: "ALL", label: "Todos" },
+  { id: "INCIDENT", label: "Incidencias" },
+  { id: "DOCUMENT", label: "Documentos" },
+  { id: "SUPPLIER", label: "Proveedores" },
+  { id: "USER", label: "Usuarios" },
+  { id: "TASK", label: "Agenda" },
+];
+
 export default function ActivityPage() {
   const token = useAuthStore((s) => s.token);
   const [authReady, setAuthReady] = useState(false);
+  const [filterType, setFilterType] = useState<string>("ALL");
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     if (useAuthStore.persist.hasHydrated()) {
@@ -64,15 +75,30 @@ export default function ActivityPage() {
   });
 
   const items = useMemo(() => {
-    const list = query.data ?? [];
-    return [...list].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 40);
-  }, [query.data]);
+    let list = query.data ?? [];
+    if (filterType !== "ALL") {
+      list = list.filter((i) => i.type === filterType);
+    }
+    if (search.trim()) {
+      const s = search.toLowerCase();
+      list = list.filter((i) => 
+        i.details?.toLowerCase().includes(s) || 
+        i.userEmail?.toLowerCase().includes(s) ||
+        typeName(i.type).toLowerCase().includes(s)
+      );
+    }
+    return [...list].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 60);
+  }, [query.data, filterType]);
 
   return (
     <div className="flex min-h-screen bg-[#eef1f8] text-[#1e2040]">
       <WebErpNavbar />
-      <main className="flex-1 pb-6 overflow-y-auto max-w-3xl">
-        <AppTopHeader />
+      <main className="flex-1 pb-6 overflow-y-auto">
+        <AppTopHeader 
+          searchValue={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Filtrar registros..."
+        />
         <div className="px-6">
           <div className="flex items-center gap-3 mb-2">
             <Link
@@ -91,6 +117,22 @@ export default function ActivityPage() {
             <p className="text-sm text-gray-500 mt-1">
               Línea de tiempo con toda la actividad de la empresa: proveedores, usuarios, documentos, incidencias y más.
             </p>
+          </div>
+
+          <div className="flex gap-2 overflow-x-auto pb-4 mb-2 scrollbar-hide">
+            {FILTERS.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setFilterType(f.id)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                  filterType === f.id
+                    ? "bg-[#4f6ef7] text-white"
+                    : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
           </div>
 
           {!authReady && (
@@ -114,51 +156,59 @@ export default function ActivityPage() {
           )}
 
           {authReady && !query.isLoading && !query.isError && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_2px_16px_rgba(149,157,165,0.10)] overflow-hidden">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_2px_16px_rgba(149,157,165,0.10)] p-6">
               {items.length === 0 ? (
-                <p className="text-sm text-gray-500 py-10 text-center px-4">
-                  Aún no hay actividad registrada en la empresa.
+                <p className="text-sm text-gray-500 py-10 text-center">
+                  Aún no hay actividad registrada para este filtro.
                 </p>
               ) : (
-                <ul className="divide-y divide-gray-50">
-                  {items.map((inc) => {
-                    const when = new Date(inc.createdAt);
-                    const timeStr = when.toLocaleString("es-ES", {
-                      day: "2-digit",
-                      month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    });
-                    const who = inc.actorName ?? "Usuario";
-                    return (
-                      <li key={inc.id} className="px-5 py-3.5 flex gap-3 hover:bg-[#fafbff]">
-                        {inc.actorAvatarUrl ? (
-                          <img src={inc.actorAvatarUrl} alt={who} className="w-9 h-9 rounded-full object-cover shrink-0" />
-                        ) : (
-                          <div className="w-9 h-9 rounded-full bg-[#f0f3ff] flex items-center justify-center shrink-0">
-                            <TypeIcon type={inc.type} />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm leading-snug">
-                            <span className="font-semibold text-[#1e2040]">{who}</span>{" "}
-                            <span className="text-gray-600">{actionVerb(inc.status)}</span>{" "}
-                            <span className="text-[#1e2040]">«{inc.title}»</span>
-                          </p>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <span className="text-[10px] text-gray-400">{timeStr}</span>
-                            <span className="text-[10px] text-gray-300">·</span>
-                            <span className="text-[10px] font-medium text-gray-500 uppercase">{typeName(inc.type)}</span>
-                            <span className="inline-flex items-center gap-1 text-[10px] text-gray-500">
+                <div className="relative">
+                  {/* Timeline connector */}
+                  <div className="absolute left-[15px] top-4 bottom-4 w-px bg-gray-200 z-0"></div>
+                  <ul className="space-y-3 relative z-10">
+                    {items.map((inc) => {
+                      const when = new Date(inc.createdAt);
+                      const timeStr = when.toLocaleString("es-ES", {
+                        day: "2-digit",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      });
+                      const who = inc.actorName ?? "Usuario";
+                      return (
+                        <li key={inc.id} className="flex gap-3 group items-start">
+                          <div className="relative shrink-0 mt-0.5">
+                            {inc.actorAvatarUrl ? (
+                              <img src={inc.actorAvatarUrl} alt={who} className="w-8 h-8 rounded-full object-cover border-[3px] border-white shadow-sm" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-[#f0f3ff] border-[3px] border-white shadow-sm flex items-center justify-center text-[#4f6ef7] font-bold text-xs">
+                                {who.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center shadow-sm">
                               <ActionIcon action={inc.status} />
-                              {inc.status}
-                            </span>
+                            </div>
                           </div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
+
+                          <div className="flex-1 bg-gray-50/50 group-hover:bg-gray-50 transition-colors border border-transparent group-hover:border-gray-100 rounded-lg px-3 py-2">
+                            <p className="text-[13px] text-gray-800 leading-snug">
+                              <span className="font-semibold text-[#1e2040]">{who}</span>{" "}
+                              <span className="text-gray-500">{actionVerb(inc.status)}</span>{" "}
+                              <span className="text-[#1e2040] font-medium">{inc.title}</span>
+                            </p>
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              <span className="text-[11px] text-gray-400">{timeStr}</span>
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white border border-gray-100 text-[10px] font-medium text-gray-600 shadow-sm">
+                                <TypeIcon type={inc.type} />
+                                {typeName(inc.type)}
+                              </span>
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
               )}
             </div>
           )}

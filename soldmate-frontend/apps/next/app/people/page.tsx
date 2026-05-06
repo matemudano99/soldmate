@@ -8,7 +8,7 @@ import {
   Star, TrendingUp, Loader2, AlertCircle,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CreatePersonModal, UserProfileMenu, WebErpNavbar } from "../shared/ui";
+import { CreatePersonModal, AppTopHeader, WebErpNavbar } from "../shared/ui";
 import { usersApi, type UserListResponse, type UserUpsertInput } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
@@ -29,6 +29,8 @@ interface Employee {
   joinDate: string;
   rating: number;
 }
+
+type NewEmployeeInput = Omit<Employee, "id" | "rating"> & { password?: string };
 
 // ─── API ↔ UI mappers ─────────────────────────────────────────────────────────
 
@@ -51,9 +53,7 @@ function mapUser(u: UserListResponse): Employee {
   };
 }
 
-function employeeToUserInput(
-  e: (Omit<Employee, "id"> | Omit<Employee, "id" | "rating">) & { password?: string },
-): UserUpsertInput {
+function employeeToUserInput(e: Omit<Employee, "id"> | NewEmployeeInput): UserUpsertInput {
   const role = (e.role || "EMPLOYEE").toUpperCase();
   const mappedRole: UserUpsertInput["role"] =
     role === "OWNER" ? "OWNER" :
@@ -65,7 +65,7 @@ function employeeToUserInput(
     email: e.email.trim(),
     role: mappedRole,
     avatarUrl: e.avatar ?? null,
-    ...(e.password ? { password: e.password } : {}),
+    ...("password" in e && e.password ? { password: e.password } : {}),
   };
 }
 
@@ -682,7 +682,7 @@ export default function PeoplePage() {
     return list;
   }, [employees, search, activeDept, sortBy]);
 
-  const addEmployee = (data: Omit<Employee, "id" | "rating">) => {
+  const addEmployee = (data: NewEmployeeInput) => {
     createMutation.mutate(employeeToUserInput(data));
   };
 
@@ -757,25 +757,11 @@ export default function PeoplePage() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top bar */}
-        <header className="flex-shrink-0 px-7 py-4 flex items-center justify-between gap-4">
-          <div className="relative max-w-xs w-full">
-            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-white border border-gray-100 rounded-xl pl-10 pr-4 py-2.5 text-sm placeholder:text-gray-400 shadow-sm outline-none focus:border-[#4f6ef7] transition-colors"
-              placeholder="Buscar usuarios..."
-            />
-            {search && (
-              <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                <X size={13} />
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <UserProfileMenu />
-          </div>
-        </header>
+        <AppTopHeader
+          searchValue={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Buscar usuarios..."
+        />
 
         {/* Content */}
         <main className="flex-1 overflow-y-auto px-7 pb-6">
