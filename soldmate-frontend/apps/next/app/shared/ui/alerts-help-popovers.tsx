@@ -2,7 +2,7 @@
 
 import React from "react";
 import { AlertTriangle, Bell, CheckCircle, Clock, HelpCircle, LifeBuoy, Mail, Phone } from "lucide-react";
-import { alertsApi, describeNetworkError, type AlertResponse } from "app/lib/api";
+import { alertsApi, notificationsApi, describeNetworkError, type AlertResponse, type NotificationResponse } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
 function useOutsideClose(ref: React.RefObject<HTMLDivElement | null>, onClose: () => void) {
@@ -20,24 +20,56 @@ export function AlertsBellPopover() {
   const token = useAuthStore((s) => s.token);
   const [open, setOpen] = React.useState(false);
   const [alerts, setAlerts] = React.useState<AlertResponse[]>([]);
+  const [notifications, setNotifications] = React.useState<NotificationResponse[]>([]);
+  const [unreadCount, setUnreadCount] = React.useState(0);
   const [error, setError] = React.useState<string | null>(null);
   const rootRef = React.useRef<HTMLDivElement>(null);
 
   useOutsideClose(rootRef, () => setOpen(false));
 
+  // Fetch unread count on mount (to show badge)
+  React.useEffect(() => {
+    if (!token) return;
+    notificationsApi.getUnreadCount(token).then(setUnreadCount).catch(() => {});
+  }, [token]);
+
   React.useEffect(() => {
     if (!open || !token) return;
-    async function loadAlerts() {
+    async function loadAll() {
       try {
         setError(null);
-        const data = await alertsApi.getAll(token);
-        setAlerts(data);
+        const [alertData, notifData, count] = await Promise.all([
+          alertsApi.getAll(token),
+          notificationsApi.getAll(token),
+          notificationsApi.getUnreadCount(token),
+        ]);
+        setAlerts(alertData);
+        setNotifications(notifData);
+        setUnreadCount(count);
       } catch (err) {
         setError(describeNetworkError(err));
       }
     }
-    loadAlerts();
+    loadAll();
   }, [open, token]);
+
+  const handleMarkAllRead = async () => {
+    if (!token) return;
+    try {
+      await notificationsApi.markAllRead(token);
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      setUnreadCount(0);
+    } catch { /* silent */ }
+  };
+
+  const handleMarkRead = async (id: number) => {
+    if (!token) return;
+    try {
+      await notificationsApi.markRead(token, id);
+      setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
+      setUnreadCount((c) => Math.max(0, c - 1));
+    } catch { /* silent */ }
+  };
 
   return (
     <div className="relative" ref={rootRef}>
@@ -48,32 +80,64 @@ export function AlertsBellPopover() {
         title="Ver alertas"
       >
         <Bell size={16} className="text-gray-500" />
-        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white flex items-center justify-center font-bold">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
       </button>
       {open ? (
-        <div className="absolute right-0 top-12 z-50 w-[340px] rounded-2xl border border-gray-100 bg-white p-3 shadow-[0_8px_28px_rgba(149,157,165,0.24)]">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Alertas</p>
-          <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
+        <div className="absolute right-0 top-12 z-50 w-[360px] rounded-2xl border border-gray-100 bg-white shadow-[0_8px_28px_rgba(149,157,165,0.24)] overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
+            <p className="text-sm font-semibold text-[#1e2040]">Notificaciones</p>
+            {unreadCount > 0 && (
+              <button type="button" onClick={handleMarkAllRead} className="text-xs text-[#4f6ef7] hover:underline">
+                Marcar todas leídas
+              </button>
+            )}
+          </div>
+          <div className="max-h-80 overflow-y-auto">
+            {/* Persistent notifications */}
+            {notifications.map((n) => {
+              const Icon = n.type === "ALERT" ? AlertTriangle : n.type === "WARNING" ? Clock : CheckCircle;
+              const styles = n.type === "ALERT" ? "text-red-500" : n.type === "WARNING" ? "text-amber-500" : "text-[#4f6ef7]";
+              return (
+                <button
+                  key={n.id}
+                  type="button"
+                  onClick={() => handleMarkRead(n.id)}
+                  className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-50 ${n.read ? "opacity-60" : ""}`}
+                >
+                  <Icon size={14} className={`mt-0.5 flex-shrink-0 ${styles}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium text-[#1e2040] ${n.read ? "" : "font-semibold"}`}>{n.title}</p>
+                    {n.body && <p className="text-xs text-gray-400 truncate mt-0.5">{n.body}</p>}
+                  </div>
+                  {!n.read && <span className="w-2 h-2 bg-[#4f6ef7] rounded-full mt-1 flex-shrink-0" />}
+                </button>
+              );
+            })}
+            {/* Legacy inventory alerts */}
+            {alerts.length > 0 && (
+              <div className="px-4 pt-3 pb-1">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Alertas de inventario</p>
+              </div>
+            )}
             {alerts.map((a, idx) => {
               const Icon = a.type === "critical" ? AlertTriangle : a.type === "warning" ? Clock : CheckCircle;
-              const styles =
-                a.type === "critical"
-                  ? "bg-red-50 border-red-100 text-red-600"
-                  : a.type === "warning"
-                    ? "bg-amber-50 border-amber-100 text-amber-600"
-                    : "bg-green-50 border-green-100 text-green-600";
+              const styles = a.type === "critical" ? "text-red-600" : a.type === "warning" ? "text-amber-600" : "text-green-600";
               return (
-                <div key={`${a.text}-${idx}`} className={`flex items-center gap-3 rounded-xl border p-3 ${styles}`}>
-                  <Icon size={15} className="flex-shrink-0" />
-                  <span className="text-sm font-medium">{a.text}</span>
+                <div key={`alert-${idx}`} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50">
+                  <Icon size={14} className={`flex-shrink-0 ${styles}`} />
+                  <span className="text-sm text-gray-700">{a.text}</span>
                 </div>
               );
             })}
-            {!alerts.length ? (
-              <p className="text-xs text-gray-500 px-1 py-2">No hay alertas recientes.</p>
+            {!notifications.length && !alerts.length ? (
+              <p className="text-xs text-gray-400 px-4 py-8 text-center">Sin notificaciones</p>
             ) : null}
           </div>
-          {error ? <p className="text-xs text-amber-600 mt-2 px-1">{error}</p> : null}
+          {error ? <p className="text-xs text-amber-600 px-4 pb-3">{error}</p> : null}
         </div>
       ) : null}
     </div>

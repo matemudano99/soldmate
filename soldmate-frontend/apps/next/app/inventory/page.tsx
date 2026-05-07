@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Package, ChevronLeft, AlertTriangle, Minus, Plus, Trash2, Save, X } from "lucide-react";
-import { AppTopHeader, WebErpNavbar } from "../shared/ui";
+import { AppTopHeader, WebErpNavbar, notify, useConfirm, SkeletonTable, EmptyState } from "../shared/ui";
 import { inventoryApi, type ProductResponse } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
@@ -22,6 +22,7 @@ export default function InventoryPage() {
   const qc = useQueryClient();
   const [authReady, setAuthReady] = useState(false);
   const [search, setSearch] = useState("");
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   useEffect(() => {
     if (useAuthStore.persist.hasHydrated()) {
@@ -39,7 +40,8 @@ export default function InventoryPage() {
 
   const stockMut = useMutation({
     mutationFn: ({ id, delta }: { id: number; delta: number }) => inventoryApi.updateStock(token!, id, delta),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["inventory"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["inventory"] }); notify.success("Stock actualizado"); },
+    onError: (e: Error) => notify.error(e.message ?? "Error al actualizar stock"),
   });
   const createMut = useMutation({
     mutationFn: (payload: {
@@ -50,7 +52,8 @@ export default function InventoryPage() {
       category?: string | null;
       vatRate?: number | null;
     }) => inventoryApi.create(token!, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["inventory"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["inventory"] }); notify.success("Producto creado"); },
+    onError: (e: Error) => notify.error(e.message ?? "Error al crear producto"),
   });
   const updateMut = useMutation({
     mutationFn: (payload: {
@@ -70,11 +73,13 @@ export default function InventoryPage() {
         category: payload.category ?? null,
         vatRate: payload.vatRate ?? null,
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["inventory"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["inventory"] }); notify.success("Producto actualizado"); },
+    onError: (e: Error) => notify.error(e.message ?? "Error al actualizar producto"),
   });
   const removeMut = useMutation({
     mutationFn: (id: number) => inventoryApi.remove(token!, id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["inventory"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["inventory"] }); notify.success("Producto eliminado"); },
+    onError: (e: Error) => notify.error(e.message ?? "Error al eliminar producto"),
   });
 
   const products = useMemo(() => {
@@ -168,9 +173,9 @@ export default function InventoryPage() {
                       onUpdateMin={(id, minStock, currentStock, name, unit, category, vatRate) =>
                         updateMut.mutate({ id, minStock, currentStock, name, unit, category, vatRate })
                       }
-                      onRemove={(id, name) => {
-                        if (!confirm(`¿Eliminar el producto «${name}»?`)) return;
-                        removeMut.mutate(id);
+                      onRemove={async (id, name) => {
+                        const ok = await confirm(`¿Eliminar el producto «${name}»?`, "Esta acción no se puede deshacer.", "danger");
+                        if (ok) removeMut.mutate(id);
                       }}
                       pending={stockMut.isPending}
                     />
@@ -192,9 +197,9 @@ export default function InventoryPage() {
                       onUpdateMin={(id, minStock, currentStock, name, unit, category, vatRate) =>
                         updateMut.mutate({ id, minStock, currentStock, name, unit, category, vatRate })
                       }
-                      onRemove={(id, name) => {
-                        if (!confirm(`¿Eliminar el producto «${name}»?`)) return;
-                        removeMut.mutate(id);
+                      onRemove={async (id, name) => {
+                        const ok = await confirm(`¿Eliminar el producto «${name}»?`, "Esta acción no se puede deshacer.", "danger");
+                        if (ok) removeMut.mutate(id);
                       }}
                       pending={stockMut.isPending}
                     />
@@ -203,15 +208,18 @@ export default function InventoryPage() {
               </section>
             )}
 
-            {products.length === 0 && (
-              <p className="text-sm text-gray-500 py-8 text-center bg-white rounded-2xl border border-gray-100">
-                No hay productos en el catálogo.
-              </p>
+            {products.length === 0 && !query.isLoading && (
+              <EmptyState
+                icon={Package}
+                title="Sin productos"
+                description="Añade tu primer producto al catálogo usando el formulario de arriba."
+              />
             )}
           </div>
         )}
         </div>
       </main>
+      {confirmDialog}
     </div>
   );
 }
@@ -248,17 +256,19 @@ function AddProductCard({
         />
         <input
           value={currentStock}
-          onChange={(e) => setCurrentStock(e.target.value)}
+          onChange={(e) => setCurrentStock(e.target.value.replace(/[^0-9]/g, ""))}
           type="number"
-          step="0.01"
+          step="1"
+          min="0"
           placeholder="Stock actual"
           className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
         />
         <input
           value={minStock}
-          onChange={(e) => setMinStock(e.target.value)}
+          onChange={(e) => setMinStock(e.target.value.replace(/[^0-9]/g, ""))}
           type="number"
-          step="0.01"
+          step="1"
+          min="0"
           placeholder="Mínimo necesario"
           className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
         />
@@ -286,8 +296,8 @@ function AddProductCard({
           onClick={() => {
             onCreate({
               name: name.trim(),
-              currentStock: Number(currentStock || 0),
-              minStock: Number(minStock || 0),
+              currentStock: Math.floor(Number(currentStock || 0)),
+              minStock: Math.floor(Number(minStock || 0)),
               unit,
               category: category.trim() || null,
               vatRate: 10,

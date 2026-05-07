@@ -803,3 +803,64 @@ export const documentsApi = {
     }
   },
 };
+
+// ─── Búsqueda global ─────────────────────────────────────────────────────────
+
+export interface SearchResult {
+  id: string;
+  type: "PRODUCT" | "INCIDENT" | "SUPPLIER" | "DOCUMENT";
+  title: string;
+  subtitle: string;
+  href: string;
+}
+
+export const searchApi = {
+  search: async (token: string, query: string): Promise<SearchResult[]> => {
+    if (!query || query.trim().length < 2) return [];
+    const res = await authFetch(`/api/v1/search?q=${encodeURIComponent(query.trim())}`, token);
+    return handleResponse<SearchResult[]>(res);
+  },
+};
+
+// ─── Notificaciones persistidas ───────────────────────────────────────────────
+
+export interface NotificationResponse {
+  id: number;
+  type: "INFO" | "WARNING" | "ALERT";
+  title: string;
+  body: string | null;
+  read: boolean;
+  createdAt: string;
+}
+
+export const notificationsApi = {
+  getAll: async (token: string): Promise<NotificationResponse[]> => {
+    const res = await authFetch("/api/v1/notifications", token);
+    return handleResponse<NotificationResponse[]>(res);
+  },
+
+  getUnreadCount: async (token: string): Promise<number> => {
+    const res = await authFetch("/api/v1/notifications/unread-count", token);
+    const data = await handleResponse<{ unread: number }>(res);
+    return data.unread;
+  },
+
+  markRead: async (token: string, id: number): Promise<NotificationResponse> => {
+    const res = await authFetch(`/api/v1/notifications/${id}/read`, token, { method: "PUT" });
+    return handleResponse<NotificationResponse>(res);
+  },
+
+  markAllRead: async (token: string): Promise<void> => {
+    const res = await authFetch("/api/v1/notifications/read-all", token, { method: "PUT" });
+    if (!res.ok) throw new Error(`Error ${res.status}`);
+  },
+
+  create: async (token: string, type: string, title: string, body?: string): Promise<NotificationResponse> => {
+    const res = await authFetch("/api/v1/notifications", token, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, title, body }),
+    });
+    return handleResponse<NotificationResponse>(res);
+  },
+};

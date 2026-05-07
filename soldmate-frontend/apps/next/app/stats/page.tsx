@@ -5,8 +5,11 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
-import { Users, ShoppingCart, Star, Activity } from "lucide-react";
-import { AppTopHeader, WebErpNavbar } from "../shared/ui";
+import { Users, ShoppingCart, Star, Activity, Download } from "lucide-react";
+import { AppTopHeader, WebErpNavbar, notify } from "../shared/ui";
+import { dashboardApi, inventoryApi } from "app/lib/api";
+import { useAuthStore } from "app/lib/store";
+import { useEffect } from "react";
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
@@ -80,6 +83,30 @@ function PieLabel({ cx, cy, midAngle, outerRadius, percent, name }: any) {
 
 export default function StatsPage() {
   const [period, setPeriod] = useState<typeof PERIODS[number]>("Esta semana");
+  const token = useAuthStore((s) => s.token);
+  const [liveKpis, setLiveKpis] = useState<typeof SUMMARY_KPIS | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    async function load() {
+      try {
+        const [summary, products] = await Promise.all([
+          dashboardApi.getSummary(token!),
+          inventoryApi.getAll(token!),
+        ]);
+        const lowStock = products.filter((p) => p.lowStock).length;
+        setLiveKpis([
+          { label: "Productos en catálogo", value: String(summary.totalProducts), Icon: ShoppingCart, color: "text-[#4f6ef7]", bg: "bg-blue-50 border-blue-100" },
+          { label: "Stock bajo", value: String(lowStock), Icon: Activity, color: "text-amber-500", bg: "bg-amber-50 border-amber-100" },
+          { label: "Incidencias abiertas", value: String(summary.openIncidents), Icon: Activity, color: "text-red-500", bg: "bg-red-50 border-red-100" },
+          { label: "Usuarios activos", value: String(summary.activeContacts), Icon: Users, color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-100" },
+        ]);
+      } catch { /* fallback to mock */ }
+    }
+    load();
+  }, [token]);
+
+  const displayKpis = liveKpis ?? SUMMARY_KPIS;
 
   return (
     <div className="flex min-h-screen bg-[#eef1f8] text-[#1e2040]">
@@ -92,8 +119,24 @@ export default function StatsPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-[#1e2040]">Estadísticas</h1>
-            <p className="text-sm text-gray-400 mt-0.5">Análisis de rendimiento operativo</p>
+            <p className="text-sm text-gray-400 mt-0.5">
+              Análisis de rendimiento operativo {liveKpis ? "· Datos en tiempo real" : "· Datos de ejemplo"}
+            </p>
           </div>
+          <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              const rows = WEEKLY_PERF;
+              const csv = [Object.keys(rows[0]).join(","), ...rows.map((r) => Object.values(r).join(","))].join("\n");
+              const blob = new Blob([csv], { type: "text/csv" });
+              const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "estadisticas.csv"; a.click();
+              notify.success("CSV exportado");
+            }}
+            className="flex items-center gap-2 bg-white border border-gray-100 rounded-xl px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 shadow-sm"
+          >
+            <Download size={13} /> CSV
+          </button>
           <div className="flex gap-1 bg-white border border-gray-100 rounded-xl p-1 shadow-sm">
             {PERIODS.map((p) => (
               <button
@@ -109,11 +152,12 @@ export default function StatsPage() {
               </button>
             ))}
           </div>
+          </div>
         </div>
 
         {/* KPI Grid */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-          {SUMMARY_KPIS.map((k) => (
+          {displayKpis.map((k) => (
             <div key={k.label} className={`bg-white rounded-2xl p-5 shadow-[0_2px_16px_rgba(149,157,165,0.10)] border ${k.bg}`}>
               <div className="flex items-start justify-between mb-3">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider leading-tight max-w-[70%]">{k.label}</p>

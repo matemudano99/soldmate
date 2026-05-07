@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Plus, CloudRain, Wind, Thermometer, Loader2, Pencil, Trash2 } from "lucide-react";
 import { SectionCard } from "../components/web-ui";
-import { AppTopHeader, CreateCalendarTaskModal, WebErpNavbar } from "../shared/ui";
+import { AppTopHeader, CreateCalendarTaskModal, WebErpNavbar, notify, useConfirm } from "../shared/ui";
 import { businessProfileApi, calendarApi, forecastApi, type CalendarEventResponse, type ForecastImpactDay } from "app/lib/api";
 import { describeNetworkError } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
@@ -52,6 +52,7 @@ export default function CalendarPage() {
   const [forecastError, setForecastError] = useState<string | null>(null);
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [taskActionError, setTaskActionError] = useState<string | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const weekDates = useMemo(() => {
     const now = new Date();
@@ -114,16 +115,20 @@ export default function CalendarPage() {
   }, [events]);
 
   async function handleDeleteTask(task: CalendarEventResponse) {
-    if (!confirm(`¿Eliminar la tarea "${task.title}"?`)) return;
+    const ok = await confirm(`¿Eliminar la tarea "${task.title}"?`, "Esta acción no se puede deshacer.", "danger");
+    if (!ok) return;
     setTaskActionError(null);
     const prev = events;
     setEvents((current) => current.filter((e) => e.id !== task.id));
     if (!token) return;
     try {
       await calendarApi.remove(token, task.id);
+      notify.success("Tarea eliminada");
     } catch (error) {
       setEvents(prev);
-      setTaskActionError(describeNetworkError(error));
+      const msg = describeNetworkError(error);
+      setTaskActionError(msg);
+      notify.error(msg);
     }
   }
 
@@ -353,6 +358,7 @@ export default function CalendarPage() {
         )}
         </div>
       </main>
+      {confirmDialog}
     </div>
   );
 }

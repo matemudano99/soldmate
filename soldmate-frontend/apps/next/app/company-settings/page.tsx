@@ -7,6 +7,37 @@ import { AppTopHeader } from "../shared/ui";
 import { authApi, businessProfileApi, type BusinessProfileResponse, describeNetworkError } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 import { Building2, Camera, MapPin, Settings2, UserRound } from "lucide-react";
+import { notify } from "../shared/ui";
+
+const COUNTRY_OPTIONS = [
+  { code: "ES", name: "España" },
+  { code: "MX", name: "México" },
+  { code: "AR", name: "Argentina" },
+  { code: "CO", name: "Colombia" },
+  { code: "CL", name: "Chile" },
+  { code: "PE", name: "Perú" },
+  { code: "US", name: "Estados Unidos" },
+  { code: "GB", name: "Reino Unido" },
+  { code: "FR", name: "Francia" },
+  { code: "DE", name: "Alemania" },
+  { code: "IT", name: "Italia" },
+  { code: "PT", name: "Portugal" },
+];
+
+const TIMEZONE_OPTIONS = [
+  "Europe/Madrid",
+  "Europe/London",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "America/Mexico_City",
+  "America/Bogota",
+  "America/Lima",
+  "America/Santiago",
+  "America/Buenos_Aires",
+  "America/New_York",
+  "America/Los_Angeles",
+  "UTC",
+];
 
 const DEFAULT_OPENING_HOURS = JSON.stringify(
   {
@@ -115,8 +146,11 @@ export default function CompanySettingsPage() {
       });
       setProfile({ firstName: updated.firstName, lastName: updated.lastName, avatarUrl: updated.avatarUrl });
       setSaved(true);
+      notify.success("Perfil guardado correctamente");
     } catch (err: any) {
-      setError(err.message ?? "No se pudo guardar el perfil");
+      const msg = err.message ?? "No se pudo guardar el perfil";
+      setError(msg);
+      notify.error(msg);
     } finally {
       setLoading(false);
     }
@@ -149,8 +183,11 @@ export default function CompanySettingsPage() {
         timezone: preferences.timezone || business.timezone,
       });
       setSavedBusiness(true);
+      notify.success("Perfil de empresa guardado");
     } catch (err) {
-      setBusinessError(describeNetworkError(err));
+      const msg = describeNetworkError(err);
+      setBusinessError(msg);
+      notify.error(msg);
     } finally {
       setLoadingBusiness(false);
     }
@@ -267,11 +304,15 @@ export default function CompanySettingsPage() {
               </div>
               <div className="rounded-xl border border-gray-100 bg-[#f8f9fc] p-4 sm:col-span-2">
                 <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1">Zona horaria</p>
-                <input
+                <select
                   value={preferences.timezone}
                   onChange={(e) => setPreferences((p) => ({ ...p, timezone: e.target.value }))}
                   className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
-                />
+                >
+                  {TIMEZONE_OPTIONS.map((tz) => (
+                    <option key={tz} value={tz}>{tz}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </SectionCard>
@@ -302,8 +343,12 @@ export default function CompanySettingsPage() {
                     <input value={business.address ?? ""} onChange={(e) => setBusiness((b) => ({ ...b, address: e.target.value }))} placeholder="Dirección" className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm" />
                     <input value={business.city ?? ""} onChange={(e) => setBusiness((b) => ({ ...b, city: e.target.value }))} placeholder="Ciudad" className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm" />
                     <input value={business.postalCode ?? ""} onChange={(e) => setBusiness((b) => ({ ...b, postalCode: e.target.value }))} placeholder="Código postal" className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm" />
-                    <input value={business.country ?? ""} onChange={(e) => setBusiness((b) => ({ ...b, country: e.target.value }))} placeholder="País (ISO2)" className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm" />
-                    <input value={preferences.timezone} onChange={(e) => setPreferences((p) => ({ ...p, timezone: e.target.value }))} placeholder="Zona horaria" className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm" />
+                    <select value={business.country ?? "ES"} onChange={(e) => setBusiness((b) => ({ ...b, country: e.target.value }))} className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm">
+                      {COUNTRY_OPTIONS.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+                    </select>
+                    <select value={preferences.timezone} onChange={(e) => setPreferences((p) => ({ ...p, timezone: e.target.value }))} className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm">
+                      {TIMEZONE_OPTIONS.map((tz) => <option key={tz} value={tz}>{tz}</option>)}
+                    </select>
                     <label className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm flex items-center gap-2">
                       <MapPin size={14} className="text-gray-400" />
                       <input type="number" step="0.0001" value={business.latitude ?? 0} onChange={(e) => setBusiness((b) => ({ ...b, latitude: Number(e.target.value) }))} placeholder="Latitud" className="w-full outline-none" />
@@ -311,13 +356,47 @@ export default function CompanySettingsPage() {
                     <input type="number" step="0.0001" value={business.longitude ?? 0} onChange={(e) => setBusiness((b) => ({ ...b, longitude: Number(e.target.value) }))} placeholder="Longitud" className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm" />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 font-semibold mb-1">Horario (JSON por día)</label>
-                    <textarea
-                      rows={8}
-                      value={business.openingHours ?? ""}
-                      onChange={(e) => setBusiness((b) => ({ ...b, openingHours: e.target.value }))}
-                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs font-mono"
-                    />
+                    <label className="block text-xs text-gray-500 font-semibold mb-2">Horario por día</label>
+                    <div className="space-y-2">
+                      {(["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const).map((day) => {
+                        const label = { mon: "Lun", tue: "Mar", wed: "Mié", thu: "Jue", fri: "Vie", sat: "Sáb", sun: "Dom" }[day];
+                        let parsed: Record<string, string> = {};
+                        try { parsed = JSON.parse(business.openingHours ?? "{}"); } catch {}
+                        const val = parsed[day] ?? "CLOSED";
+                        const isClosed = val === "CLOSED";
+                        return (
+                          <div key={day} className="flex items-center gap-3">
+                            <span className="w-8 text-xs font-semibold text-gray-500">{label}</span>
+                            <input
+                              type="checkbox"
+                              checked={!isClosed}
+                              onChange={(e) => {
+                                let p: Record<string, string> = {};
+                                try { p = JSON.parse(business.openingHours ?? "{}"); } catch {}
+                                p[day] = e.target.checked ? "08:00-18:00" : "CLOSED";
+                                setBusiness((b) => ({ ...b, openingHours: JSON.stringify(p, null, 2) }));
+                              }}
+                              className="accent-[#4f6ef7]"
+                            />
+                            {!isClosed ? (
+                              <input
+                                value={val}
+                                onChange={(e) => {
+                                  let p: Record<string, string> = {};
+                                  try { p = JSON.parse(business.openingHours ?? "{}"); } catch {}
+                                  p[day] = e.target.value;
+                                  setBusiness((b) => ({ ...b, openingHours: JSON.stringify(p, null, 2) }));
+                                }}
+                                placeholder="08:00-18:00"
+                                className="flex-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs"
+                              />
+                            ) : (
+                              <span className="text-xs text-gray-400 italic">Cerrado</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                   {businessError && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{businessError}</div>}
                   {savedBusiness && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">Configuración del negocio guardada.</div>}

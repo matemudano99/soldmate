@@ -8,7 +8,7 @@ import {
   Star, TrendingUp, Loader2, AlertCircle,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CreatePersonModal, AppTopHeader, WebErpNavbar } from "../shared/ui";
+import { CreatePersonModal, AppTopHeader, WebErpNavbar, notify, useConfirm, EmptyState } from "../shared/ui";
 import { usersApi, type UserListResponse, type UserUpsertInput } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
@@ -181,10 +181,7 @@ function EmployeeCard({
         ? <p className="text-gray-400 text-xs mb-3 truncate">{emp.email}</p>
         : <p className="text-gray-300 text-xs mb-3 italic">Sin email</p>}
 
-      <div className="flex items-center justify-between mb-1">
-        <ProgressDots percent={emp.progress} />
-        <span className="text-xs text-gray-500 font-semibold ml-2">{emp.progress}%</span>
-      </div>
+
 
       <div className="flex items-center justify-between mt-3.5 pt-3 border-t border-gray-50">
         <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-widest truncate">{emp.role}</p>
@@ -375,30 +372,6 @@ function DetailPanel({
         </div>
       </div>
 
-      {/* Progress */}
-      <div className="px-5 py-4 border-b border-gray-50">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Progreso</span>
-          <span className="text-sm font-bold text-[#4f6ef7]">
-            {editing ? draft.progress : emp.progress}%
-          </span>
-        </div>
-        {editing ? (
-          <input
-            type="range" min={0} max={100}
-            value={draft.progress}
-            onChange={(e) => set("progress", Number(e.target.value))}
-            className="w-full accent-[#4f6ef7]"
-          />
-        ) : (
-          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-[#4f6ef7] rounded-full transition-all"
-              style={{ width: `${emp.progress}%` }}
-            />
-          </div>
-        )}
-      </div>
 
       {/* Contact info */}
       <div className="px-5 py-4 border-b border-gray-50 space-y-3">
@@ -648,18 +621,21 @@ export default function PeoplePage() {
   // ─── Mutations ─────────────────────────────────────────────────────────────
   const createMutation = useMutation({
     mutationFn: (data: UserUpsertInput) => usersApi.create(token!, data),
-    onSuccess:  () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["users"] }); notify.success("Usuario creado"); },
+    onError: (e: Error) => notify.error(e.message ?? "Error al crear usuario"),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: UserUpsertInput }) =>
       usersApi.update(token!, id, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["users"] }); notify.success("Usuario actualizado"); },
+    onError: (e: Error) => notify.error(e.message ?? "Error al actualizar usuario"),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => usersApi.remove(token!, id),
-    onSuccess:  () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["users"] }); notify.success("Usuario eliminado"); },
+    onError: (e: Error) => notify.error(e.message ?? "Error al eliminar usuario"),
   });
 
   // ─── Derived state ─────────────────────────────────────────────────────────

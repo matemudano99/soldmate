@@ -4,19 +4,14 @@ import com.soldmate.auth.User;
 import com.soldmate.auth.UserRepository;
 import com.soldmate.company.Company;
 import com.soldmate.company.CompanyRepository;
-import org.springframework.beans.factory.annotation.Value;
+import com.soldmate.storage.SupabaseStorageService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * IncidentService: lógica de negocio del módulo de incidencias.
@@ -35,25 +30,18 @@ public class IncidentService {
     private final UserRepository     userRepository;
     private final CompanyRepository  companyRepository;
     private final com.soldmate.activity.ActivityLogger activityLogger;
-
-    // Inyectamos los valores de Supabase desde application.properties
-    @Value("${soldmate.supabase.url}")
-    private String supabaseUrl;
-
-    @Value("${soldmate.supabase.anon-key}")
-    private String supabaseAnonKey;
-
-    @Value("${soldmate.supabase.bucket}")
-    private String supabaseBucket;
+    private final SupabaseStorageService storageService;
 
     public IncidentService(IncidentRepository incidentRepository,
                            UserRepository userRepository,
                            CompanyRepository companyRepository,
-                           com.soldmate.activity.ActivityLogger activityLogger) {
+                           com.soldmate.activity.ActivityLogger activityLogger,
+                           SupabaseStorageService storageService) {
         this.incidentRepository = incidentRepository;
         this.userRepository     = userRepository;
         this.companyRepository  = companyRepository;
         this.activityLogger     = activityLogger;
+        this.storageService     = storageService;
     }
 
     // ─── Lectura ─────────────────────────────────────────────────────────────
@@ -122,7 +110,7 @@ public class IncidentService {
                                     Incident.Priority priority,
                                     MultipartFile photo) throws IOException {
         // 1. Subir la foto a Supabase Storage
-        String photoUrl = uploadToSupabase(photo, companyId);
+        String photoUrl = storageService.upload(photo, companyId, ".jpg");
 
         // 2. Crear la incidencia con la URL de la foto
         Company company = companyRepository.findById(companyId)
@@ -182,93 +170,4 @@ public class IncidentService {
         activityLogger.log(companyId, null, "INCIDENT", "ELIMINADO", incident.getTitle());
     }
 
-    // ─── Supabase Storage ────────────────────────────────────────────────────
-
-    /**
-     * Sube un archivo de imagen a Supabase Storage y devuelve la URL pública.
-     *
-     * Usamos HttpClient (Java 11+) para hacer la petición REST a Supabase.
-     * La API de Supabase Storage sigue el estándar S3.
-     *
-     * Ruta dentro del bucket (nombre en {@code application.properties}): {@code {companyId}/{uuid}.jpg}
-     */
-    private String uploadToSupabase(MultipartFile photo, Long companyId)
-            throws IOException {
-
-        String baseUrl = normalizeSupabaseProjectUrl(supabaseUrl);
-        if (baseUrl.isBlank()) {
-            throw new RuntimeException(
-                "SOLDMATE_SUPABASE_URL / SUPABASE_URL vacía o inválida. Usa la raíz del proyecto, p. ej. https://xxxx.supabase.co"
-            );
-        }
-
-        // Nombre único dentro del bucket (sin prefijo duplicado del nombre del bucket)
-        String objectPath = String.format("%d/%s.jpg", companyId, UUID.randomUUID());
-
-        // POST {SUPABASE_PROJECT}/storage/v1/object/{bucket}/{path}
-        // Si SUPABASE_URL incluye /rest/v1, PostgREST responde PGRST125 ("Invalid path").
-        String uploadUrl = String.format(
-            "%s/storage/v1/object/%s/%s",
-            baseUrl, supabaseBucket, objectPath
-        );
-
-        HttpClient client = HttpClient.newHttpClient();
-
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(uploadUrl))
-            .header("Authorization", "Bearer " + supabaseAnonKey)
-            // Supabase exige `apikey` en casi todas las peticiones al API; sin él suele fallar la subida.
-            .header("apikey", supabaseAnonKey)
-            .header("Content-Type", photo.getContentType() != null
-                ? photo.getContentType() : "image/jpeg")
-            // BodyPublishers.ofByteArray convierte el archivo a bytes para enviarlo
-            .POST(HttpRequest.BodyPublishers.ofByteArray(photo.getBytes()))
-            .build();
-
-        try {
-            HttpResponse<String> response = client.send(
-                request, HttpResponse.BodyHandlers.ofString()
-            );
-
-            if (response.statusCode() != 200 && response.statusCode() != 201) {
-                throw new RuntimeException(
-                    "Error al subir imagen a Supabase: " + response.body()
-                );
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Subida interrumpida");
-        }
-
-        // Devolvemos la URL pública de la imagen
-        return String.format(
-            "%s/storage/v1/object/public/%s/%s",
-            baseUrl, supabaseBucket, objectPath
-        );
-    }
-
-    /**
-     * La URL del proyecto debe ser la raíz (https://xxx.supabase.co), no /rest/v1 ni /storage/v1.
-     */
-    private static String normalizeSupabaseProjectUrl(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return "";
-        }
-        String u = raw.trim();
-        while (u.endsWith("/")) {
-            u = u.substring(0, u.length() - 1);
-        }
-        String[] mistakenSuffixes = {
-            "/rest/v1", "/graphql/v1", "/auth/v1", "/storage/v1",
-        };
-        for (String suffix : mistakenSuffixes) {
-            if (u.endsWith(suffix)) {
-                u = u.substring(0, u.length() - suffix.length());
-                while (u.endsWith("/")) {
-                    u = u.substring(0, u.length() - 1);
-                }
-            }
-        }
-        return u;
-    }
 }

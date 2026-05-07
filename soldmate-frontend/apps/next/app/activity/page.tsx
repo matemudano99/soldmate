@@ -88,7 +88,7 @@ export default function ActivityPage() {
       );
     }
     return [...list].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 60);
-  }, [query.data, filterType]);
+  }, [query.data, filterType, search]);
 
   return (
     <div className="flex min-h-screen bg-[#eef1f8] text-[#1e2040]">

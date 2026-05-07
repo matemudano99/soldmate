@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, ImageIcon, ExternalLink, Pencil, Trash2 } from "lucide-react";
 import { SectionCard } from "../components/web-ui";
-import { AppTopHeader, CreateIncidentModal, WebErpNavbar } from "../shared/ui";
+import { AppTopHeader, CreateIncidentModal, WebErpNavbar, notify, useConfirm, EmptyState } from "../shared/ui";
 import { incidentsApi, type IncidentResponse, type IncidentStatus } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
@@ -47,6 +47,7 @@ export default function IncidentsPage() {
   const [authReady, setAuthReady] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"ALL" | IncidentStatus>("ALL");
   const [editing, setEditing] = useState<IncidentResponse | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   useEffect(() => {
     if (useAuthStore.persist.hasHydrated()) {
@@ -66,12 +67,14 @@ export default function IncidentsPage() {
   const statusMut = useMutation({
     mutationFn: ({ id, status }: { id: number; status: IncidentStatus }) =>
       incidentsApi.updateStatus(token!, id, status),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["incidents"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["incidents"] }); notify.success("Estado actualizado"); },
+    onError: (e: Error) => notify.error(e.message ?? "Error al actualizar estado"),
   });
 
   const removeMut = useMutation({
     mutationFn: (id: number) => incidentsApi.remove(token!, id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["incidents"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["incidents"] }); notify.success("Incidencia eliminada"); },
+    onError: (e: Error) => notify.error(e.message ?? "Error al eliminar incidencia"),
   });
 
   const incidents = query.data ?? [];
@@ -187,9 +190,9 @@ export default function IncidentsPage() {
                       {isOwner ? (
                         <button
                           type="button"
-                          onClick={() => {
-                            if (!confirm(`¿Eliminar la incidencia «${r.title}»?`)) return;
-                            removeMut.mutate(r.id);
+                          onClick={async () => {
+                            const ok = await confirm(`¿Eliminar la incidencia «${r.title}»?`, "Esta acción no se puede deshacer.", "danger");
+                            if (ok) removeMut.mutate(r.id);
                           }}
                           disabled={removeMut.isPending}
                           title="Eliminar"
@@ -217,6 +220,7 @@ export default function IncidentsPage() {
         ) : null}
         </div>
       </main>
+      {confirmDialog}
     </div>
   );
 }

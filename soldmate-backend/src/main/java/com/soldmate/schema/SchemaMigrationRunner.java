@@ -44,7 +44,9 @@ public class SchemaMigrationRunner implements ApplicationRunner {
             new MigrationStep("004", "Create planning and analytics tables", this::createPlanningTables),
             new MigrationStep("005", "Add profile and business metadata columns", this::addBusinessMetadataColumns),
             new MigrationStep("006", "Add suppliers type segmentation", this::addSupplierTypeColumn),
-            new MigrationStep("007", "Harden tenant indexes for high-traffic queries", this::addTenantIsolationIndexes)
+            new MigrationStep("007", "Harden tenant indexes for high-traffic queries", this::addTenantIsolationIndexes),
+            new MigrationStep("008", "Create notifications table", this::createNotificationsTable),
+            new MigrationStep("009", "Create search indexes for global search", this::addSearchIndexes)
         );
 
         for (MigrationStep step : steps) {
@@ -208,6 +210,28 @@ public class SchemaMigrationRunner implements ApplicationRunner {
         jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_contacts_company_created_at ON contacts(company_id, created_at DESC)");
         jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_calendar_events_company_created_at ON calendar_events(company_id, created_at DESC)");
         jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_products_company_name ON products(company_id, name)");
+    }
+
+    private void createNotificationsTable() {
+        jdbcTemplate.execute("""
+            CREATE TABLE IF NOT EXISTS notifications (
+                id BIGSERIAL PRIMARY KEY,
+                company_id BIGINT NOT NULL REFERENCES companies(id),
+                type VARCHAR(32) NOT NULL DEFAULT 'INFO',
+                title VARCHAR(255) NOT NULL,
+                body TEXT,
+                read_at TIMESTAMP,
+                created_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+        """);
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_notifications_company_created ON notifications(company_id, created_at DESC)");
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_notifications_company_unread ON notifications(company_id, read_at) WHERE read_at IS NULL");
+    }
+
+    private void addSearchIndexes() {
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_products_name_lower ON products(company_id, LOWER(name))");
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_incidents_title_lower ON incidents(company_id, LOWER(title))");
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_suppliers_name_lower ON suppliers(company_id, LOWER(name))");
     }
 
     private void addConstraintIfMissing(String constraintName, String addConstraintSql) {

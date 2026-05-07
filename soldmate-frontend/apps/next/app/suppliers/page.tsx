@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Mail, Phone, Tag, Plus, Pencil, Trash2 } from "lucide-react";
-import { AppTopHeader, CreateSupplierModal, WebErpNavbar } from "../shared/ui";
+import { AppTopHeader, CreateSupplierModal, WebErpNavbar, notify, useConfirm, EmptyState } from "../shared/ui";
 import { suppliersApi, type SupplierResponse } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
@@ -16,6 +16,7 @@ export default function SuppliersPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<SupplierResponse | null>(null);
   const [section, setSection] = useState<"suppliers" | "contacts">("suppliers");
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   useEffect(() => {
     if (useAuthStore.persist.hasHydrated()) {
@@ -38,7 +39,8 @@ export default function SuppliersPage() {
 
   const removeMut = useMutation({
     mutationFn: (id: number) => suppliersApi.remove(token!, id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["suppliers"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["suppliers"] }); notify.success("Eliminado correctamente"); },
+    onError: (e: Error) => notify.error(e.message ?? "Error al eliminar"),
   });
 
   const openCreate = () => {
@@ -149,9 +151,9 @@ export default function SuppliersPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            if (!confirm(`¿Desactivar el proveedor «${s.name}»?`)) return;
-                            removeMut.mutate(s.id);
+                          onClick={async () => {
+                            const ok = await confirm(`¿Eliminar «${s.name}»?`, "Esta acción no se puede deshacer.", "danger");
+                            if (ok) removeMut.mutate(s.id);
                           }}
                           disabled={removeMut.isPending}
                           className="p-1.5 rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
@@ -210,6 +212,7 @@ export default function SuppliersPage() {
         ) : null}
         </div>
       </main>
+      {confirmDialog}
     </div>
   );
 }

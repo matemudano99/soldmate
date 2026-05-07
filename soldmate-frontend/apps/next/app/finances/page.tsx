@@ -5,8 +5,8 @@ import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis,
   Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
-import { TrendingUp, TrendingDown, DollarSign, Clock, MoreVertical, Download } from "lucide-react";
-import { AppTopHeader, WebErpNavbar } from "../shared/ui";
+import { TrendingUp, TrendingDown, DollarSign, Clock, Download, Plus, Trash2 } from "lucide-react";
+import { AppTopHeader, WebErpNavbar, notify } from "../shared/ui";
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
@@ -40,6 +40,23 @@ const KPIS = [
 const TABS = ["Todos", "Ingresos", "Gastos"] as const;
 type Tab = typeof TABS[number];
 
+type Transaction = typeof TRANSACTIONS[number];
+
+function exportCSV(rows: Transaction[]) {
+  const headers = ["ID", "Fecha", "Descripción", "Tipo", "Importe", "Estado"];
+  const lines = [headers.join(","), ...rows.map((r) =>
+    [r.id, r.date, `"${r.desc}"`, r.type, r.amount, r.status].join(",")
+  )];
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `finanzas-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  notify.success("CSV exportado correctamente");
+}
+
 // ─── Components ───────────────────────────────────────────────────────────────
 
 function CustomTooltip({ active, payload, label }: any) {
@@ -60,10 +77,12 @@ function CustomTooltip({ active, payload, label }: any) {
 
 export default function FinancesPage() {
   const [activeTab, setActiveTab] = useState<Tab>("Todos");
+  const [search, setSearch] = useState("");
 
   const filtered = TRANSACTIONS.filter((t) => {
-    if (activeTab === "Ingresos") return t.type === "ingreso";
-    if (activeTab === "Gastos")   return t.type === "gasto";
+    if (activeTab === "Ingresos" && t.type !== "ingreso") return false;
+    if (activeTab === "Gastos"   && t.type !== "gasto")   return false;
+    if (search.trim() && !t.desc.toLowerCase().includes(search.toLowerCase()) && !t.id.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
@@ -80,9 +99,13 @@ export default function FinancesPage() {
             <h1 className="text-2xl font-bold text-[#1e2040]">Finanzas</h1>
             <p className="text-sm text-gray-400 mt-0.5">Resumen financiero · Julio 2026</p>
           </div>
-          <button className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 shadow-sm transition-all">
+          <button
+            type="button"
+            onClick={() => exportCSV(filtered)}
+            className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 shadow-sm transition-all"
+          >
             <Download size={15} />
-            Exportar
+            Exportar CSV
           </button>
         </div>
 
@@ -158,8 +181,15 @@ export default function FinancesPage() {
 
         {/* Transactions Table */}
         <div className="bg-white rounded-2xl shadow-[0_2px_16px_rgba(149,157,165,0.10)] border border-gray-50 overflow-hidden">
-          <div className="flex items-center justify-between p-5 border-b border-gray-50">
+          <div className="flex items-center justify-between gap-3 p-5 border-b border-gray-50">
             <h2 className="text-base font-semibold text-[#1e2040]">Movimientos recientes</h2>
+            <div className="flex items-center gap-2">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar movimiento..."
+              className="text-xs border border-gray-100 rounded-xl px-3 py-1.5 outline-none focus:border-[#4f6ef7] hidden md:block"
+            />
             <div className="flex gap-1 bg-[#f8f9fc] rounded-xl p-1">
               {TABS.map((t) => (
                 <button
@@ -174,6 +204,7 @@ export default function FinancesPage() {
                   {t}
                 </button>
               ))}
+            </div>
             </div>
           </div>
 

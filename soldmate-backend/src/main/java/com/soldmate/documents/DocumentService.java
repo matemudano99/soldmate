@@ -4,20 +4,15 @@ import com.soldmate.auth.User;
 import com.soldmate.auth.UserRepository;
 import com.soldmate.company.Company;
 import com.soldmate.company.CompanyRepository;
-import org.springframework.beans.factory.annotation.Value;
+import com.soldmate.storage.SupabaseStorageService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * DocumentService: lógica de negocio del módulo de documentos.
@@ -35,27 +30,20 @@ public class DocumentService {
     private final UserRepository             userRepository;
     private final CompanyRepository          companyRepository;
     private final com.soldmate.activity.ActivityLogger activityLogger;
-
-    @Value("${soldmate.supabase.url}")
-    private String supabaseUrl;
-
-    @Value("${soldmate.supabase.anon-key}")
-    private String supabaseAnonKey;
-
-    /** Bucket compartido para ficheros (incidencias y documentos). */
-    @Value("${soldmate.supabase.bucket:incidents}")
-    private String documentsBucket;
+    private final SupabaseStorageService storageService;
 
     public DocumentService(DocumentRepository documentRepository,
                            DocumentCategoryRepository categoryRepository,
                            UserRepository userRepository,
                            CompanyRepository companyRepository,
-                           com.soldmate.activity.ActivityLogger activityLogger) {
+                           com.soldmate.activity.ActivityLogger activityLogger,
+                           SupabaseStorageService storageService) {
         this.documentRepository = documentRepository;
         this.categoryRepository  = categoryRepository;
         this.userRepository      = userRepository;
         this.companyRepository   = companyRepository;
         this.activityLogger      = activityLogger;
+        this.storageService      = storageService;
     }
 
     // ─── Documentos ──────────────────────────────────────────────────────────
@@ -101,7 +89,7 @@ public class DocumentService {
         String docType  = detectDocType(mimeType, file.getOriginalFilename());
 
         // 2. Subir a Supabase Storage
-        String fileUrl = uploadToSupabase(file, companyId, docType);
+        String fileUrl = storageService.upload(file, companyId, docTypeToExt(docType));
 
         // 3. Persistir metadatos
         Document doc = new Document();
@@ -194,12 +182,8 @@ public class DocumentService {
         activityLogger.log(companyId, null, "DOCUMENT_CATEGORY", "ELIMINADO", cat.getName());
     }
 
-    // ─── Supabase Storage ─────────────────────────────────────────────────────
+    // ─── Helpers ──────────────────────────────────────────────────────────────
 
-    /**
-     * Detecta el tipo normalizado de documento a partir del MIME type.
-     * Se usa tanto para el campo `docType` como para elegir la extensión del fichero en Storage.
-     */
     static String detectDocType(String mimeType, String originalFilename) {
         if (mimeType == null) mimeType = "";
         String mime = mimeType.toLowerCase();
@@ -229,54 +213,6 @@ public class DocumentService {
         return false;
     }
 
-    /**
-     * Sube el fichero a Supabase Storage.
-     * Reutiliza el patrón del IncidentService con el bucket de documentos.
-     */
-    private String uploadToSupabase(MultipartFile file, Long companyId, String docType)
-            throws IOException {
-
-        String baseUrl = normalizeSupabaseProjectUrl(supabaseUrl);
-        if (baseUrl.isBlank()) {
-            throw new RuntimeException(
-                "SOLDMATE_SUPABASE_URL vacía o inválida. Usa la raíz del proyecto, p. ej. https://xxxx.supabase.co"
-            );
-        }
-
-        // Elegimos la extensión correcta según el tipo detectado
-        String ext = docTypeToExt(docType);
-        String objectPath = String.format("%d/%s%s", companyId, UUID.randomUUID(), ext);
-        String uploadUrl  = String.format(
-            "%s/storage/v1/object/%s/%s",
-            baseUrl, documentsBucket, objectPath
-        );
-
-        HttpClient client  = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(uploadUrl))
-            .header("Authorization", "Bearer " + supabaseAnonKey)
-            .header("apikey", supabaseAnonKey)
-            .header("Content-Type", file.getContentType() != null
-                    ? file.getContentType() : "application/octet-stream")
-            .POST(HttpRequest.BodyPublishers.ofByteArray(file.getBytes()))
-            .build();
-
-        try {
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200 && response.statusCode() != 201) {
-                throw new RuntimeException("Error al subir documento a Supabase: " + response.body());
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Subida interrumpida");
-        }
-
-        return String.format(
-            "%s/storage/v1/object/public/%s/%s",
-            baseUrl, documentsBucket, objectPath
-        );
-    }
-
     private static String docTypeToExt(String docType) {
         return switch (docType) {
             case "PDF"   -> ".pdf";
@@ -292,17 +228,4 @@ public class DocumentService {
         };
     }
 
-    private static String normalizeSupabaseProjectUrl(String raw) {
-        if (raw == null || raw.isBlank()) return "";
-        String u = raw.trim();
-        while (u.endsWith("/")) u = u.substring(0, u.length() - 1);
-        String[] mistakenSuffixes = {"/rest/v1", "/graphql/v1", "/auth/v1", "/storage/v1"};
-        for (String suffix : mistakenSuffixes) {
-            if (u.endsWith(suffix)) {
-                u = u.substring(0, u.length() - suffix.length());
-                while (u.endsWith("/")) u = u.substring(0, u.length() - 1);
-            }
-        }
-        return u;
-    }
 }

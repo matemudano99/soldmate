@@ -5,7 +5,7 @@ import {
   FileText, FileSpreadsheet, Image as ImageIcon, File, Upload,
   Search, Download, Eye, MoreVertical, ChevronRight, Trash2, Edit3, X
 } from "lucide-react";
-import { AppTopHeader, UploadDocumentModal, WebErpNavbar } from "../shared/ui";
+import { AppTopHeader, UploadDocumentModal, WebErpNavbar, notify, useConfirm } from "../shared/ui";
 import { documentsApi, type DocumentResponse, type DocumentCategoryResponse, type DocumentStatsResponse } from "../shared/api";
 import { useAuthStore } from "app/lib/store";
 
@@ -40,6 +40,7 @@ export default function DocumentsPage() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<DocumentCategoryResponse | null>(null);
   const [catForm, setCatForm] = useState({ name: "", color: "#4f6ef7" });
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   useEffect(() => {
     if (token) {
@@ -59,30 +60,34 @@ export default function DocumentsPage() {
       setCategories(c);
       setStats(s);
     } catch (err) {
-      console.error(err);
+      notify.error((err as Error)?.message ?? "Error al cargar documentos");
     }
   };
 
   const handleUpload = async (payload: { name: string; category: string; type: string; size: string }, file?: File) => {
     if (!token || !file) return;
+    const id = notify.loading("Subiendo documento...");
     try {
       await documentsApi.upload(token, file, payload.name, payload.category);
+      notify.dismiss(id);
+      notify.success("Documento subido correctamente");
       await loadData();
     } catch (err) {
-      console.error("Error subiendo documento", err);
-      alert("Error al subir el documento");
+      notify.dismiss(id);
+      notify.error((err as Error)?.message ?? "Error al subir el documento");
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (docId: number) => {
     if (!token) return;
-    if (!confirm("¿Eliminar documento?")) return;
+    const ok = await confirm("¿Eliminar documento?", "Esta acción no se puede deshacer.", "danger");
+    if (!ok) return;
     try {
-      await documentsApi.remove(token, id);
+      await documentsApi.remove(token, docId);
+      notify.success("Documento eliminado");
       await loadData();
     } catch (err) {
-      console.error(err);
-      alert("Error al eliminar documento");
+      notify.error((err as Error)?.message ?? "Error al eliminar documento");
     }
   };
 
@@ -92,30 +97,32 @@ export default function DocumentsPage() {
     try {
       if (editingCategory) {
         await documentsApi.updateCategory(token, editingCategory.id, catForm);
+        notify.success("Categoría actualizada");
       } else {
         await documentsApi.createCategory(token, catForm.name, catForm.color);
+        notify.success("Categoría creada");
       }
       setShowCategoryModal(false);
       await loadData();
     } catch (err) {
-      console.error(err);
-      alert("Error al guardar categoría");
+      notify.error((err as Error)?.message ?? "Error al guardar categoría");
     }
   };
 
   const handleDeleteCategory = async (id: number) => {
     if (!token) return;
-    if (!confirm("¿Eliminar categoría? Los documentos quedarán sin categoría.")) return;
+    const ok = await confirm("¿Eliminar categoría?", "Los documentos de esta categoría quedarán sin categoría.", "warning");
+    if (!ok) return;
     try {
       await documentsApi.removeCategory(token, id);
+      notify.success("Categoría eliminada");
       if (categories.find(c => c.id === id)?.name === activeCategory) {
         setActiveCategory("Todos");
       } else {
         await loadData();
       }
     } catch (err) {
-      console.error(err);
-      alert("Error al eliminar categoría");
+      notify.error((err as Error)?.message ?? "Error al eliminar categoría");
     }
   };
 
@@ -371,6 +378,7 @@ export default function DocumentsPage() {
           </div>
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }
@@ -383,7 +391,7 @@ function UploadDocumentModalReal({ onClose, onUpload, categories }: { onClose: (
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) return alert("Selecciona un archivo");
+    if (!file) { notify.error("Selecciona un archivo"); return; }
     setSubmitting(true);
     await onUpload({ name: form.name, category: form.category, type: "other", size: "0" }, file);
     setSubmitting(false);

@@ -21,13 +21,16 @@ public class ProductController {
     private final ProductRepository productRepository;
     private final CompanyRepository companyRepository;
     private final JwtUtil jwtUtil;
+    private final com.soldmate.activity.ActivityLogger activityLogger;
 
     public ProductController(ProductRepository productRepository,
                              CompanyRepository companyRepository,
-                             JwtUtil jwtUtil) {
+                             JwtUtil jwtUtil,
+                             com.soldmate.activity.ActivityLogger activityLogger) {
         this.productRepository = productRepository;
         this.companyRepository = companyRepository;
         this.jwtUtil = jwtUtil;
+        this.activityLogger = activityLogger;
     }
 
     public record ProductResponse(
@@ -94,8 +97,10 @@ public class ProductController {
         product.setVatRate(req.vatRate() != null ? req.vatRate() : new BigDecimal("10.00"));
         product.setCompany(company);
 
-        return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ProductResponse.from(productRepository.save(product)));
+        Product saved = productRepository.save(product);
+        String userEmail = jwtUtil.extractEmail(authHeader.substring(7));
+        activityLogger.log(companyId, userEmail, "PRODUCT", "CREADO", saved.getName());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ProductResponse.from(saved));
     }
 
     @PatchMapping("/{id}/stock")
@@ -134,7 +139,10 @@ public class ProductController {
         product.setCategory(req.category());
         product.setVatRate(req.vatRate() != null ? req.vatRate() : product.getVatRate());
 
-        return ResponseEntity.ok(ProductResponse.from(productRepository.save(product)));
+        Product updated = productRepository.save(product);
+        String userEmail = jwtUtil.extractEmail(authHeader.substring(7));
+        activityLogger.log(companyId, userEmail, "PRODUCT", "MODIFICADO", updated.getName());
+        return ResponseEntity.ok(ProductResponse.from(updated));
     }
 
     @DeleteMapping("/{id}")
@@ -149,7 +157,10 @@ public class ProductController {
             return ResponseEntity.notFound().build();
         }
 
+        String name = product.getName();
         productRepository.delete(product);
+        String userEmail = jwtUtil.extractEmail(authHeader.substring(7));
+        activityLogger.log(companyId, userEmail, "PRODUCT", "ELIMINADO", name);
         return ResponseEntity.noContent().build();
     }
 

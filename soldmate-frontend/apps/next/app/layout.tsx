@@ -8,6 +8,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 // QueryClient: la instancia de React Query que gestiona el caché
@@ -41,8 +42,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body style={{ fontFamily: "'Syne', sans-serif", margin: 0 }} className="antialiased">
         {/* QueryClientProvider: hace disponible React Query en toda la app */}
         <QueryClientProvider client={queryClient}>
-          {/* children: el contenido de cada página */}
           {children}
+          <Toaster
+            position="bottom-right"
+            richColors
+            closeButton
+            toastOptions={{ style: { fontFamily: "'Syne', sans-serif" } }}
+          />
         </QueryClientProvider>
       </body>
     </html>
