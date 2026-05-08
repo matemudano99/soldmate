@@ -4,6 +4,7 @@ import com.soldmate.company.Company;
 import com.soldmate.company.CompanyRepository;
 import com.soldmate.company.CompanySettingsService;
 import com.soldmate.company.NifCifValidator;
+import com.soldmate.storage.SupabaseStorageService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -14,15 +15,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.util.Map;
-import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 
 /**
  * AuthController: registro y login.
@@ -39,27 +35,27 @@ public class AuthController {
     private final CompanyRepository       companyRepository;
     private final PasswordEncoder         passwordEncoder;
     private final JwtUtil                 jwtUtil;
+    private final AuthRateLimiter         authRateLimiter;
     private final NifCifValidator         nifCifValidator;
     private final CompanySettingsService  settingsService;
-    @Value("${soldmate.supabase.url}")
-    private String supabaseUrl;
-    @Value("${soldmate.supabase.anon-key}")
-    private String supabaseAnonKey;
-    @Value("${soldmate.supabase.bucket}")
-    private String supabaseBucket;
+    private final SupabaseStorageService  storageService;
 
     public AuthController(UserRepository userRepository,
                           CompanyRepository companyRepository,
                           PasswordEncoder passwordEncoder,
                           JwtUtil jwtUtil,
+                          AuthRateLimiter authRateLimiter,
                           NifCifValidator nifCifValidator,
-                          CompanySettingsService settingsService) {
+                          CompanySettingsService settingsService,
+                          SupabaseStorageService storageService) {
         this.userRepository   = userRepository;
         this.companyRepository = companyRepository;
         this.passwordEncoder  = passwordEncoder;
         this.jwtUtil          = jwtUtil;
+        this.authRateLimiter  = authRateLimiter;
         this.nifCifValidator  = nifCifValidator;
         this.settingsService  = settingsService;
+        this.storageService   = storageService;
     }
 
     // ─── DTOs ────────────────────────────────────────────────────────────────
@@ -98,7 +94,15 @@ public class AuthController {
     // ─── POST /api/v1/auth/register ──────────────────────────────────────────
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest req) {
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest req, HttpServletRequest httpRequest) {
+        if (!authRateLimiter.allowRegister(clientIp(httpRequest))) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body("Demasiados intentos de registro. Inténtalo de nuevo en unos minutos.");
+        }
+        if (!isPasswordStrong(req.password())) {
+            return ResponseEntity.badRequest().body("La contraseña debe incluir mayúscula, minúscula y número.");
+        }
+
 
         // 1. Validar NIF/CIF para empresas españolas
         if (!nifCifValidator.isValid(req.taxId(), req.country())) {
@@ -152,7 +156,11 @@ public class AuthController {
     // ─── POST /api/v1/auth/login ─────────────────────────────────────────────
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req, HttpServletRequest httpRequest) {
+        if (!authRateLimiter.allowLogin(clientIp(httpRequest))) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body("Demasiados intentos de login. Inténtalo de nuevo en unos minutos.");
+        }
         User user = userRepository.findByEmail(req.email().toLowerCase().trim())
             .orElse(null);
 
@@ -254,7 +262,7 @@ public class AuthController {
         }
 
         try {
-            String avatarUrl = uploadToSupabase(photo, user.getCompany().getId(), "avatars");
+            String avatarUrl = storageService.upload(photo, user.getCompany().getId(), ".jpg", "incidents", "avatars");
             user.setAvatarUrl(avatarUrl);
             userRepository.save(user);
             return ResponseEntity.ok(Map.of("avatarUrl", avatarUrl));
@@ -267,44 +275,26 @@ public class AuthController {
         }
     }
 
-    private String uploadToSupabase(MultipartFile photo, Long companyId, String folder) throws IOException {
-        String baseUrl = normalizeSupabaseProjectUrl(supabaseUrl);
-        if (baseUrl.isBlank()) {
-            throw new RuntimeException("SUPABASE_URL vacía o inválida.");
+    private static boolean isPasswordStrong(String password) {
+        if (password == null || password.length() < 8) return false;
+        boolean hasUpper = false, hasLower = false, hasDigit = false;
+        for (char c : password.toCharArray()) {
+            if (Character.isUpperCase(c)) hasUpper = true;
+            else if (Character.isLowerCase(c)) hasLower = true;
+            else if (Character.isDigit(c)) hasDigit = true;
         }
-        String objectPath = String.format("%d/%s/%s.jpg", companyId, folder, UUID.randomUUID());
-        String uploadUrl = String.format("%s/storage/v1/object/%s/%s", baseUrl, supabaseBucket, objectPath);
-
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(uploadUrl))
-            .header("Authorization", "Bearer " + supabaseAnonKey)
-            .header("apikey", supabaseAnonKey)
-            .header("Content-Type", photo.getContentType() != null ? photo.getContentType() : "image/jpeg")
-            .POST(HttpRequest.BodyPublishers.ofByteArray(photo.getBytes()))
-            .build();
-        try {
-            HttpResponse<String> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200 && response.statusCode() != 201) {
-                throw new RuntimeException("Error al subir imagen a Supabase: " + response.body());
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Subida interrumpida");
-        }
-        return String.format("%s/storage/v1/object/public/%s/%s", baseUrl, supabaseBucket, objectPath);
+        return hasUpper && hasLower && hasDigit;
     }
 
-    private static String normalizeSupabaseProjectUrl(String raw) {
-        if (raw == null || raw.isBlank()) return "";
-        String u = raw.trim();
-        while (u.endsWith("/")) u = u.substring(0, u.length() - 1);
-        String[] suffixes = {"/rest/v1", "/graphql/v1", "/auth/v1", "/storage/v1"};
-        for (String suffix : suffixes) {
-            if (u.endsWith(suffix)) {
-                u = u.substring(0, u.length() - suffix.length());
-                while (u.endsWith("/")) u = u.substring(0, u.length() - 1);
-            }
+    private static String clientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
         }
-        return u;
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) {
+            return realIp.trim();
+        }
+        return request.getRemoteAddr();
     }
 }

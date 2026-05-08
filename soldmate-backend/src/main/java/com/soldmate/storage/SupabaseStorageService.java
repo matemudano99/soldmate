@@ -53,6 +53,13 @@ public class SupabaseStorageService {
      * @return URL pública del objeto
      */
     public String upload(MultipartFile file, Long companyId, String extension, String bucket) throws IOException {
+        return upload(file, companyId, extension, bucket, null);
+    }
+
+    /**
+     * Sube un MultipartFile con carpeta lógica opcional (ej. avatars, incidents, documents).
+     */
+    public String upload(MultipartFile file, Long companyId, String extension, String bucket, String folder) throws IOException {
         String baseUrl = normalize(supabaseUrl);
         if (baseUrl.isBlank()) {
             throw new IllegalStateException(
@@ -60,7 +67,8 @@ public class SupabaseStorageService {
             );
         }
 
-        String objectPath = companyId + "/" + UUID.randomUUID() + extension;
+        String folderPart = (folder == null || folder.isBlank()) ? "" : (folder.trim().replaceAll("^/+|/+$", "") + "/");
+        String objectPath = companyId + "/" + folderPart + UUID.randomUUID() + extension;
         String uploadUrl  = baseUrl + "/storage/v1/object/" + bucket + "/" + objectPath;
 
         String contentType = file.getContentType() != null ? file.getContentType() : "application/octet-stream";
