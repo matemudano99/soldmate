@@ -9,7 +9,13 @@ import {
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CreatePersonModal, AppTopHeader, WebErpNavbar, notify, useConfirm, EmptyState } from "../shared/ui";
-import { usersApi, type UserListResponse, type UserUpsertInput } from "app/lib/api";
+import {
+  activityApi,
+  usersApi,
+  type ActivityItemResponse,
+  type UserListResponse,
+  type UserUpsertInput,
+} from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -114,6 +120,19 @@ function Avatar({ emp, size = 56 }: { emp: Employee; size?: number }) {
       <User className="text-blue-200" size={size * 0.5} />
     </div>
   );
+}
+
+function formatRelativeTime(isoDate: string): string {
+  const d = new Date(isoDate);
+  const diff = Date.now() - d.getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "Ahora";
+  if (min < 60) return `Hace ${min}m`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `Hace ${h}h`;
+  const days = Math.floor(h / 24);
+  if (days === 1) return "Ayer";
+  return `Hace ${days}d`;
 }
 
 // ─── Employee Card (grid view) ────────────────────────────────────────────────
@@ -246,10 +265,12 @@ function EmployeeRow({
 
 function DetailPanel({
   emp,
+  recentActivity,
   onUpdate,
   onClose,
 }: {
   emp: Employee;
+  recentActivity: ActivityItemResponse[];
   onUpdate: (updated: Employee) => void;
   onClose: () => void;
 }) {
@@ -428,19 +449,27 @@ function DetailPanel({
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Actividad reciente</p>
         </div>
         <div className="space-y-2">
-          {[
-            { action: "Completó revisión de diseño",     time: "Hace 2h",  color: "bg-green-400" },
-            { action: "Comentó en Brand Redesign",       time: "Hace 5h",  color: "bg-blue-400" },
-            { action: "Actualizó documentación",          time: "Ayer",     color: "bg-violet-400" },
-          ].map((a) => (
-            <div key={a.action} className="flex items-start gap-2.5">
-              <div className={`w-1.5 h-1.5 rounded-full ${a.color} mt-1.5 flex-shrink-0`} />
-              <div>
-                <p className="text-xs text-gray-600 leading-tight">{a.action}</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">{a.time}</p>
-              </div>
-            </div>
-          ))}
+          {recentActivity.length ? (
+            recentActivity.map((a, idx) => {
+              const color =
+                a.status === "ELIMINADO" ? "bg-red-400"
+                : a.status === "MODIFICADO" ? "bg-amber-400"
+                : "bg-green-400";
+              return (
+                <div key={`${a.id}-${idx}`} className="flex items-start gap-2.5">
+                  <div className={`w-1.5 h-1.5 rounded-full ${color} mt-1.5 flex-shrink-0`} />
+                  <div>
+                    <p className="text-xs text-gray-600 leading-tight line-clamp-2">
+                      {a.title}
+                    </p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{formatRelativeTime(a.createdAt)}</p>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <p className="text-xs text-gray-400">Sin actividad reciente para este usuario.</p>
+          )}
         </div>
       </div>
 
@@ -616,6 +645,12 @@ export default function PeoplePage() {
     enabled: !!token,
   });
 
+  const { data: allActivity = [] } = useQuery({
+    queryKey: ["activity-feed", token],
+    queryFn: () => activityApi.getAll(token!),
+    enabled: !!token,
+  });
+
   const employees = useMemo(() => users.map(mapUser), [users]);
 
   // ─── Mutations ─────────────────────────────────────────────────────────────
@@ -640,6 +675,18 @@ export default function PeoplePage() {
 
   // ─── Derived state ─────────────────────────────────────────────────────────
   const selectedEmp = employees.find((e) => e.id === selectedId) ?? null;
+  const selectedEmpActivity = useMemo(() => {
+    if (!selectedEmp) return [];
+    const nameLc = selectedEmp.name.toLowerCase();
+    const emailLc = selectedEmp.email.toLowerCase();
+    return allActivity
+      .filter((a) => {
+        const actorEmail = (a.actorEmail ?? "").toLowerCase();
+        const actorName = (a.actorName ?? "").toLowerCase();
+        return (emailLc && actorEmail === emailLc) || (!!nameLc && actorName.includes(nameLc));
+      })
+      .slice(0, 3);
+  }, [allActivity, selectedEmp]);
 
   const filtered = useMemo(() => {
     let list = employees.filter((e) => {
@@ -882,6 +929,7 @@ export default function PeoplePage() {
       {selectedEmp && (
         <DetailPanel
           emp={selectedEmp}
+          recentActivity={selectedEmpActivity}
           onUpdate={updateEmployee}
           onClose={() => setSelectedId(null)}
         />

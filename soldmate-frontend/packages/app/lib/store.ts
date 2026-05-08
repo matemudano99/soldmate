@@ -8,7 +8,7 @@
 // Cualquier componente puede leer y escribir en el store directamente.
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 import type { AuthResponse } from "./api";
 
 // ─── Tipos del estado ────────────────────────────────────────────────────────
@@ -30,7 +30,7 @@ interface AuthState {
   editMode: boolean;
 
   // Acciones (funciones que modifican el estado)
-  login: (data: AuthResponse) => void;
+  login: (data: AuthResponse, remember?: boolean) => void;
   logout: () => void;
   setProfile: (data: Pick<AuthResponse, "firstName" | "lastName" | "avatarUrl">) => void;
   toggleEditMode: () => void;
@@ -41,9 +41,10 @@ interface AuthState {
 
 // ─── Helpers para cookies (accesibles por el middleware de Next.js) ──────────
 
-function setCookie(name: string, value: string, maxAgeSec = 86400) {
+function setCookie(name: string, value: string, maxAgeSec?: number) {
   if (typeof document === "undefined") return;
-  document.cookie = `${name}=${value}; path=/; max-age=${maxAgeSec}; SameSite=Strict`;
+  const maxAgePart = typeof maxAgeSec === "number" ? `; max-age=${maxAgeSec}` : "";
+  document.cookie = `${name}=${value}; path=/${maxAgePart}; SameSite=Strict`;
 }
 
 function deleteCookie(name: string) {
@@ -69,9 +70,17 @@ export const useAuthStore = create<AuthState>()(
   editMode: false,
 
   // Acción login: guarda los datos del usuario tras el login/registro
-  login: (data: AuthResponse) => {
+  login: (data: AuthResponse, remember = true) => {
+    // Define el almacenamiento persistente para esta sesión:
+    // - localStorage: "recordarme" activo
+    // - sessionStorage: solo durante esta sesión del navegador
+    if (typeof window !== "undefined") {
+      localStorage.setItem("soldmate-auth-storage", remember ? "local" : "session");
+    }
+
     // Cookie para el middleware de Next.js (no accesible por JS después de login)
-    setCookie("sm_token", data.token, 86400);
+    // Si no marca "recordarme", dejamos cookie de sesión (sin max-age).
+    setCookie("sm_token", data.token, remember ? 86400 : undefined);
     set({
       token: data.token,
       email: data.email,
@@ -89,6 +98,11 @@ export const useAuthStore = create<AuthState>()(
   // Acción logout: limpia todos los datos del usuario
   logout: () => {
     deleteCookie("sm_token");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("soldmate-auth-storage");
+      localStorage.removeItem("soldmate-auth");
+      sessionStorage.removeItem("soldmate-auth");
+    }
     set({
       token: null,
       email: null,
@@ -119,6 +133,13 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "soldmate-auth",
+      storage: createJSONStorage(() => {
+        // Modo por defecto: recordar
+        const mode = typeof window !== "undefined"
+          ? localStorage.getItem("soldmate-auth-storage")
+          : "local";
+        return mode === "session" ? sessionStorage : localStorage;
+      }),
     }
   )
 );
