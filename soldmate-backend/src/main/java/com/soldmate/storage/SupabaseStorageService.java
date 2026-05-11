@@ -10,6 +10,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * SupabaseStorageService centraliza la subida de ficheros a Supabase Storage.
@@ -19,6 +21,7 @@ import java.util.UUID;
  */
 @Service
 public class SupabaseStorageService {
+    private static final Logger log = LoggerFactory.getLogger(SupabaseStorageService.class);
 
     @Value("${soldmate.supabase.url}")
     private String supabaseUrl;
@@ -94,6 +97,8 @@ public class SupabaseStorageService {
         try {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200 && response.statusCode() != 201) {
+                log.error("Supabase upload failed: status={}, bucket={}, objectPath={}, body={}",
+                    response.statusCode(), bucket, objectPath, response.body());
                 throw new RuntimeException("Supabase Storage error (" + response.statusCode() + "): " + response.body());
             }
         } catch (InterruptedException e) {
