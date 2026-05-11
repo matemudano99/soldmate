@@ -4,7 +4,7 @@ import Link from "next/link";
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen bg-[#eef1f8] text-[#1e2040] px-6 py-10">
+    <main className="min-h-screen bg-[#eef1f8] text-[#1e2040] px-4 sm:px-6 py-10">
       <div className="max-w-3xl mx-auto bg-white rounded-2xl border border-gray-100 p-8 shadow-sm">
         <h1 className="text-2xl font-bold mb-2">Términos y Condiciones</h1>
         <p className="text-sm text-gray-500 mb-6">Última actualización: 2026-05-08</p>

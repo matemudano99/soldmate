@@ -10,6 +10,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * SupabaseStorageService centraliza la subida de ficheros a Supabase Storage.
@@ -19,12 +21,16 @@ import java.util.UUID;
  */
 @Service
 public class SupabaseStorageService {
+    private static final Logger log = LoggerFactory.getLogger(SupabaseStorageService.class);
 
     @Value("${soldmate.supabase.url}")
     private String supabaseUrl;
 
     @Value("${soldmate.supabase.anon-key}")
     private String supabaseAnonKey;
+
+    @Value("${soldmate.supabase.service-key:}")
+    private String supabaseServiceKey;
 
     @Value("${soldmate.supabase.bucket:incidents}")
     private String defaultBucket;
@@ -66,6 +72,13 @@ public class SupabaseStorageService {
                 "SOLDMATE_SUPABASE_URL está vacía. Configura la URL raíz del proyecto Supabase."
             );
         }
+        if (bucket == null || bucket.isBlank()) {
+            throw new IllegalStateException(
+                "SOLDMATE_SUPABASE_BUCKET está vacío. Define el bucket de Storage."
+            );
+        }
+
+        String authKey = resolveStorageKey();
 
         String folderPart = (folder == null || folder.isBlank()) ? "" : (folder.trim().replaceAll("^/+|/+$", "") + "/");
         String objectPath = companyId + "/" + folderPart + UUID.randomUUID() + extension;
@@ -75,8 +88,8 @@ public class SupabaseStorageService {
 
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(uploadUrl))
-            .header("Authorization", "Bearer " + supabaseAnonKey)
-            .header("apikey", supabaseAnonKey)
+            .header("Authorization", "Bearer " + authKey)
+            .header("apikey", authKey)
             .header("Content-Type", contentType)
             .POST(HttpRequest.BodyPublishers.ofByteArray(file.getBytes()))
             .build();
@@ -84,6 +97,8 @@ public class SupabaseStorageService {
         try {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200 && response.statusCode() != 201) {
+                log.error("Supabase upload failed: status={}, bucket={}, objectPath={}, body={}",
+                    response.statusCode(), bucket, objectPath, response.body());
                 throw new RuntimeException("Supabase Storage error (" + response.statusCode() + "): " + response.body());
             }
         } catch (InterruptedException e) {
@@ -92,6 +107,20 @@ public class SupabaseStorageService {
         }
 
         return baseUrl + "/storage/v1/object/public/" + bucket + "/" + objectPath;
+    }
+
+    private String resolveStorageKey() {
+        String service = supabaseServiceKey != null ? supabaseServiceKey.trim() : "";
+        if (!service.isBlank() && !service.equals("placeholder-key")) {
+            return service;
+        }
+        String anon = supabaseAnonKey != null ? supabaseAnonKey.trim() : "";
+        if (anon.isBlank() || anon.equals("placeholder-key")) {
+            throw new IllegalStateException(
+                "No hay clave válida de Supabase. Configura SOLDMATE_SUPABASE_SERVICE_KEY (recomendado) o SOLDMATE_SUPABASE_ANON_KEY."
+            );
+        }
+        return anon;
     }
 
     /** Elimina la URL base de rutas como /rest/v1, /storage/v1, etc. */

@@ -150,16 +150,16 @@ export default function DocumentsPage() {
           onSearchChange={setSearch}
           searchPlaceholder="Buscar documentos..."
         />
-        <div className="px-6">
+        <div className="px-4 sm:px-6">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-bold text-[#1e2040]">Documentos</h1>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-[#1e2040]">Documentos</h1>
               <p className="text-sm text-gray-400 mt-0.5">Repositorio centralizado del negocio</p>
             </div>
             <button 
               onClick={() => setShowUpload(true)} 
-              className="flex items-center gap-2 bg-[#4f6ef7] text-white rounded-xl px-4 py-2.5 text-sm font-semibold shadow-[0_4px_15px_rgba(79,110,247,0.30)] hover:bg-[#3d5ae0] transition-all"
+              className="inline-flex shrink-0 items-center justify-center gap-2 bg-[#4f6ef7] text-white rounded-xl px-4 py-3 sm:py-2.5 text-sm font-semibold shadow-[0_4px_15px_rgba(79,110,247,0.30)] hover:bg-[#3d5ae0] transition-all w-full sm:w-auto min-h-[44px]"
             >
               <Upload size={15} />
               Subir documento
@@ -167,34 +167,34 @@ export default function DocumentsPage() {
           </div>
 
           {/* Stats bar */}
-          <div className="grid grid-cols-3 gap-3 mb-6">
-            <div className="bg-white rounded-xl p-3.5 shadow-[0_2px_10px_rgba(149,157,165,0.08)] border border-gray-50 flex items-center gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+            <div className="bg-white rounded-xl p-3.5 shadow-[0_2px_10px_rgba(149,157,165,0.08)] border border-gray-50 flex items-center gap-3 min-w-0">
               <div className="w-2 h-8 rounded-full flex-shrink-0 bg-[#4f6ef7]" />
-              <div>
-                <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Documentos</p>
+              <div className="min-w-0">
+                <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider truncate">Documentos</p>
                 <p className="text-base font-bold text-[#1e2040] mt-0.5">{stats?.totalDocuments ?? 0}</p>
               </div>
             </div>
-            <div className="bg-white rounded-xl p-3.5 shadow-[0_2px_10px_rgba(149,157,165,0.08)] border border-gray-50 flex items-center gap-3">
+            <div className="bg-white rounded-xl p-3.5 shadow-[0_2px_10px_rgba(149,157,165,0.08)] border border-gray-50 flex items-center gap-3 min-w-0">
               <div className="w-2 h-8 rounded-full flex-shrink-0 bg-emerald-400" />
-              <div>
+              <div className="min-w-0">
                 <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Almacenamiento</p>
-                <p className="text-base font-bold text-[#1e2040] mt-0.5">{stats?.totalSizeHuman ?? "0 B"}</p>
+                <p className="text-base font-bold text-[#1e2040] mt-0.5 truncate">{stats?.totalSizeHuman ?? "0 B"}</p>
               </div>
             </div>
-            <div className="bg-white rounded-xl p-3.5 shadow-[0_2px_10px_rgba(149,157,165,0.08)] border border-gray-50 flex items-center gap-3">
+            <div className="bg-white rounded-xl p-3.5 shadow-[0_2px_10px_rgba(149,157,165,0.08)] border border-gray-50 flex items-center gap-3 min-w-0">
               <div className="w-2 h-8 rounded-full flex-shrink-0 bg-amber-400" />
-              <div>
+              <div className="min-w-0">
                 <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Esta semana</p>
                 <p className="text-base font-bold text-[#1e2040] mt-0.5">{stats?.newThisWeek ?? 0} nuevos</p>
               </div>
             </div>
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
             {/* Left: filters & categories */}
-            <div className="w-44 flex-shrink-0 space-y-1">
-              <div className="flex items-center justify-between px-3 mb-2">
+            <div className="w-full lg:w-44 lg:flex-shrink-0 space-y-1">
+              <div className="flex items-center justify-between px-1 sm:px-3 mb-2">
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Categorías</p>
                 {isOwnerOrManager && (
                   <button 
@@ -206,33 +206,34 @@ export default function DocumentsPage() {
                 )}
               </div>
               
+              <div className="flex flex-row flex-wrap gap-2 lg:flex-col lg:flex-nowrap lg:gap-0 lg:space-y-1">
               <button
                 onClick={() => setActiveCategory("Todos")}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                className={`flex-1 min-w-[calc(50%-0.25rem)] sm:min-w-0 lg:w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
                   activeCategory === "Todos"
                     ? "bg-[#4f6ef7] text-white shadow-sm"
-                    : "text-gray-500 hover:bg-white hover:text-gray-700 hover:shadow-sm"
+                    : "text-gray-500 hover:bg-white hover:text-gray-700 hover:shadow-sm bg-white/80 border border-gray-100 lg:border-0 lg:bg-transparent"
                 }`}
               >
                 <span>Todos</span>
-                {activeCategory === "Todos" && <ChevronRight size={13} className="opacity-70" />}
+                {activeCategory === "Todos" && <ChevronRight size={13} className="opacity-70 flex-shrink-0" />}
               </button>
 
               {categories.map((cat) => (
-                <div key={cat.id} className="group relative">
+                <div key={cat.id} className="group relative flex-1 min-w-[calc(50%-0.25rem)] sm:min-w-[140px] lg:min-w-0 lg:w-full">
                   <button
                     onClick={() => setActiveCategory(cat.name)}
                     className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
                       activeCategory === cat.name
                         ? "bg-[#4f6ef7] text-white shadow-sm"
-                        : "text-gray-500 hover:bg-white hover:text-gray-700 hover:shadow-sm"
+                        : "text-gray-500 hover:bg-white hover:text-gray-700 hover:shadow-sm bg-white/80 border border-gray-100 lg:border-0 lg:bg-transparent"
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color || "#ccc" }} />
-                      <span className="truncate max-w-[90px]">{cat.name}</span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color || "#ccc" }} />
+                      <span className="truncate lg:max-w-[90px]">{cat.name}</span>
                     </div>
-                    {activeCategory === cat.name && <ChevronRight size={13} className="opacity-70" />}
+                    {activeCategory === cat.name && <ChevronRight size={13} className="opacity-70 flex-shrink-0" />}
                   </button>
                   {isOwnerOrManager && activeCategory !== cat.name && (
                     <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1 bg-white rounded-md shadow-sm border border-gray-100 p-0.5">
@@ -242,10 +243,11 @@ export default function DocumentsPage() {
                   )}
                 </div>
               ))}
+              </div>
             </div>
 
             {/* Right: document list */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 lg:min-w-0">
               {/* Search */}
               <div className="relative mb-4">
                 <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -257,8 +259,77 @@ export default function DocumentsPage() {
                 />
               </div>
 
-              {/* Table */}
-              <div className="bg-white rounded-2xl shadow-[0_2px_16px_rgba(149,157,165,0.10)] border border-gray-50 overflow-hidden">
+              {/* Lista móvil (tarjetas) */}
+              <div className="lg:hidden space-y-3">
+                {filtered.length === 0 ? (
+                  <div className="bg-white rounded-2xl py-14 flex flex-col items-center justify-center text-gray-400 border border-gray-50 shadow-sm">
+                    <FileText size={32} className="mb-3 opacity-40" />
+                    <p className="text-sm font-medium">No se encontraron documentos</p>
+                  </div>
+                ) : (
+                  filtered.map((doc) => {
+                    const meta = TYPE_META[doc.docType] || TYPE_META.OTHER;
+                    return (
+                      <div
+                        key={doc.id}
+                        className="bg-white rounded-2xl border border-gray-50 shadow-[0_2px_12px_rgba(149,157,165,0.08)] p-4 flex gap-3"
+                      >
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${meta.bg} flex-shrink-0`}>
+                          <meta.Icon size={18} className={meta.text} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-[#1e2040] break-words" title={doc.name}>{doc.name}</p>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5 text-xs text-gray-500">
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${meta.bg} ${meta.text}`}>{meta.ext}</span>
+                            <span>{parseDate(doc.createdAt)}</span>
+                            <span className="text-gray-300">·</span>
+                            <span>{formatSize(doc.fileSize)}</span>
+                          </div>
+                          {doc.category ? (
+                            <p className="text-[10px] text-gray-400 mt-1">{doc.category}</p>
+                          ) : null}
+                          <div className="flex items-center justify-between gap-2 mt-3">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              {doc.uploaderAvatarUrl ? (
+                                <img src={doc.uploaderAvatarUrl} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+                              ) : (
+                                <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-500 flex-shrink-0">
+                                  {doc.uploaderName.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                              <span className="text-xs text-gray-500 truncate">{doc.uploaderName}</span>
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <a
+                                href={doc.fileUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center justify-center min-w-[40px] min-h-[40px] rounded-xl bg-[#f0f3ff] text-[#4f6ef7]"
+                                title="Ver / Descargar"
+                              >
+                                <Eye size={16} />
+                              </a>
+                              {isOwnerOrManager ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDelete(doc.id)}
+                                  className="inline-flex items-center justify-center min-w-[40px] min-h-[40px] rounded-xl bg-red-50 text-red-500"
+                                  title="Eliminar"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Tabla escritorio */}
+              <div className="hidden lg:block bg-white rounded-2xl shadow-[0_2px_16px_rgba(149,157,165,0.10)] border border-gray-50 overflow-hidden">
                 <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-4 px-5 py-3 border-b border-gray-50 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
                   <span className="w-9" />
                   <span>Nombre</span>
@@ -283,12 +354,10 @@ export default function DocumentsPage() {
                           onMouseLeave={() => setHoveredId(null)}
                           className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-4 px-5 py-3.5 items-center hover:bg-[#fafbff] transition-colors"
                         >
-                          {/* Icon */}
                           <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${meta.bg} flex-shrink-0`}>
                             <meta.Icon size={16} className={meta.text} />
                           </div>
 
-                          {/* Name + meta */}
                           <div className="min-w-0">
                             <p className="text-sm font-semibold text-[#1e2040] truncate" title={doc.name}>{doc.name}</p>
                             <div className="flex items-center gap-2 mt-0.5">
@@ -310,13 +379,10 @@ export default function DocumentsPage() {
                             </div>
                           </div>
 
-                          {/* Date */}
                           <span className="text-xs text-gray-400 whitespace-nowrap">{parseDate(doc.createdAt)}</span>
 
-                          {/* Size */}
                           <span className="text-xs text-gray-400 whitespace-nowrap">{formatSize(doc.fileSize)}</span>
 
-                          {/* Actions */}
                           <div className={`flex items-center gap-1.5 transition-opacity w-16 justify-center ${
                             hoveredId === doc.id ? "opacity-100" : "opacity-0"
                           }`}>

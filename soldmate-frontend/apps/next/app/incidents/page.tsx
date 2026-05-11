@@ -84,7 +84,7 @@ export default function IncidentsPage() {
       <WebErpNavbar />
       <main className="flex-1 pb-6 overflow-y-auto">
         <AppTopHeader />
-        <div className="px-6">
+        <div className="px-4 sm:px-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
           <h1 className="text-2xl font-bold text-[#1e2040]">Incidencias</h1>
           <Link

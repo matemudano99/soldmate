@@ -292,39 +292,45 @@ function DetailPanel({
   };
 
   return (
-    <aside className="w-72 flex-shrink-0 bg-white border-l border-gray-100 flex flex-col overflow-y-auto">
+    <aside className="fixed inset-y-0 right-0 z-40 flex w-full max-w-lg flex-col overflow-y-auto bg-white shadow-2xl border-l border-gray-100 lg:relative lg:inset-auto lg:z-auto lg:max-w-none lg:w-72 lg:flex-shrink-0 lg:shadow-none">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-50">
+      <div className="flex items-center justify-between gap-2 px-4 sm:px-5 pt-4 sm:pt-5 pb-3 border-b border-gray-50">
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Perfil</p>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           {editing ? (
             <>
               <button
+                type="button"
                 onClick={save}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#4f6ef7] text-white text-xs font-semibold hover:bg-[#3d5ae0] transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#4f6ef7] text-white text-xs font-semibold hover:bg-[#3d5ae0] transition-colors min-h-[40px]"
               >
-                <Check size={11} /> Guardar
+                <Check size={12} /> Guardar
               </button>
               <button
+                type="button"
                 onClick={() => { setDraft(emp); setEditing(false); }}
-                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors"
+                className="p-2.5 rounded-xl text-gray-400 hover:bg-gray-100 transition-colors min-w-[40px] min-h-[40px] inline-flex items-center justify-center"
+                aria-label="Cancelar edición"
               >
-                <X size={13} />
+                <X size={16} />
               </button>
             </>
           ) : (
             <>
               <button
+                type="button"
                 onClick={() => setEditing(true)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-gray-200 text-gray-500 text-xs font-medium hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-gray-600 text-xs font-medium hover:bg-gray-50 transition-colors min-h-[40px]"
               >
-                <Pencil size={10} /> Editar
+                <Pencil size={12} /> Editar
               </button>
               <button
+                type="button"
                 onClick={onClose}
-                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors"
+                className="p-2.5 rounded-xl text-gray-500 hover:bg-gray-100 transition-colors min-w-[40px] min-h-[40px] inline-flex items-center justify-center"
+                aria-label="Cerrar perfil"
               >
-                <X size={13} />
+                <X size={16} />
               </button>
             </>
           )}
@@ -515,7 +521,7 @@ function AddModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-50">
           <div>
             <h2 className="text-base font-bold text-[#1e2040]">Añadir persona</h2>
             <p className="text-xs text-gray-400 mt-0.5">Completa los datos del nuevo miembro</p>
@@ -525,7 +531,7 @@ function AddModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+        <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-5 space-y-4">
           {/* Name */}
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -734,7 +740,7 @@ export default function PeoplePage() {
   // ─── Loading / Error states ────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="flex h-screen overflow-hidden bg-[#eef1f8] text-[#1e2040]">
+      <div className="flex min-h-[100dvh] overflow-hidden bg-[#eef1f8] text-[#1e2040]">
         <WebErpNavbar />
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3 text-gray-400">
@@ -748,7 +754,7 @@ export default function PeoplePage() {
 
   if (isError) {
     return (
-      <div className="flex h-screen overflow-hidden bg-[#eef1f8] text-[#1e2040]">
+      <div className="flex min-h-[100dvh] overflow-hidden bg-[#eef1f8] text-[#1e2040]">
         <WebErpNavbar />
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4 text-center max-w-sm">
@@ -774,7 +780,7 @@ export default function PeoplePage() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#eef1f8] text-[#1e2040]">
+    <div className="flex min-h-[100dvh] overflow-hidden bg-[#eef1f8] text-[#1e2040]">
       <WebErpNavbar />
 
       {/* Main Content */}
@@ -787,18 +793,21 @@ export default function PeoplePage() {
         />
 
         {/* Content */}
-        <main className="flex-1 overflow-y-auto px-7 pb-6">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-7 pb-6">
           {/* Title + actions */}
-          <div className="flex items-end justify-between mb-5">
-            <div>
-              <h1 className="text-3xl font-bold text-[#1e2040]">Usuarios</h1>
-              <p className="text-sm text-gray-400 mt-0.5">
-                {teamStats.total} usuarios · {teamStats.online} activos ahora · {teamStats.avgProgress}% progreso medio
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-5">
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-bold text-[#1e2040]">Usuarios</h1>
+              <p className="text-xs sm:text-sm text-gray-400 mt-1 leading-relaxed">
+                <span className="block sm:inline">{teamStats.total} usuarios · {teamStats.online} activos ahora</span>
+                <span className="hidden sm:inline"> · </span>
+                <span className="block sm:inline">{teamStats.avgProgress}% progreso medio</span>
               </p>
             </div>
             <button
+              type="button"
               onClick={() => setShowModal(true)}
-              className="flex items-center gap-2 bg-[#4f6ef7] text-white rounded-xl px-4 py-2.5 text-sm font-semibold shadow-[0_4px_12px_rgba(79,110,247,0.30)] hover:bg-[#3d5ae0] transition-all"
+              className="inline-flex w-full sm:w-auto items-center justify-center gap-2 bg-[#4f6ef7] text-white rounded-xl px-4 py-3 sm:py-2.5 text-sm font-semibold shadow-[0_4px_12px_rgba(79,110,247,0.30)] hover:bg-[#3d5ae0] transition-all shrink-0 min-h-[44px]"
             >
               <Plus size={15} /> Añadir usuario
             </button>
@@ -925,14 +934,22 @@ export default function PeoplePage() {
         </main>
       </div>
 
-      {/* Detail Panel */}
+      {/* Detail Panel (overlay en móvil, columna en lg+) */}
       {selectedEmp && (
-        <DetailPanel
-          emp={selectedEmp}
-          recentActivity={selectedEmpActivity}
-          onUpdate={updateEmployee}
-          onClose={() => setSelectedId(null)}
-        />
+        <>
+          <button
+            type="button"
+            aria-label="Cerrar panel"
+            className="fixed inset-0 z-30 bg-black/25 backdrop-blur-[1px] lg:hidden"
+            onClick={() => setSelectedId(null)}
+          />
+          <DetailPanel
+            emp={selectedEmp}
+            recentActivity={selectedEmpActivity}
+            onUpdate={updateEmployee}
+            onClose={() => setSelectedId(null)}
+          />
+        </>
       )}
 
       {/* Add Modal */}
