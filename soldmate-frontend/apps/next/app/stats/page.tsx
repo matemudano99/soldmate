@@ -116,14 +116,14 @@ export default function StatsPage() {
         <AppTopHeader />
         <div className="px-4 sm:px-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-[#1e2040]">Estadísticas</h1>
-            <p className="text-sm text-gray-400 mt-0.5">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-6">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#1e2040]">Estadísticas</h1>
+            <p className="text-xs sm:text-sm text-gray-400 mt-0.5 leading-snug">
               Análisis de rendimiento operativo {liveKpis ? "· Datos en tiempo real" : "· Datos de ejemplo"}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 shrink-0 w-full md:w-auto">
           <button
             type="button"
             onClick={() => {
@@ -133,16 +133,17 @@ export default function StatsPage() {
               const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "estadisticas.csv"; a.click();
               notify.success("CSV exportado");
             }}
-            className="flex items-center gap-2 bg-white border border-gray-100 rounded-xl px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 shadow-sm"
+            className="inline-flex items-center justify-center gap-2 bg-white border border-gray-100 rounded-xl px-4 py-2.5 sm:py-1.5 text-sm sm:text-xs font-medium text-gray-600 hover:bg-gray-50 shadow-sm min-h-[44px] sm:min-h-0"
           >
-            <Download size={13} /> CSV
+            <Download size={15} className="sm:w-[13px] sm:h-[13px]" /> CSV
           </button>
-          <div className="flex gap-1 bg-white border border-gray-100 rounded-xl p-1 shadow-sm">
+          <div className="flex gap-1 bg-white border border-gray-100 rounded-xl p-1 shadow-sm flex-1 sm:flex-initial min-w-0">
             {PERIODS.map((p) => (
               <button
                 key={p}
+                type="button"
                 onClick={() => setPeriod(p)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                className={`flex-1 sm:flex-initial px-2 sm:px-3 py-2 sm:py-1.5 rounded-lg text-xs font-semibold transition-all min-h-[40px] sm:min-h-0 ${
                   period === p
                     ? "bg-[#4f6ef7] text-white shadow-sm"
                     : "text-gray-400 hover:text-gray-600"
@@ -156,14 +157,14 @@ export default function StatsPage() {
         </div>
 
         {/* KPI Grid */}
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 min-[400px]:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-6">
           {displayKpis.map((k) => (
-            <div key={k.label} className={`bg-white rounded-2xl p-5 shadow-[0_2px_16px_rgba(149,157,165,0.10)] border ${k.bg}`}>
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider leading-tight max-w-[70%]">{k.label}</p>
-                <k.Icon size={16} className={k.color} />
+            <div key={k.label} className={`bg-white rounded-2xl p-4 sm:p-5 shadow-[0_2px_16px_rgba(149,157,165,0.10)] border ${k.bg}`}>
+              <div className="flex items-start justify-between mb-2 sm:mb-3 gap-2">
+                <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider leading-snug flex-1 min-w-0">{k.label}</p>
+                <k.Icon size={16} className={`${k.color} flex-shrink-0`} />
               </div>
-              <p className="text-3xl font-bold text-[#1e2040]">{k.value}</p>
+              <p className="text-2xl sm:text-3xl font-bold text-[#1e2040]">{k.value}</p>
             </div>
           ))}
         </div>
