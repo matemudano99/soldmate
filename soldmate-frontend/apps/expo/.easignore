@@ -1,0 +1,13 @@
+# Keep Expo app in managed/CNG mode for cloud builds.
+# This forces EAS to run prebuild remotely instead of using local native folders.
+android/
+ios/
+
+# Local-only files
+.expo/
+node_modules/
+npm-debug.log*
+.env
+.env.*
+!.env.example
+
