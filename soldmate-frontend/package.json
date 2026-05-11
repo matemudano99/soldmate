@@ -6,8 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "web": "npm run dev -w soldmate-next",
-    "mobile": "npm run start -w soldmate-expo"
+    "web": "npm run dev -w soldmate-next"
   },
   "devDependencies": {
     "typescript": "^5.3.3"

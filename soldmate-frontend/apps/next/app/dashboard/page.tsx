@@ -153,7 +153,7 @@ export default function DashboardPage() {
   const recentIncidents = summary?.recentIncidents ?? [];
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#eef1f8] text-[#1e2040]">
+    <div className="flex min-h-[100dvh] overflow-hidden bg-[#eef1f8] text-[#1e2040]">
       <WebErpNavbar />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -162,7 +162,7 @@ export default function DashboardPage() {
           onSearchChange={setGlobalSearch}
         />
 
-        <main className="flex-1 overflow-y-auto px-7 pb-6 space-y-5">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-7 pb-6 space-y-5">
           {error && <p className="text-xs text-amber-600">{error}</p>}
           <p className="text-xs text-gray-500">
             Estado del negocio:{" "}

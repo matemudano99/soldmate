@@ -150,7 +150,7 @@ export default function DocumentsPage() {
           onSearchChange={setSearch}
           searchPlaceholder="Buscar documentos..."
         />
-        <div className="px-6">
+        <div className="px-4 sm:px-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>

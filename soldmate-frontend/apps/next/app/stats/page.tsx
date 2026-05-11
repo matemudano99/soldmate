@@ -114,7 +114,7 @@ export default function StatsPage() {
 
       <main className="flex-1 overflow-y-auto pb-6">
         <AppTopHeader />
-        <div className="px-6">
+        <div className="px-4 sm:px-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>

@@ -8,7 +8,6 @@
     "start": "next start"
   },
   "dependencies": {
-    "@expo/next-adapter": "^6.0.0",
     "@react-native/assets-registry": "^0.74.84",
     "@tanstack/react-query": "^5.28.0",
     "app": "*",

@@ -66,7 +66,7 @@ export default function SuppliersPage() {
       <WebErpNavbar />
       <main className="flex-1 pb-6 overflow-y-auto">
         <AppTopHeader />
-        <div className="px-6">
+        <div className="px-4 sm:px-6">
         <div className="flex items-center justify-between mb-5">
           <div>
             <h1 className="text-2xl font-bold text-[#1e2040]">Proveedores</h1>

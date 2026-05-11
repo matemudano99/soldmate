@@ -103,7 +103,7 @@ export default function InventoryPage() {
           onSearchChange={setSearch}
           searchPlaceholder="Buscar en inventario..."
         />
-        <div className="px-6">
+        <div className="px-4 sm:px-6">
         <div className="flex items-center gap-3 mb-2">
           <Link
             href="/dashboard"

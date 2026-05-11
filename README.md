@@ -31,6 +31,7 @@ El sector hostelero requiere soluciones rápidas. Herramientas tradicionales com
 
 ## 🛠️ Tecnologías
 - **Frontend**: React, Next.js (App Router), Tailwind CSS, Zustand, React Query.
+- **App Android wrapper**: WebView nativo (sin Expo) en `soldmate-android-wrapper`.
 - **Backend**: Java 21, Spring Boot 3, Spring Security, JWT Auth.
 - **Base de Datos y Almacenamiento**: PostgreSQL y Supabase Storage (BaaS).
 - **Despliegue**: Docker Compose (Local), Vercel/Railway (Cloud).

@@ -173,7 +173,7 @@ export default function CalendarPage() {
       <WebErpNavbar />
       <main className="flex-1 pb-6 overflow-y-auto">
         <AppTopHeader />
-        <div className="px-6">
+        <div className="px-4 sm:px-6">
         <div className="flex items-center justify-between mb-5">
           <h1 className="text-2xl font-bold text-[#1e2040]">Calendario</h1>
           <button onClick={() => setShowCreate(true)} className="inline-flex items-center gap-2 rounded-xl bg-[#4f6ef7] text-white px-4 py-2.5 text-sm font-semibold hover:bg-[#3d5ae0]">
