@@ -1,5 +1,6 @@
 package com.soldmate.schema;
 
+import com.soldmate.auth.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -10,7 +11,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Versionador de esquema propio (sin Flyway).
@@ -46,7 +49,8 @@ public class SchemaMigrationRunner implements ApplicationRunner {
             new MigrationStep("006", "Add suppliers type segmentation", this::addSupplierTypeColumn),
             new MigrationStep("007", "Harden tenant indexes for high-traffic queries", this::addTenantIsolationIndexes),
             new MigrationStep("008", "Create notifications table", this::createNotificationsTable),
-            new MigrationStep("009", "Create search indexes for global search", this::addSearchIndexes)
+            new MigrationStep("009", "Create search indexes for global search", this::addSearchIndexes),
+            new MigrationStep("010", "Sync users.role constraint with backend enum", this::syncUsersRoleConstraint)
         );
 
         for (MigrationStep step : steps) {
@@ -232,6 +236,26 @@ public class SchemaMigrationRunner implements ApplicationRunner {
         jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_products_name_lower ON products(company_id, LOWER(name))");
         jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_incidents_title_lower ON incidents(company_id, LOWER(title))");
         jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_suppliers_name_lower ON suppliers(company_id, LOWER(name))");
+    }
+
+    /**
+     * Evita desalineaciones backend ↔ DB:
+     * - normaliza `users.role`
+     * - corrige valores inválidos a EMPLOYEE
+     * - recrea `users_role_check` usando los roles reales del enum User.Role
+     */
+    private void syncUsersRoleConstraint() {
+        List<String> allowedRoles = Arrays.stream(User.Role.values())
+            .map(Enum::name)
+            .toList();
+        String inClause = allowedRoles.stream()
+            .map(role -> "'" + role + "'")
+            .collect(Collectors.joining(", "));
+
+        jdbcTemplate.execute("UPDATE users SET role = UPPER(TRIM(role)) WHERE role IS NOT NULL");
+        jdbcTemplate.execute("UPDATE users SET role = 'EMPLOYEE' WHERE role IS NULL OR role = '' OR role NOT IN (" + inClause + ")");
+        jdbcTemplate.execute("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check");
+        jdbcTemplate.execute("ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN (" + inClause + "))");
     }
 
     private void addConstraintIfMissing(String constraintName, String addConstraintSql) {

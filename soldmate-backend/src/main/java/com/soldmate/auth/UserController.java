@@ -2,6 +2,7 @@ package com.soldmate.auth;
 
 import com.soldmate.company.Company;
 import com.soldmate.company.CompanyRepository;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -95,7 +96,7 @@ public class UserController {
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<UserResponse> createUser(
         @RequestHeader("Authorization") String authHeader,
-        @RequestBody CreateUserRequest req
+        @Valid @RequestBody CreateUserRequest req
     ) {
         Long companyId = jwtUtil.extractCompanyId(authHeader.substring(7));
         Company company = companyRepository.findById(companyId).orElseThrow();
@@ -125,15 +126,21 @@ public class UserController {
     public ResponseEntity<UserResponse> updateUser(
         @RequestHeader("Authorization") String authHeader,
         @PathVariable Long id,
-        @RequestBody UpdateUserRequest req
+        @Valid @RequestBody UpdateUserRequest req
     ) {
         Long companyId = jwtUtil.extractCompanyId(authHeader.substring(7));
         User user = userRepository.findByIdAndCompanyId(id, companyId).orElse(null);
         if (user == null) return ResponseEntity.notFound().build();
 
+        String normalizedEmail = req.email().toLowerCase().trim();
+        if (!normalizedEmail.equalsIgnoreCase(user.getEmail()) && userRepository.existsByEmail(normalizedEmail)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+
         String[] names = splitName(req.fullName());
         user.setFirstName(names[0]);
         user.setLastName(names[1]);
+        user.setEmail(normalizedEmail);
         user.setRole(resolveRole(req.role()));
         user.setAvatarUrl(blankToNull(req.avatarUrl()));
         userRepository.save(user);
@@ -168,6 +175,9 @@ public class UserController {
     }
 
     private String[] splitName(String fullName) {
+        if (fullName == null || fullName.isBlank()) {
+            return new String[]{"Usuario", ""};
+        }
         String[] names = fullName.trim().split("\\s+", 2);
         String first = names.length > 0 ? names[0] : "Usuario";
         String last = names.length > 1 ? names[1] : "";
