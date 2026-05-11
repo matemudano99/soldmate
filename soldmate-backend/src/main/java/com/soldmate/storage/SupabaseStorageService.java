@@ -26,6 +26,9 @@ public class SupabaseStorageService {
     @Value("${soldmate.supabase.anon-key}")
     private String supabaseAnonKey;
 
+    @Value("${soldmate.supabase.service-key:}")
+    private String supabaseServiceKey;
+
     @Value("${soldmate.supabase.bucket:incidents}")
     private String defaultBucket;
 
@@ -66,6 +69,13 @@ public class SupabaseStorageService {
                 "SOLDMATE_SUPABASE_URL está vacía. Configura la URL raíz del proyecto Supabase."
             );
         }
+        if (bucket == null || bucket.isBlank()) {
+            throw new IllegalStateException(
+                "SOLDMATE_SUPABASE_BUCKET está vacío. Define el bucket de Storage."
+            );
+        }
+
+        String authKey = resolveStorageKey();
 
         String folderPart = (folder == null || folder.isBlank()) ? "" : (folder.trim().replaceAll("^/+|/+$", "") + "/");
         String objectPath = companyId + "/" + folderPart + UUID.randomUUID() + extension;
@@ -75,8 +85,8 @@ public class SupabaseStorageService {
 
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(uploadUrl))
-            .header("Authorization", "Bearer " + supabaseAnonKey)
-            .header("apikey", supabaseAnonKey)
+            .header("Authorization", "Bearer " + authKey)
+            .header("apikey", authKey)
             .header("Content-Type", contentType)
             .POST(HttpRequest.BodyPublishers.ofByteArray(file.getBytes()))
             .build();
@@ -92,6 +102,20 @@ public class SupabaseStorageService {
         }
 
         return baseUrl + "/storage/v1/object/public/" + bucket + "/" + objectPath;
+    }
+
+    private String resolveStorageKey() {
+        String service = supabaseServiceKey != null ? supabaseServiceKey.trim() : "";
+        if (!service.isBlank() && !service.equals("placeholder-key")) {
+            return service;
+        }
+        String anon = supabaseAnonKey != null ? supabaseAnonKey.trim() : "";
+        if (anon.isBlank() || anon.equals("placeholder-key")) {
+            throw new IllegalStateException(
+                "No hay clave válida de Supabase. Configura SOLDMATE_SUPABASE_SERVICE_KEY (recomendado) o SOLDMATE_SUPABASE_ANON_KEY."
+            );
+        }
+        return anon;
     }
 
     /** Elimina la URL base de rutas como /rest/v1, /storage/v1, etc. */
