@@ -83,6 +83,16 @@ function resolvePersistStorage(): StateStorage {
   return window.sessionStorage;
 }
 
+function getWebStorages() {
+  if (typeof window === "undefined") {
+    return { local: null as Storage | null, session: null as Storage | null };
+  }
+
+  const local = typeof window.localStorage !== "undefined" ? window.localStorage : null;
+  const session = typeof window.sessionStorage !== "undefined" ? window.sessionStorage : null;
+  return { local, session };
+}
+
 // ─── Store ───────────────────────────────────────────────────────────────────
 
 export const useAuthStore = create<AuthState>()(
@@ -105,8 +115,13 @@ export const useAuthStore = create<AuthState>()(
     // Define el almacenamiento persistente para esta sesión:
     // - localStorage: "recordarme" activo
     // - sessionStorage: solo durante esta sesión del navegador
-    if (typeof window !== "undefined") {
-      localStorage.setItem("soldmate-auth-storage", remember ? "local" : "session");
+    const { local, session } = getWebStorages();
+    if (remember) {
+      local?.setItem("soldmate-auth-storage", "local");
+    } else if (session) {
+      session.setItem("soldmate-auth-storage", "session");
+    } else {
+      local?.setItem("soldmate-auth-storage", "session");
     }
 
     // Cookie para el middleware de Next.js (no accesible por JS después de login)
@@ -129,11 +144,10 @@ export const useAuthStore = create<AuthState>()(
   // Acción logout: limpia todos los datos del usuario
   logout: () => {
     deleteCookie("sm_token");
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("soldmate-auth-storage");
-      localStorage.removeItem("soldmate-auth");
-      sessionStorage.removeItem("soldmate-auth");
-    }
+    const { local, session } = getWebStorages();
+    local?.removeItem("soldmate-auth-storage");
+    local?.removeItem("soldmate-auth");
+    session?.removeItem("soldmate-auth");
     set({
       token: null,
       email: null,

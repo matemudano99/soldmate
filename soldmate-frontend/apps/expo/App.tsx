@@ -1,9 +1,11 @@
 // apps/mobile/App.tsx
 import React from "react";
+import "./global.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Home, Wrench, Truck, Settings, PlusCircle } from "lucide-react-native";
 import { useAuthStore } from "app/lib/store";
 import { LoginScreen }           from "app/screens/LoginScreen";
@@ -107,34 +109,36 @@ export default function App() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <NavigationContainer>
-        <Stack.Navigator id="root-stack" screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#020617" } }}>
-          {isAuthenticated ? (
-            <>
-              <Stack.Screen name="MainTabs"        component={MainTabsNavigator} />
-              <Stack.Screen
-                name="NewIncident"
-                component={NewIncidentScreen}
-                options={{
-                  presentation: "modal",
-                  headerShown: true,
-                  title: "Nueva incidencia",
-                  headerTintColor: "#1e293b",
-                }}
-              />
-              <Stack.Screen name="IncidentsList"   component={IncidentsListScreen} />
-              <Stack.Screen name="Suppliers"       component={SuppliersScreen} />
-              <Stack.Screen name="CompanySettings" component={CompanySettingsScreen} />
-            </>
-          ) : (
-            <>
-              <Stack.Screen name="Login"    component={LoginScreen} />
-              <Stack.Screen name="Register" component={RegisterScreen} options={{ presentation: "modal" }} />
-            </>
-          )}
-        </Stack.Navigator>
-      </NavigationContainer>
-    </QueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+        <NavigationContainer>
+          <Stack.Navigator id="root-stack" screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#020617" } }}>
+            {isAuthenticated ? (
+              <>
+                <Stack.Screen name="MainTabs"        component={MainTabsNavigator} />
+                <Stack.Screen
+                  name="NewIncident"
+                  component={NewIncidentScreen}
+                  options={{
+                    presentation: "modal",
+                    headerShown: true,
+                    title: "Nueva incidencia",
+                    headerTintColor: "#1e293b",
+                  }}
+                />
+                <Stack.Screen name="IncidentsList"   component={IncidentsListScreen} />
+                <Stack.Screen name="Suppliers"       component={SuppliersScreen} />
+                <Stack.Screen name="CompanySettings" component={CompanySettingsScreen} />
+              </>
+            ) : (
+              <>
+                <Stack.Screen name="Login"    component={LoginScreen} />
+                <Stack.Screen name="Register" component={RegisterScreen} options={{ presentation: "modal" }} />
+              </>
+            )}
+          </Stack.Navigator>
+        </NavigationContainer>
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }
