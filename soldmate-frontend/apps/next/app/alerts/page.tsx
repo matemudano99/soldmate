@@ -31,7 +31,7 @@ export default function AlertsPage() {
       <WebErpNavbar />
       <main className="flex-1 pb-6 overflow-y-auto">
         <AppTopHeader />
-        <div className="px-6">
+        <div className="px-4 sm:px-6">
         <h1 className="text-2xl font-bold text-[#1e2040] mb-5">Alertas y soporte</h1>
         <div className="max-w-4xl grid gap-4 lg:grid-cols-[1.5fr_1fr]">
           <SectionCard title="Alertas recientes" subtitle="Estado operativo">

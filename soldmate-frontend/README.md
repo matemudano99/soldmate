@@ -1,7 +1,7 @@
 # Soldmate — ERP Modular para Hostelería
 
 ERP multi-tenant para restaurantes, bares y cafeterías.  
-Stack: Java 21 + Spring Boot 3.4 · Next.js · Expo · Supabase
+Stack: Java 21 + Spring Boot 3.4 · Next.js · Supabase
 
 ---
 
@@ -16,10 +16,9 @@ soldmate/
 │       ├── inventory/         # Product, InventoryController
 │       └── incidents/         # Incident
 │
-└── soldmate-frontend/         # Monorepo Solito
+└── soldmate-frontend/         # Frontend web (Next.js)
     ├── apps/
-    │   ├── web/               # Next.js 14 (panel de administración)
-    │   └── mobile/            # Expo (app para camarero / cocina)
+    │   └── next/              # Next.js 14 (panel de administración)
     └── packages/
         └── app/               # Código compartido (lógica + componentes)
             ├── screens/       # Pantallas (LoginScreen, DashboardScreen…)
@@ -79,26 +78,11 @@ cd soldmate-frontend
 yarn install
 
 # Crea el archivo de variables de entorno
-echo "NEXT_PUBLIC_API_URL=http://localhost:8080" > apps/web/.env.local
+echo "NEXT_PUBLIC_API_URL=http://localhost:8080" > apps/next/.env.local
 
 # Arranca el servidor de desarrollo
-yarn web
+npm run web
 # Accede en http://localhost:3000
-```
-
-### 4 — Frontend Mobile (Expo)
-
-```bash
-cd soldmate-frontend
-
-# Instala Expo CLI si no lo tienes
-npm install -g expo-cli
-
-# Arranca el servidor de Expo
-yarn mobile
-
-# Escanea el QR con la app Expo Go en tu móvil
-# O pulsa 'w' para abrirlo en el navegador
 ```
 
 ---

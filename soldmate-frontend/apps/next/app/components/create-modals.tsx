@@ -26,7 +26,7 @@ function ModalShell({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-50">
           <div>
             <h2 className="text-base font-bold text-[#1e2040]">{title}</h2>
             <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>
@@ -36,7 +36,7 @@ function ModalShell({
           </button>
         </div>
 
-        <form onSubmit={onSubmit} className="px-6 py-5 space-y-4">
+        <form onSubmit={onSubmit} className="px-4 sm:px-6 py-5 space-y-4">
           {children}
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-200 text-gray-500 font-semibold py-2.5 text-sm hover:bg-gray-50">

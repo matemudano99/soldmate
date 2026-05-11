@@ -198,7 +198,7 @@ export default function CompanySettingsPage() {
       <WebErpNavbar />
       <main className="flex-1 pb-6 overflow-y-auto">
         <AppTopHeader />
-        <div className="px-6">
+        <div className="px-4 sm:px-6">
         <h1 className="text-2xl font-bold text-[#1e2040] mb-5">Ajustes</h1>
         <div className="max-w-4xl grid gap-4">
           <SectionCard title="Mi perfil" subtitle="Datos del usuario autenticado">

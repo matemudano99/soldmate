@@ -515,7 +515,7 @@ function AddModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-50">
           <div>
             <h2 className="text-base font-bold text-[#1e2040]">Añadir persona</h2>
             <p className="text-xs text-gray-400 mt-0.5">Completa los datos del nuevo miembro</p>
@@ -525,7 +525,7 @@ function AddModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+        <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-5 space-y-4">
           {/* Name */}
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -734,7 +734,7 @@ export default function PeoplePage() {
   // ─── Loading / Error states ────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="flex h-screen overflow-hidden bg-[#eef1f8] text-[#1e2040]">
+      <div className="flex min-h-[100dvh] overflow-hidden bg-[#eef1f8] text-[#1e2040]">
         <WebErpNavbar />
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3 text-gray-400">
@@ -748,7 +748,7 @@ export default function PeoplePage() {
 
   if (isError) {
     return (
-      <div className="flex h-screen overflow-hidden bg-[#eef1f8] text-[#1e2040]">
+      <div className="flex min-h-[100dvh] overflow-hidden bg-[#eef1f8] text-[#1e2040]">
         <WebErpNavbar />
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4 text-center max-w-sm">
@@ -774,7 +774,7 @@ export default function PeoplePage() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#eef1f8] text-[#1e2040]">
+    <div className="flex min-h-[100dvh] overflow-hidden bg-[#eef1f8] text-[#1e2040]">
       <WebErpNavbar />
 
       {/* Main Content */}
@@ -787,7 +787,7 @@ export default function PeoplePage() {
         />
 
         {/* Content */}
-        <main className="flex-1 overflow-y-auto px-7 pb-6">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-7 pb-6">
           {/* Title + actions */}
           <div className="flex items-end justify-between mb-5">
             <div>

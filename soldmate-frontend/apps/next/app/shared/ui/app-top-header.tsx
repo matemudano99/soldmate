@@ -67,7 +67,7 @@ export function AppTopHeader({
   }, [token]);
 
   return (
-    <header className="flex-shrink-0 px-7 py-4 flex items-center justify-between gap-4">
+    <header className="flex-shrink-0 pl-16 pr-7 py-4 md:px-7 flex items-center justify-between gap-4">
       <div>
         <p className="text-xs text-gray-400">{todayCap}</p>
         <h1 className="text-xl font-bold text-[#1e2040]">{displayName}</h1>

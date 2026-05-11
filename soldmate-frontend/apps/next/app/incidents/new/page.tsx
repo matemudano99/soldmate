@@ -32,7 +32,7 @@ export default function NewIncidentPage() {
       <WebErpNavbar />
       <main className="flex-1 pb-6 overflow-y-auto">
         <AppTopHeader />
-        <div className="px-6">
+        <div className="px-4 sm:px-6">
         <h1 className="text-2xl font-bold text-[#1e2040] mb-2">Nueva incidencia</h1>
         <p className="text-sm text-gray-500 mb-5 max-w-lg">
           Completa el formulario. Si eliges una imagen, el backend la sube al bucket <code className="text-xs bg-gray-100 px-1 rounded">incidents</code> en

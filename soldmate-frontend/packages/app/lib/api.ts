@@ -8,14 +8,10 @@
 
 // ─── URL del backend ────────────────────────────────────────────────────────
 // Web (Next): NEXT_PUBLIC_API_URL
-// Expo/React Native: EXPO_PUBLIC_API_URL
 // Fallback local para dev: http://localhost:28080
 function resolveApiBaseUrl(): string {
   const webUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (webUrl) return webUrl;
-
-  const expoUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
-  if (expoUrl) return expoUrl;
 
   return "http://localhost:28080";
 }
@@ -30,7 +26,7 @@ export function describeNetworkError(err: unknown): string {
     /failed to fetch|networkerror|load failed|fetch/i.test(raw) ||
     /network request failed/i.test(raw);
   if (looksNetwork) {
-    return `No hay conexión con el API (${API_BASE_URL}). Arranca el backend (docker compose up -d, puerto 28080). Web: NEXT_PUBLIC_API_URL. Expo: EXPO_PUBLIC_API_URL en apps/expo/.env.`;
+    return `No hay conexión con el API (${API_BASE_URL}). Arranca el backend (docker compose up -d, puerto 28080). Configura NEXT_PUBLIC_API_URL en apps/next/.env.local.`;
   }
   return raw || "Error de red.";
 }
