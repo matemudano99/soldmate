@@ -154,15 +154,19 @@ public class DocumentController {
         @RequestParam(value = "name",     required = false) String name,
         @RequestParam(value = "category", required = false) String category
     ) {
-        Long   companyId      = extractCompanyId(authHeader);
-        String uploaderEmail  = extractEmail(authHeader);
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body("Authorization inválido. Se esperaba 'Bearer <token>'.");
+        }
 
-        // Límite de 50 MB por documento
-        if (file.getSize() > 50L * 1024 * 1024) {
-            return ResponseEntity.badRequest().body("El documento no puede superar 50 MB");
+        // Alineado con spring.servlet.multipart.max-file-size=10MB (application.properties)
+        if (file.getSize() > 10L * 1024 * 1024) {
+            return ResponseEntity.badRequest().body("El documento no puede superar 10 MB");
         }
 
         try {
+            Long companyId = extractCompanyId(authHeader);
+            String uploaderEmail = extractEmail(authHeader);
             Document doc = documentService.upload(companyId, uploaderEmail, name, category, file);
             return ResponseEntity.status(HttpStatus.CREATED).body(DocumentResponse.from(doc));
         } catch (IOException e) {
@@ -171,6 +175,9 @@ public class DocumentController {
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                 .body("Almacenamiento: " + e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Error inesperado al procesar la subida: " + e.getMessage());
         }
     }
 
