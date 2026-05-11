@@ -10,6 +10,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { AuthResponse } from "./api";
+import type { StateStorage } from "zustand/middleware";
 
 // ─── Tipos del estado ────────────────────────────────────────────────────────
 
@@ -50,6 +51,36 @@ function setCookie(name: string, value: string, maxAgeSec?: number) {
 function deleteCookie(name: string) {
   if (typeof document === "undefined") return;
   document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+}
+
+const noopStorage: StateStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
+
+function resolvePersistStorage(): StateStorage {
+  if (typeof window === "undefined") {
+    return noopStorage;
+  }
+
+  const hasLocal = typeof window.localStorage !== "undefined";
+  const hasSession = typeof window.sessionStorage !== "undefined";
+
+  if (!hasLocal && !hasSession) {
+    return noopStorage;
+  }
+
+  const mode = hasLocal ? window.localStorage.getItem("soldmate-auth-storage") : "local";
+  if (mode === "session" && hasSession) {
+    return window.sessionStorage;
+  }
+
+  if (hasLocal) {
+    return window.localStorage;
+  }
+
+  return window.sessionStorage;
 }
 
 // ─── Store ───────────────────────────────────────────────────────────────────
@@ -133,13 +164,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "soldmate-auth",
-      storage: createJSONStorage(() => {
-        // Modo por defecto: recordar
-        const mode = typeof window !== "undefined"
-          ? localStorage.getItem("soldmate-auth-storage")
-          : "local";
-        return mode === "session" ? sessionStorage : localStorage;
-      }),
+      storage: createJSONStorage(resolvePersistStorage),
     }
   )
 );
