@@ -52,7 +52,7 @@ export interface ProductResponse {
   unit: "KG" | "L" | "UNIT" | "BOX";
   category: string | null;
   vatRate: number;
-  lowStock: boolean; // el backend nos dice si está por debajo del mínimo
+  lowStock: boolean; // true si currentStock < minStock (igual al mínimo no cuenta como bajo)
 }
 
 export interface ProductInput {
