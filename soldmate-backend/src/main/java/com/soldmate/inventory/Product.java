@@ -41,8 +41,9 @@ public class Product {
     @JoinColumn(name = "company_id", nullable = false)
     private Company company;
 
+    /** Stock bajo solo si el actual es estrictamente menor que el mínimo (igual al mínimo = OK). */
     public boolean isLowStock() {
-        return currentStock.compareTo(minStock) <= 0;
+        return currentStock.compareTo(minStock) < 0;
     }
 
     public enum Unit { KG, L, UNIT, BOX }
