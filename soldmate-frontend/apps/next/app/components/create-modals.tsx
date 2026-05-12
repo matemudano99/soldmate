@@ -422,25 +422,75 @@ export function UploadDocumentModal({ onClose, onCreate }: { onClose: () => void
   );
 }
 
-export function CreateProductModal({
+export function CreateInventoryCategoryModal({
   onClose,
   onCreate,
   submitting = false,
 }: {
   onClose: () => void;
+  onCreate: (name: string) => void;
+  submitting?: boolean;
+}) {
+  const [name, setName] = useState("");
+
+  return (
+    <ModalShell
+      title="Nueva categoría"
+      subtitle="Solo el nombre. El proveedor se asigna en cada producto."
+      onClose={onClose}
+      submitLabel="Crear categoría"
+      submitting={submitting}
+      onSubmit={(e) => {
+        e.preventDefault();
+        const t = name.trim();
+        if (!t) return;
+        onCreate(t);
+      }}
+    >
+      <div>
+        <Label>Nombre *</Label>
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. Desechables" required />
+      </div>
+    </ModalShell>
+  );
+}
+
+export function CreateProductModal({
+  onClose,
+  onCreate,
+  submitting = false,
+  categories = [],
+  suppliers = [],
+}: {
+  onClose: () => void;
   onCreate: (payload: ProductInput) => void;
   submitting?: boolean;
+  /** Nombres de categoría de inventario (incluye «Ninguna»). */
+  categories?: string[];
+  suppliers?: SupplierResponse[];
 }) {
   const [name, setName] = useState("");
   const [currentStock, setCurrentStock] = useState("0");
   const [minStock, setMinStock] = useState("10");
   const [unit, setUnit] = useState<ProductInput["unit"]>("UNIT");
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState("Ninguna");
+  const [supplierId, setSupplierId] = useState("");
+
+  const categoryOptions = useMemo(
+    () => (categories.length > 0 ? categories : (["Ninguna"] as string[])),
+    [categories],
+  );
+
+  useEffect(() => {
+    setCategory((prev) =>
+      categoryOptions.includes(prev) ? prev : categoryOptions.includes("Ninguna") ? "Ninguna" : categoryOptions[0]!,
+    );
+  }, [categoryOptions]);
 
   return (
     <ModalShell
       title="Nuevo producto"
-      subtitle="Nombre, stock, mínimo de alerta y unidad de medida"
+      subtitle="Nombre, stock, categoría, proveedor opcional y unidad de medida"
       onClose={onClose}
       submitLabel="Crear producto"
       submitting={submitting}
@@ -452,7 +502,8 @@ export function CreateProductModal({
           currentStock: Math.floor(Number(currentStock || 0)),
           minStock: Math.floor(Number(minStock || 0)),
           unit,
-          category: category.trim() || null,
+          category: category === "Ninguna" ? "Ninguna" : category || null,
+          supplierId: supplierId === "" ? null : Number(supplierId),
           vatRate: 10,
         });
       }}
@@ -483,23 +534,48 @@ export function CreateProductModal({
           />
         </div>
       </div>
+      <div>
+        <Label>Unidad</Label>
+        <select
+          value={unit}
+          onChange={(e) => setUnit(e.target.value as ProductInput["unit"])}
+          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-[#1e2040] outline-none focus:border-[#4f6ef7]"
+        >
+          <option value="UNIT">Unidades (ud)</option>
+          <option value="KG">Kilogramos (kg)</option>
+          <option value="L">Litros (L)</option>
+          <option value="BOX">Cajas</option>
+        </select>
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label>Unidad</Label>
+          <Label>Categoría</Label>
           <select
-            value={unit}
-            onChange={(e) => setUnit(e.target.value as ProductInput["unit"])}
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
             className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-[#1e2040] outline-none focus:border-[#4f6ef7]"
           >
-            <option value="UNIT">Unidades (ud)</option>
-            <option value="KG">Kilogramos (kg)</option>
-            <option value="L">Litros (L)</option>
-            <option value="BOX">Cajas</option>
+            {categoryOptions.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
           </select>
         </div>
         <div>
-          <Label>Categoría</Label>
-          <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Opcional" />
+          <Label>Proveedor (opcional)</Label>
+          <select
+            value={supplierId}
+            onChange={(e) => setSupplierId(e.target.value)}
+            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-[#1e2040] outline-none focus:border-[#4f6ef7]"
+          >
+            <option value="">Sin proveedor</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={String(s.id)}>
+                {s.name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
     </ModalShell>

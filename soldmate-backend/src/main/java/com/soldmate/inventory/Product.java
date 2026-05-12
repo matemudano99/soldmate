@@ -31,6 +31,10 @@ public class Product {
 
     private String category;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "supplier_id")
+    private Supplier supplier;
+
     @Column(precision = 10, scale = 2)
     private BigDecimal price;
 

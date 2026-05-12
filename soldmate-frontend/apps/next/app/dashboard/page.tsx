@@ -7,7 +7,7 @@ import {
   ChevronRight, Circle,
   CheckCircle2, Clock, Activity, CloudRain,
 } from "lucide-react";
-import { WebErpNavbar, AppTopHeader } from "../shared/ui";
+import { ErpPageShell, AppTopHeader } from "../shared/ui";
 import Link from "next/link";
 import { useAuthStore } from "app/lib/store";
 import {
@@ -153,16 +153,13 @@ export default function DashboardPage() {
   const recentIncidents = summary?.recentIncidents ?? [];
 
   return (
-    <div className="flex min-h-[100dvh] overflow-hidden bg-[#eef1f8] text-[#1e2040]">
-      <WebErpNavbar />
-
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+    <ErpPageShell>
         <AppTopHeader 
           searchValue={globalSearch}
           onSearchChange={setGlobalSearch}
         />
 
-        <main className="flex-1 overflow-y-auto px-4 sm:px-7 pb-6 space-y-5">
+        <main className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-7 pb-6 space-y-5">
           {error && <p className="text-xs text-amber-600">{error}</p>}
           <p className="text-xs text-gray-500">
             Estado del negocio:{" "}
@@ -373,7 +370,6 @@ export default function DashboardPage() {
             </div>
           </div>
         </main>
-      </div>
-    </div>
+    </ErpPageShell>
   );
 }

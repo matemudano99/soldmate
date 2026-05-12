@@ -8,7 +8,7 @@ import {
   Star, TrendingUp, Loader2, AlertCircle,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CreatePersonModal, AppTopHeader, WebErpNavbar, notify, useConfirm, EmptyState } from "../shared/ui";
+import { CreatePersonModal, AppTopHeader, ErpPageShell, notify, useConfirm, EmptyState } from "../shared/ui";
 import {
   activityApi,
   usersApi,
@@ -740,23 +740,21 @@ export default function PeoplePage() {
   // ─── Loading / Error states ────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="flex min-h-[100dvh] overflow-hidden bg-[#eef1f8] text-[#1e2040]">
-        <WebErpNavbar />
-        <div className="flex-1 flex items-center justify-center">
+      <ErpPageShell>
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
           <div className="flex flex-col items-center gap-3 text-gray-400">
             <Loader2 size={32} className="animate-spin text-[#4f6ef7]" />
             <p className="text-sm">Cargando usuarios...</p>
           </div>
         </div>
-      </div>
+      </ErpPageShell>
     );
   }
 
   if (isError) {
     return (
-      <div className="flex min-h-[100dvh] overflow-hidden bg-[#eef1f8] text-[#1e2040]">
-        <WebErpNavbar />
-        <div className="flex-1 flex items-center justify-center">
+      <ErpPageShell>
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
           <div className="flex flex-col items-center gap-4 text-center max-w-sm">
             <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center">
               <AlertCircle size={24} className="text-red-400" />
@@ -775,25 +773,19 @@ export default function PeoplePage() {
             </button>
           </div>
         </div>
-      </div>
+      </ErpPageShell>
     );
   }
 
   return (
-    <div className="flex min-h-[100dvh] overflow-hidden bg-[#eef1f8] text-[#1e2040]">
-      <WebErpNavbar />
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top bar */}
+    <ErpPageShell>
         <AppTopHeader
           searchValue={search}
           onSearchChange={setSearch}
           searchPlaceholder="Buscar usuarios..."
         />
 
-        {/* Content */}
-        <main className="flex-1 overflow-y-auto px-4 sm:px-7 pb-6">
+        <main className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-7 pb-6">
           {/* Title + actions */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-5">
             <div className="min-w-0">
@@ -932,7 +924,6 @@ export default function PeoplePage() {
             </div>
           )}
         </main>
-      </div>
 
       {/* Detail Panel (overlay en móvil, columna en lg+) */}
       {selectedEmp && (
@@ -975,6 +966,6 @@ export default function PeoplePage() {
           }
         />
       )}
-    </div>
+    </ErpPageShell>
   );
 }

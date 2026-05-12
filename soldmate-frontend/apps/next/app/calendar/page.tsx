@@ -3,7 +3,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Plus, CloudRain, Wind, Thermometer, Loader2, Pencil, Trash2, CalendarDays } from "lucide-react";
 import { SectionCard } from "../components/web-ui";
-import { AppTopHeader, CreateCalendarTaskModal, WebErpNavbar, notify, useConfirm } from "../shared/ui";
+import { AppTopHeader, CreateCalendarTaskModal, ErpPageShell, notify, useConfirm } from "../shared/ui";
 import { businessProfileApi, calendarApi, forecastApi, type CalendarEventResponse, type ForecastImpactDay } from "app/lib/api";
 import { describeNetworkError } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
@@ -257,10 +257,9 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#eef1f8]">
-      <WebErpNavbar />
-      <main className="flex-1 overflow-y-auto pb-6">
+    <ErpPageShell>
         <AppTopHeader />
+        <main className="flex-1 min-h-0 overflow-y-auto pb-6">
         <div className="px-4 sm:px-6">
           <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -334,10 +333,14 @@ export default function CalendarPage() {
                                     ? "bg-amber-100 text-amber-800"
                                     : recommended
                                       ? "bg-emerald-100 text-emerald-800"
-                                      : "bg-blue-50 text-[#4f6ef7]"
+                                      : fc.impactScore >= 45
+                                        ? "bg-rose-100 text-rose-800"
+                                        : fc.impactScore >= 25
+                                          ? "bg-amber-50 text-amber-900"
+                                          : "bg-blue-50 text-[#4f6ef7]"
                                 }`}
                               >
-                                Carga {fc.impactScore}
+                                Índice: {fc.impactScore}
                               </span>
                               <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
                                 <span className="inline-flex items-center gap-1">
@@ -365,9 +368,12 @@ export default function CalendarPage() {
                                 }))
                               }
                             />
-                            {recommended || adverse ? (
-                              <p className={`text-xs font-medium ${adverse ? "text-amber-800" : "text-emerald-800"}`}>
-                                {lowerSalesReason(fc)}
+                            {adverse ? (
+                              <p className="text-xs font-medium text-amber-800">{lowerSalesReason(fc)}</p>
+                            ) : recommended ? (
+                              <p className="text-xs font-medium text-emerald-800">
+                                Día con menor índice de la semana en el pronóstico (misma lógica que «Clima y menor
+                                volumen» en el panel).
                               </p>
                             ) : null}
                           </div>
@@ -494,6 +500,6 @@ export default function CalendarPage() {
         </div>
       </main>
       {confirmDialog}
-    </div>
+    </ErpPageShell>
   );
 }

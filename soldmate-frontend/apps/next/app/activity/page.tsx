@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Activity, ChevronLeft, Wrench, Circle, Clock, CheckCircle2, Package, Users, FileText, Calendar, PlusCircle, Edit3, Trash2, ShieldAlert, Truck } from "lucide-react";
-import { AppTopHeader, WebErpNavbar } from "../shared/ui";
+import { AppTopHeader, ErpPageShell } from "../shared/ui";
 import { activityApi, type ActivityItemResponse } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
@@ -91,14 +91,13 @@ export default function ActivityPage() {
   }, [query.data, filterType, search]);
 
   return (
-    <div className="flex min-h-screen bg-[#eef1f8] text-[#1e2040]">
-      <WebErpNavbar />
-      <main className="flex-1 pb-6 overflow-y-auto">
+    <ErpPageShell>
         <AppTopHeader 
           searchValue={search}
           onSearchChange={setSearch}
           searchPlaceholder="Filtrar registros..."
         />
+        <main className="flex-1 min-h-0 overflow-y-auto pb-6">
         <div className="px-4 sm:px-6">
           <div className="flex items-center gap-3 mb-2">
             <Link
@@ -214,6 +213,6 @@ export default function ActivityPage() {
           )}
         </div>
       </main>
-    </div>
+    </ErpPageShell>
   );
 }

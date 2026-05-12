@@ -6,7 +6,7 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
 import { Users, ShoppingCart, Star, Activity, Download } from "lucide-react";
-import { AppTopHeader, WebErpNavbar, notify } from "../shared/ui";
+import { AppTopHeader, ErpPageShell, notify } from "../shared/ui";
 import { dashboardApi, inventoryApi } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 import { useEffect } from "react";
@@ -109,11 +109,9 @@ export default function StatsPage() {
   const displayKpis = liveKpis ?? SUMMARY_KPIS;
 
   return (
-    <div className="flex min-h-screen bg-[#eef1f8] text-[#1e2040]">
-      <WebErpNavbar />
-
-      <main className="flex-1 overflow-y-auto pb-6">
+    <ErpPageShell>
         <AppTopHeader />
+        <main className="flex-1 min-h-0 overflow-y-auto pb-6">
         <div className="px-4 sm:px-6">
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-6">
@@ -296,6 +294,6 @@ export default function StatsPage() {
         </div>
         </div>
       </main>
-    </div>
+    </ErpPageShell>
   );
 }

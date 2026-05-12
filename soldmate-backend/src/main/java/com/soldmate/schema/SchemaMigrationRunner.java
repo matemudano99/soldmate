@@ -50,7 +50,9 @@ public class SchemaMigrationRunner implements ApplicationRunner {
             new MigrationStep("007", "Harden tenant indexes for high-traffic queries", this::addTenantIsolationIndexes),
             new MigrationStep("008", "Create notifications table", this::createNotificationsTable),
             new MigrationStep("009", "Create search indexes for global search", this::addSearchIndexes),
-            new MigrationStep("010", "Sync users.role constraint with backend enum", this::syncUsersRoleConstraint)
+            new MigrationStep("010", "Sync users.role constraint with backend enum", this::syncUsersRoleConstraint),
+            new MigrationStep("011", "Create inventory_categories for product taxonomy", this::createInventoryCategoriesTable),
+            new MigrationStep("012", "Product supplier FK and inventory_categories hardening", this::migrateProductSupplierAndInventoryCategories)
         );
 
         for (MigrationStep step : steps) {
@@ -256,6 +258,54 @@ public class SchemaMigrationRunner implements ApplicationRunner {
         jdbcTemplate.execute("UPDATE users SET role = 'EMPLOYEE' WHERE role IS NULL OR role = '' OR role NOT IN (" + inClause + ")");
         jdbcTemplate.execute("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check");
         jdbcTemplate.execute("ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN (" + inClause + "))");
+    }
+
+    private void createInventoryCategoriesTable() {
+        jdbcTemplate.execute("""
+            CREATE TABLE IF NOT EXISTS inventory_categories (
+              id BIGSERIAL PRIMARY KEY,
+              company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+              name VARCHAR(120) NOT NULL,
+              sort_order INTEGER NOT NULL DEFAULT 0
+            )
+            """);
+        jdbcTemplate.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ux_inventory_categories_company_name ON inventory_categories(company_id, name)"
+        );
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_inventory_categories_company ON inventory_categories(company_id)");
+    }
+
+    /**
+     * Proveedor por producto (no por categoría). Asegura columnas si la tabla existía sin migración 011.
+     */
+    private void migrateProductSupplierAndInventoryCategories() {
+        jdbcTemplate.execute("""
+            CREATE TABLE IF NOT EXISTS inventory_categories (
+              id BIGSERIAL PRIMARY KEY,
+              company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+              name VARCHAR(120) NOT NULL,
+              sort_order INTEGER NOT NULL DEFAULT 0
+            )
+            """);
+        jdbcTemplate.execute("ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0");
+        jdbcTemplate.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ux_inventory_categories_company_name ON inventory_categories(company_id, name)"
+        );
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_inventory_categories_company ON inventory_categories(company_id)");
+        jdbcTemplate.execute("ALTER TABLE inventory_categories DROP COLUMN IF EXISTS supplier_id");
+        jdbcTemplate.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_id BIGINT");
+        jdbcTemplate.execute("""
+            DO $$
+            BEGIN
+              IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint WHERE conname = 'products_supplier_id_fkey'
+              ) THEN
+                ALTER TABLE products
+                  ADD CONSTRAINT products_supplier_id_fkey
+                  FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL;
+              END IF;
+            END $$
+            """);
     }
 
     private void addConstraintIfMissing(String constraintName, String addConstraintSql) {
