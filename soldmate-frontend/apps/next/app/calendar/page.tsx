@@ -1,13 +1,25 @@
 "use client";
 
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Plus, CloudRain, Wind, Thermometer, Loader2, Pencil, Trash2, CalendarDays, ChevronDown } from "lucide-react";
+import {
+  Plus,
+  CloudRain,
+  Wind,
+  Thermometer,
+  Loader2,
+  Pencil,
+  Trash2,
+  CalendarDays,
+  ChevronDown,
+  Landmark,
+} from "lucide-react";
 import { SectionCard } from "../components/web-ui";
 import { AppTopHeader, CreateCalendarTaskModal, ErpPageShell, notify, useConfirm } from "../shared/ui";
 import { businessProfileApi, calendarApi, forecastApi, type CalendarEventResponse, type ForecastImpactDay } from "app/lib/api";
 import { describeNetworkError } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 import { getRecommendedLowLoadDays } from "app/lib/weather";
+import { getMalagaCapitalPublicHolidaysByDate } from "../../lib/malagaPublicHolidays";
 
 const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"] as const;
 
@@ -225,6 +237,11 @@ export default function CalendarPage() {
     return map;
   }, [events]);
 
+  const publicHolidaysByIso = useMemo(() => {
+    if (!rangeStart || !rangeEnd) return new Map<string, string[]>();
+    return getMalagaCapitalPublicHolidaysByDate(rangeStart, rangeEnd);
+  }, [rangeStart, rangeEnd]);
+
   async function handleDeleteTask(task: CalendarEventResponse) {
     const ok = await confirm(`¿Eliminar la tarea "${task.title}"?`, "Esta acción no se puede deshacer.", "danger");
     if (!ok) return;
@@ -283,7 +300,7 @@ export default function CalendarPage() {
             <div>
               <h1 className="text-xl font-bold text-[#1e2040] sm:text-2xl">Calendario</h1>
               <p className="mt-0.5 text-sm text-gray-500">
-                Clima y tareas por día · {businessCity}
+                Clima, festivos de referencia (Málaga capital + ES/AN) y tareas por día · {businessCity}
               </p>
             </div>
             <button
@@ -298,7 +315,7 @@ export default function CalendarPage() {
 
           <SectionCard
             title={extraWeeks > 0 ? `Próximos ${visibleDates.length} días` : "Vista semanal"}
-            subtitle={`Desde el lunes de esta semana: pronóstico y tareas. Al final puedes pulsar «Ver más» para cargar más días (hasta ${7 + MAX_EXTRA_WEEKS * 7}).`}
+            subtitle={`Desde el lunes de esta semana: pronóstico, festivos públicos de referencia para Málaga (capital: laboral estatal, andaluz y dos locales típicas; sin traslados por domingo) y tareas. «Ver más» amplía hasta ${7 + MAX_EXTRA_WEEKS * 7} días.`}
           >
             {forecastError && !loadingForecast && (
               <div className="mb-4 rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-600">
@@ -310,6 +327,7 @@ export default function CalendarPage() {
               {visibleDates.map((d, dayIndex) => {
                 const fc = forecastByIso.get(d.iso);
                 const dayEvents = eventsByDate.get(d.iso) ?? [];
+                const holidayNames = publicHolidaysByIso.get(d.iso) ?? [];
                 const isToday = d.iso === todayStr;
                 const strip = DAY_STRIP[dayIndex % 7] ?? DAY_STRIP[0];
                 const taskTone = TASK_CHIP[dayIndex % 7] ?? TASK_CHIP[0];
@@ -334,6 +352,21 @@ export default function CalendarPage() {
                           ) : null}
                         </div>
                         <p className="mt-0.5 text-sm font-semibold text-[#1e2040]">{formatDayTitle(d.iso)}</p>
+                        {holidayNames.length ? (
+                          <ul className="mt-2 space-y-1.5">
+                            {holidayNames.map((name) => (
+                              <li key={name}>
+                                <span
+                                  title={name}
+                                  className="inline-flex max-w-full items-center gap-1 rounded-lg border border-rose-100 bg-rose-50/90 px-2 py-1 text-[10px] font-semibold leading-tight text-rose-900"
+                                >
+                                  <Landmark size={11} className="shrink-0 text-rose-700" aria-hidden />
+                                  <span className="line-clamp-2">{name}</span>
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
                       </div>
 
                       <div className="min-w-0 flex-1 px-4 py-3">

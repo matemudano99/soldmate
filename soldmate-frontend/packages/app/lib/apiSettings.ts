@@ -20,7 +20,7 @@ export interface GroupedSettingsResponse {
   groups: Record<string, SettingResponse[]>;
 }
 
-export type SettingGroup = "VAT" | "CATEGORY" | "ORDER_STATUS";
+export type SettingGroup = "VAT" | "CATEGORY" | "ORDER_STATUS" | "FINANCE";
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 

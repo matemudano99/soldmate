@@ -53,7 +53,9 @@ public class SchemaMigrationRunner implements ApplicationRunner {
             new MigrationStep("010", "Sync users.role constraint with backend enum", this::syncUsersRoleConstraint),
             new MigrationStep("011", "Create inventory_categories for product taxonomy", this::createInventoryCategoriesTable),
             new MigrationStep("012", "Product supplier FK and inventory_categories hardening", this::migrateProductSupplierAndInventoryCategories),
-            new MigrationStep("013", "Create daily_finance_entries for manual daily totals", this::createDailyFinanceEntriesTable)
+            new MigrationStep("013", "Create daily_finance_entries for manual daily totals", this::createDailyFinanceEntriesTable),
+            new MigrationStep("014", "Extend daily_finance_entries and add daily_finance_lines", this::extendDailyFinanceAndCreateLines),
+            new MigrationStep("015", "Cash register daily model and fix Europe/Malaga timezone", this::migrateFinanceCashRegisterDailyModel)
         );
 
         for (MigrationStep step : steps) {
@@ -325,6 +327,161 @@ public class SchemaMigrationRunner implements ApplicationRunner {
         jdbcTemplate.execute(
                 "CREATE INDEX IF NOT EXISTS idx_daily_finance_company_date ON daily_finance_entries(company_id, entry_date DESC)"
         );
+    }
+
+    private void extendDailyFinanceAndCreateLines() {
+        jdbcTemplate.execute("""
+            ALTER TABLE daily_finance_entries
+              ADD COLUMN IF NOT EXISTS cash_amount NUMERIC(14,2),
+              ADD COLUMN IF NOT EXISTS card_amount NUMERIC(14,2),
+              ADD COLUMN IF NOT EXISTS other_amount NUMERIC(14,2),
+              ADD COLUMN IF NOT EXISTS covers INTEGER,
+              ADD COLUMN IF NOT EXISTS ticket_count INTEGER,
+              ADD COLUMN IF NOT EXISTS refunds NUMERIC(14,2),
+              ADD COLUMN IF NOT EXISTS discounts NUMERIC(14,2),
+              ADD COLUMN IF NOT EXISTS vat_collected NUMERIC(14,2),
+              ADD COLUMN IF NOT EXISTS vat_paid NUMERIC(14,2),
+              ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP,
+              ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+              ADD COLUMN IF NOT EXISTS created_by VARCHAR(255),
+              ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255)
+            """);
+        jdbcTemplate.execute("""
+            CREATE TABLE IF NOT EXISTS daily_finance_lines (
+                id BIGSERIAL PRIMARY KEY,
+                company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+                entry_date DATE NOT NULL,
+                kind VARCHAR(16) NOT NULL,
+                category VARCHAR(64) NOT NULL,
+                amount NUMERIC(14,2) NOT NULL,
+                vat_amount NUMERIC(14,2),
+                note VARCHAR(200),
+                sort_order INT NOT NULL DEFAULT 0,
+                CONSTRAINT chk_daily_finance_line_kind CHECK (kind IN ('REVENUE','EXPENSE'))
+            )
+            """);
+        jdbcTemplate.execute(
+                "CREATE INDEX IF NOT EXISTS idx_daily_finance_lines_company_date ON daily_finance_lines(company_id, entry_date)"
+        );
+    }
+
+    /**
+     * Cierre de caja diario: nuevos campos, elimina líneas legacy y columnas antiguas.
+     * Corrige timezone inválido Europe/Malaga (no existe en IANA → Madrid).
+     */
+    private void migrateFinanceCashRegisterDailyModel() {
+        jdbcTemplate.execute("""
+            UPDATE companies SET timezone = 'Europe/Madrid'
+            WHERE lower(trim(timezone)) = 'europe/malaga'
+            """);
+        jdbcTemplate.execute("""
+            ALTER TABLE daily_finance_entries
+              ADD COLUMN IF NOT EXISTS cash_opening NUMERIC(14,2),
+              ADD COLUMN IF NOT EXISTS income_dataphone NUMERIC(14,2),
+              ADD COLUMN IF NOT EXISTS income_just_eat NUMERIC(14,2),
+              ADD COLUMN IF NOT EXISTS income_glovo NUMERIC(14,2),
+              ADD COLUMN IF NOT EXISTS income_uber_eats NUMERIC(14,2),
+              ADD COLUMN IF NOT EXISTS cash_closing NUMERIC(14,2),
+              ADD COLUMN IF NOT EXISTS expense_lines_json TEXT
+            """);
+        jdbcTemplate.execute("""
+            ALTER TABLE daily_finance_entries
+              ADD COLUMN IF NOT EXISTS cash_opening NUMERIC(14,2),
+              ADD COLUMN IF NOT EXISTS income_dataphone NUMERIC(14,2),
+              ADD COLUMN IF NOT EXISTS income_just_eat NUMERIC(14,2),
+              ADD COLUMN IF NOT EXISTS income_glovo NUMERIC(14,2),
+              ADD COLUMN IF NOT EXISTS income_uber_eats NUMERIC(14,2),
+              ADD COLUMN IF NOT EXISTS cash_closing NUMERIC(14,2),
+              ADD COLUMN IF NOT EXISTS expense_lines_json TEXT
+            """);
+        if (Boolean.TRUE.equals(columnExists("daily_finance_entries", "cash_amount"))) {
+            jdbcTemplate.execute("""
+                UPDATE daily_finance_entries SET
+                  cash_opening = COALESCE(cash_opening, cash_amount, 0),
+                  income_dataphone = COALESCE(income_dataphone, card_amount, 0),
+                  income_just_eat = COALESCE(income_just_eat, 0),
+                  income_glovo = COALESCE(income_glovo, 0),
+                  income_uber_eats = COALESCE(income_uber_eats, 0),
+                  cash_closing = COALESCE(cash_closing, other_amount, 0)
+                """);
+        } else {
+            jdbcTemplate.execute("""
+                UPDATE daily_finance_entries SET
+                  cash_opening = COALESCE(cash_opening, 0),
+                  income_dataphone = COALESCE(income_dataphone, 0),
+                  income_just_eat = COALESCE(income_just_eat, 0),
+                  income_glovo = COALESCE(income_glovo, 0),
+                  income_uber_eats = COALESCE(income_uber_eats, 0),
+                  cash_closing = COALESCE(cash_closing, 0)
+                """);
+        }
+        jdbcTemplate.execute("""
+            UPDATE daily_finance_entries SET expense_lines_json = '[]'
+            WHERE expense_lines_json IS NULL
+            """);
+        jdbcTemplate.execute("""
+            UPDATE daily_finance_entries SET expense_lines_json =
+              ('[{"detail":"Importación histórica","amount":' || trim(to_char(expenses, 'FM9999999999990.00')) || '}]')
+            WHERE (expense_lines_json IS NULL OR expense_lines_json = '' OR expense_lines_json = '[]')
+              AND expenses IS NOT NULL AND expenses > 0
+            """);
+        jdbcTemplate.execute("""
+            UPDATE daily_finance_entries SET revenue =
+              COALESCE(income_dataphone, 0) + COALESCE(income_just_eat, 0)
+              + COALESCE(income_glovo, 0) + COALESCE(income_uber_eats, 0)
+            """);
+        jdbcTemplate.execute("""
+            UPDATE daily_finance_entries e SET expenses = COALESCE((
+              SELECT SUM((elem->>'amount')::numeric)
+              FROM jsonb_array_elements(e.expense_lines_json::jsonb) AS elem
+            ), 0)
+            """);
+        jdbcTemplate.execute("DROP TABLE IF EXISTS daily_finance_lines");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries DROP COLUMN IF EXISTS cash_amount");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries DROP COLUMN IF EXISTS card_amount");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries DROP COLUMN IF EXISTS other_amount");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries DROP COLUMN IF EXISTS covers");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries DROP COLUMN IF EXISTS ticket_count");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries DROP COLUMN IF EXISTS refunds");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries DROP COLUMN IF EXISTS discounts");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries DROP COLUMN IF EXISTS vat_collected");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries DROP COLUMN IF EXISTS vat_paid");
+        jdbcTemplate.execute("""
+            UPDATE daily_finance_entries SET
+              cash_opening = COALESCE(cash_opening, 0),
+              income_dataphone = COALESCE(income_dataphone, 0),
+              income_just_eat = COALESCE(income_just_eat, 0),
+              income_glovo = COALESCE(income_glovo, 0),
+              income_uber_eats = COALESCE(income_uber_eats, 0),
+              cash_closing = COALESCE(cash_closing, 0)
+            """);
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries ALTER COLUMN cash_opening SET DEFAULT 0");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries ALTER COLUMN cash_opening SET NOT NULL");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries ALTER COLUMN income_dataphone SET DEFAULT 0");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries ALTER COLUMN income_dataphone SET NOT NULL");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries ALTER COLUMN income_just_eat SET DEFAULT 0");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries ALTER COLUMN income_just_eat SET NOT NULL");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries ALTER COLUMN income_glovo SET DEFAULT 0");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries ALTER COLUMN income_glovo SET NOT NULL");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries ALTER COLUMN income_uber_eats SET DEFAULT 0");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries ALTER COLUMN income_uber_eats SET NOT NULL");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries ALTER COLUMN cash_closing SET DEFAULT 0");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries ALTER COLUMN cash_closing SET NOT NULL");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries ALTER COLUMN expense_lines_json SET DEFAULT '[]'");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries ALTER COLUMN expense_lines_json SET NOT NULL");
+    }
+
+    private boolean columnExists(String table, String column) {
+        Integer c = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = ? AND column_name = ?
+                """,
+                Integer.class,
+                table,
+                column
+        );
+        return c != null && c > 0;
     }
 
     private void addConstraintIfMissing(String constraintName, String addConstraintSql) {

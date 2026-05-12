@@ -139,6 +139,60 @@ public class CompanySettingsService {
         settingRepository.save(setting);
     }
 
+    // ─── Bloqueo de meses (finanzas), grupo FINANCE ───────────────────────────
+
+    public static final String FINANCE_SETTINGS_GROUP = "FINANCE";
+
+    public static String financeMonthLockKey(int year, int month) {
+        return String.format("FINANCE_LOCK_%d-%02d", year, month);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isFinanceMonthLocked(Long companyId, java.time.LocalDate date) {
+        String key = financeMonthLockKey(date.getYear(), date.getMonthValue());
+        return settingRepository.findByCompanyIdAndKey(companyId, key)
+                .map(CompanySetting::isActive)
+                .orElse(false);
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<String> listLockedFinanceMonths(Long companyId) {
+        return settingRepository.findByCompanyIdAndGroupAndActiveTrue(companyId, FINANCE_SETTINGS_GROUP).stream()
+                .map(CompanySetting::getKey)
+                .filter(k -> k.startsWith("FINANCE_LOCK_"))
+                .map(k -> k.substring("FINANCE_LOCK_".length()))
+                .sorted()
+                .toList();
+    }
+
+    @Transactional
+    public void lockFinanceMonth(Long companyId, int year, int month) {
+        String key = financeMonthLockKey(year, month);
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
+        java.util.Optional<CompanySetting> opt = settingRepository.findByCompanyIdAndKey(companyId, key);
+        if (opt.isPresent()) {
+            CompanySetting s = opt.get();
+            s.setActive(true);
+            s.setValue("1");
+            settingRepository.save(s);
+            return;
+        }
+        String label = "Bloqueo cierre " + year + "-" + String.format("%02d", month);
+        CompanySetting s = new CompanySetting(company, key, "1", label, FINANCE_SETTINGS_GROUP);
+        s.setDisplayOrder(0);
+        settingRepository.save(s);
+    }
+
+    @Transactional
+    public void unlockFinanceMonth(Long companyId, int year, int month) {
+        String key = financeMonthLockKey(year, month);
+        settingRepository.findByCompanyIdAndKey(companyId, key).ifPresent(s -> {
+            s.setActive(false);
+            settingRepository.save(s);
+        });
+    }
+
     // ─── Helpers privados ────────────────────────────────────────────────────
 
     private void setDisplayOrder(List<CompanySetting> settings) {

@@ -4,11 +4,12 @@ import com.soldmate.auth.JwtUtil;
 import com.soldmate.company.Company;
 import com.soldmate.company.CompanyRepository;
 import com.soldmate.forecast.ForecastController;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.Comparator;
@@ -23,26 +24,17 @@ public class PredictiveController {
     private final JwtUtil jwtUtil;
     private final CompanyRepository companyRepository;
     private final SaleRecordRepository saleRecordRepository;
-    private final ShiftPlanRepository shiftPlanRepository;
-    private final PurchaseSuggestionRepository purchaseSuggestionRepository;
     private final ForecastController forecastController;
 
     public PredictiveController(JwtUtil jwtUtil,
                                 CompanyRepository companyRepository,
                                 SaleRecordRepository saleRecordRepository,
-                                ShiftPlanRepository shiftPlanRepository,
-                                PurchaseSuggestionRepository purchaseSuggestionRepository,
                                 ForecastController forecastController) {
         this.jwtUtil = jwtUtil;
         this.companyRepository = companyRepository;
         this.saleRecordRepository = saleRecordRepository;
-        this.shiftPlanRepository = shiftPlanRepository;
-        this.purchaseSuggestionRepository = purchaseSuggestionRepository;
         this.forecastController = forecastController;
     }
-
-    public record SaleRecordRequest(String saleDate, BigDecimal total, String channel) {}
-    public record ShiftPlanRequest(String shiftDate, String shiftName, Integer staffRequired, String notes) {}
 
     public record PredictiveDay(
         String date,
@@ -52,41 +44,6 @@ public class PredictiveController {
         int suggestedStaff,
         String inventoryHint
     ) {}
-
-    @PostMapping("/sales")
-    public ResponseEntity<Void> addSaleRecord(
-        @RequestHeader("Authorization") String authHeader,
-        @RequestBody SaleRecordRequest req
-    ) {
-        Long companyId = extractCompanyId(authHeader);
-        Company company = companyRepository.findById(companyId).orElseThrow();
-
-        SaleRecord record = new SaleRecord();
-        record.setCompany(company);
-        record.setSaleDate(LocalDate.parse(req.saleDate()));
-        record.setTotal(req.total() != null ? req.total() : BigDecimal.ZERO);
-        record.setChannel(req.channel() != null && !req.channel().isBlank() ? req.channel() : "DINING");
-        saleRecordRepository.save(record);
-        return ResponseEntity.status(HttpStatus.CREATED).build();
-    }
-
-    @PostMapping("/shifts")
-    public ResponseEntity<Void> addShiftPlan(
-        @RequestHeader("Authorization") String authHeader,
-        @RequestBody ShiftPlanRequest req
-    ) {
-        Long companyId = extractCompanyId(authHeader);
-        Company company = companyRepository.findById(companyId).orElseThrow();
-
-        ShiftPlan plan = new ShiftPlan();
-        plan.setCompany(company);
-        plan.setShiftDate(LocalDate.parse(req.shiftDate()));
-        plan.setShiftName(req.shiftName() != null ? req.shiftName() : "General");
-        plan.setStaffRequired(req.staffRequired() != null ? req.staffRequired() : 2);
-        plan.setNotes(req.notes());
-        shiftPlanRepository.save(plan);
-        return ResponseEntity.status(HttpStatus.CREATED).build();
-    }
 
     @GetMapping("/operations")
     public ResponseEntity<List<PredictiveDay>> predictOperations(
@@ -130,17 +87,6 @@ public class PredictiveController {
                 hint
             );
         }).sorted(Comparator.comparing(PredictiveDay::date)).toList();
-
-        // Guardamos sugerencias para consulta posterior (no reemplaza funcionalidad existente).
-        for (PredictiveDay day : output) {
-            PurchaseSuggestion suggestion = new PurchaseSuggestion();
-            suggestion.setCompany(company);
-            suggestion.setTargetDate(LocalDate.parse(day.date()));
-            suggestion.setItemName("Perecederos generales");
-            suggestion.setRecommendation(day.inventoryHint());
-            suggestion.setExpectedDemand(day.predictedDemand() < day.historicalBaseline() ? "LOW" : "NORMAL");
-            purchaseSuggestionRepository.save(suggestion);
-        }
 
         return ResponseEntity.ok(output);
     }

@@ -28,7 +28,21 @@ import {
 import { compareProductsByCategoryThenName } from "app/lib/inventorySort";
 import { isBusinessOpenNow } from "app/lib/weather";
 
-const RAIN_DASHBOARD_MM = 1.0;
+/** Lluvia diaria prevista que suele impactar reparto y afluencia (por encima de llovizna trivial). */
+const RAIN_DASHBOARD_MIN_MM = 5.0;
+
+function calendarYmdLocal(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Solo días estrictamente posteriores a hoy (no incluye el día actual). */
+function isForecastDateAfterToday(dateIso: string): boolean {
+  const ymd = dateIso.slice(0, 10);
+  return ymd > calendarYmdLocal(new Date());
+}
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
@@ -192,7 +206,7 @@ export default function DashboardPage() {
 
   const rainForecastDays = useMemo(() => {
     return [...weatherImpactRaw]
-      .filter((d) => d.rain >= RAIN_DASHBOARD_MM)
+      .filter((d) => isForecastDateAfterToday(d.date) && d.rain >= RAIN_DASHBOARD_MIN_MM)
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [weatherImpactRaw]);
 
@@ -289,12 +303,13 @@ export default function DashboardPage() {
             <div className="bg-white rounded-2xl p-5 shadow-[0_2px_16px_rgba(149,157,165,0.10)] border border-gray-50">
               <h2 className="text-base font-semibold text-[#1e2040] mb-1">Días con lluvia</h2>
               <p className="text-xs text-gray-400 mb-3">
-                Solo fechas con al menos {RAIN_DASHBOARD_MM} mm previstos en el pronóstico.
+                Solo días futuros (desde mañana) con al menos {RAIN_DASHBOARD_MIN_MM} mm previstos — lluvia
+                suficiente para afectar reparto y afluencia.
               </p>
               <div className="space-y-2">
                 {rainForecastDays.length === 0 ? (
                   <p className="rounded-xl border border-dashed border-gray-200 py-8 text-center text-sm text-gray-500">
-                    No hay días con lluvia prevista en el pronóstico actual.
+                    No hay días futuros con lluvia relevante en el pronóstico actual.
                   </p>
                 ) : (
                   rainForecastDays.map((w) => {

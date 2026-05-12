@@ -703,14 +703,56 @@ export const predictionsApi = {
   },
 };
 
-/** Cierre diario manual: un registro por empresa y día (ingresos + gastos del día). */
+/** Cierre de caja diario (efectivo apertura/cierre, canales, gastos con detalle). */
+export const FINANCE_MAX_DAILY_AMOUNT = 99_999_999.99;
+
+export interface DailyFinanceExpenseLineResponse {
+  detail: string;
+  amount: number;
+}
+
 export interface DailyFinanceEntryResponse {
   id: number;
   entryDate: string;
+  cashOpening: number;
+  incomeDataphone: number;
+  incomeJustEat: number;
+  incomeGlovo: number;
+  incomeUberEats: number;
+  cashClosing: number;
+  /** Suma ingresos datáfono + apps (sin efectivo apertura/cierre). */
   revenue: number;
+  /** Suma líneas de gastos/sueldos. */
   expenses: number;
+  /** efectivo_apertura + ingresos_canales − gastos − efectivo_cierre */
+  finalBalance: number;
+  expenseLines: DailyFinanceExpenseLineResponse[];
   notes: string | null;
+  createdAt: string;
+  createdBy: string | null;
   updatedAt: string;
+  updatedBy: string | null;
+}
+
+export interface DailyFinanceUpsertExpenseLineBody {
+  detail: string;
+  amount: number;
+}
+
+export interface DailyFinanceUpsertBody {
+  cashOpening: number;
+  incomeDataphone: number;
+  incomeJustEat: number;
+  incomeGlovo: number;
+  incomeUberEats: number;
+  cashClosing: number;
+  notes?: string | null;
+  expenseLines?: DailyFinanceUpsertExpenseLineBody[] | null;
+}
+
+export interface DailyFinanceUpsertResponse {
+  data: DailyFinanceEntryResponse;
+  warnings: string[];
 }
 
 export const financeApi = {
@@ -719,20 +761,43 @@ export const financeApi = {
     const res = await authFetch(`/api/v1/finance/daily?${q}`, token);
     return handleResponse<DailyFinanceEntryResponse[]>(res);
   },
-  upsertDaily: async (
-    token: string,
-    date: string,
-    body: { revenue: number; expenses: number; notes?: string | null },
-  ): Promise<DailyFinanceEntryResponse> => {
+  listLockedMonths: async (token: string): Promise<string[]> => {
+    const res = await authFetch("/api/v1/finance/locked-months", token);
+    return handleResponse<string[]>(res);
+  },
+  lockMonth: async (token: string, yearMonth: string): Promise<void> => {
+    const res = await authFetch(`/api/v1/finance/locked-months/${encodeURIComponent(yearMonth)}`, token, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || `Error ${res.status}`);
+    }
+  },
+  unlockMonth: async (token: string, yearMonth: string): Promise<void> => {
+    const res = await authFetch(`/api/v1/finance/locked-months/${encodeURIComponent(yearMonth)}`, token, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || `Error ${res.status}`);
+    }
+  },
+  upsertDaily: async (token: string, date: string, body: DailyFinanceUpsertBody): Promise<DailyFinanceUpsertResponse> => {
     const res = await authFetch(`/api/v1/finance/daily/${date}`, token, {
       method: "PUT",
       body: JSON.stringify({
-        revenue: body.revenue,
-        expenses: body.expenses,
+        cashOpening: body.cashOpening,
+        incomeDataphone: body.incomeDataphone,
+        incomeJustEat: body.incomeJustEat,
+        incomeGlovo: body.incomeGlovo,
+        incomeUberEats: body.incomeUberEats,
+        cashClosing: body.cashClosing,
         notes: body.notes ?? null,
+        expenseLines: body.expenseLines?.length ? body.expenseLines : [],
       }),
     });
-    return handleResponse<DailyFinanceEntryResponse>(res);
+    return handleResponse<DailyFinanceUpsertResponse>(res);
   },
   deleteDaily: async (token: string, date: string): Promise<void> => {
     const res = await authFetch(`/api/v1/finance/daily/${date}`, token, { method: "DELETE" });
