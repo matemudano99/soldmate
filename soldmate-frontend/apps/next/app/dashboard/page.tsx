@@ -23,9 +23,12 @@ import {
   type DashboardSummaryResponse,
   type PredictiveDay,
   type ProductResponse,
+  type ForecastImpactDay,
 } from "app/lib/api";
 import { compareProductsByCategoryThenName } from "app/lib/inventorySort";
-import { getRecommendedLowLoadDays, isBusinessOpenNow } from "app/lib/weather";
+import { isBusinessOpenNow } from "app/lib/weather";
+
+const RAIN_DASHBOARD_MM = 1.0;
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
@@ -81,7 +84,7 @@ export default function DashboardPage() {
   const [allLowStockProducts, setAllLowStockProducts] = React.useState<ProductResponse[]>([]);
   const [activityFeedFull, setActivityFeedFull] = React.useState<ActivityItemResponse[]>([]);
   const [businessProfile, setBusinessProfile] = React.useState<BusinessProfileResponse | null>(null);
-  const [weatherImpact, setWeatherImpact] = React.useState<any[]>([]);
+  const [weatherImpactRaw, setWeatherImpactRaw] = React.useState<ForecastImpactDay[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const [dashSearch, setDashSearch] = React.useState("");
   React.useEffect(() => {
@@ -99,7 +102,7 @@ export default function DashboardPage() {
           businessProfileApi.get(authToken!),
         ]);
         setSummary(summaryRes);
-        setWeatherImpact(getRecommendedLowLoadDays(weatherRes, 3));
+        setWeatherImpactRaw(weatherRes);
         setPredictions(predictionRes.slice(0, 3));
         setAllLowStockProducts(
           [...productsRes].sort(compareProductsByCategoryThenName).filter((p) => p.lowStock),
@@ -186,6 +189,12 @@ export default function DashboardPage() {
       })
       .slice(0, 24);
   }, [activityFeedFull, dq]);
+
+  const rainForecastDays = useMemo(() => {
+    return [...weatherImpactRaw]
+      .filter((d) => d.rain >= RAIN_DASHBOARD_MM)
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [weatherImpactRaw]);
 
   return (
     <ErpPageShell>
@@ -278,16 +287,38 @@ export default function DashboardPage() {
 
           <div className="grid lg:grid-cols-2 gap-4">
             <div className="bg-white rounded-2xl p-5 shadow-[0_2px_16px_rgba(149,157,165,0.10)] border border-gray-50">
-              <h2 className="text-base font-semibold text-[#1e2040] mb-3">Clima y menor volumen</h2>
+              <h2 className="text-base font-semibold text-[#1e2040] mb-1">Días con lluvia</h2>
+              <p className="text-xs text-gray-400 mb-3">
+                Solo fechas con al menos {RAIN_DASHBOARD_MM} mm previstos en el pronóstico.
+              </p>
               <div className="space-y-2">
-                {weatherImpact.map((w: any) => (
-                  <div key={w.date} className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
-                    <p className="text-sm font-semibold text-emerald-700">{w.date}</p>
-                    <p className="text-xs text-emerald-700 flex items-center gap-1 mt-1">
-                      <CloudRain size={12} /> Índice: {w.impactScore} · {w.recommendation}
-                    </p>
-                  </div>
-                ))}
+                {rainForecastDays.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-gray-200 py-8 text-center text-sm text-gray-500">
+                    No hay días con lluvia prevista en el pronóstico actual.
+                  </p>
+                ) : (
+                  rainForecastDays.map((w) => {
+                    const dayLabel = new Date(`${w.date.slice(0, 10)}T12:00:00`).toLocaleDateString("es-ES", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "short",
+                    });
+                    const cap = dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1);
+                    return (
+                      <div key={w.date} className="rounded-xl border border-sky-100 bg-sky-50/80 p-3">
+                        <p className="text-sm font-semibold text-sky-900">{cap}</p>
+                        <p className="text-xs text-sky-800 flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                          <span className="inline-flex items-center gap-1">
+                            <CloudRain size={12} />
+                            {w.rain.toFixed(1)} mm
+                          </span>
+                          <span className="text-sky-600/80">· Índice {w.impactScore}</span>
+                        </p>
+                        <p className="text-xs text-sky-800/90 mt-1.5 leading-relaxed">{w.recommendation}</p>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
             <div className="bg-white rounded-2xl p-5 shadow-[0_2px_16px_rgba(149,157,165,0.10)] border border-gray-50">

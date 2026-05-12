@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Plus, CloudRain, Wind, Thermometer, Loader2, Pencil, Trash2, CalendarDays } from "lucide-react";
+import { Plus, CloudRain, Wind, Thermometer, Loader2, Pencil, Trash2, CalendarDays, ChevronDown } from "lucide-react";
 import { SectionCard } from "../components/web-ui";
 import { AppTopHeader, CreateCalendarTaskModal, ErpPageShell, notify, useConfirm } from "../shared/ui";
 import { businessProfileApi, calendarApi, forecastApi, type CalendarEventResponse, type ForecastImpactDay } from "app/lib/api";
@@ -35,6 +35,8 @@ const CITY = { label: "negocio" };
 const RAIN_ALERT_MM = 1.0;
 const STRONG_WIND_KMH = 35;
 const TASK_PREVIEW_COUNT = 4;
+/** Semanas extra tras la semana actual (cada una suma 7 días). Máx. 3 → hasta 28 días. */
+const MAX_EXTRA_WEEKS = 3;
 
 function localIso(d: Date): string {
   const y = d.getFullYear();
@@ -130,22 +132,43 @@ export default function CalendarPage() {
   const [taskActionError, setTaskActionError] = useState<string | null>(null);
   const [weatherExpandedByIso, setWeatherExpandedByIso] = useState<Record<string, boolean>>({});
   const [tasksExpandedByIso, setTasksExpandedByIso] = useState<Record<string, boolean>>({});
+  const [extraWeeks, setExtraWeeks] = useState(0);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   const todayStr = localIso(new Date());
 
-  const weekDates = useMemo(() => {
+  const visibleDates = useMemo(() => {
     const now = new Date();
     const monday = new Date(now);
     const diff = (now.getDay() + 6) % 7;
     monday.setDate(now.getDate() - diff);
-    return DAYS.map((label, i) => {
+    const totalDays = Math.min(7 + extraWeeks * 7, 7 + MAX_EXTRA_WEEKS * 7);
+    return Array.from({ length: totalDays }, (_, i) => {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
       const iso = localIso(d);
+      const shortRaw = d.toLocaleDateString("es-ES", { weekday: "short" });
+      const short = shortRaw.replace(/\./g, "").trim();
+      const label = short ? short.charAt(0).toUpperCase() + short.slice(1) : DAYS[i % 7];
       return { label, iso };
     });
-  }, []);
+  }, [extraWeeks]);
+
+  const rangeStart = visibleDates[0]?.iso;
+  const rangeEnd = visibleDates[visibleDates.length - 1]?.iso;
+
+  const modalDayOptions = useMemo(
+    () => visibleDates.map((d) => ({ value: d.iso, label: formatDayTitle(d.iso) })),
+    [visibleDates],
+  );
+
+  const editDayOptions = useMemo(() => {
+    const base = modalDayOptions;
+    if (editingTask && !base.some((o) => o.value === editingTask.eventDate)) {
+      return [...base, { value: editingTask.eventDate, label: formatDayTitle(editingTask.eventDate) }];
+    }
+    return base;
+  }, [modalDayOptions, editingTask]);
 
   useEffect(() => {
     const authToken = token;
@@ -153,7 +176,7 @@ export default function CalendarPage() {
     async function load() {
       try {
         setEventsError(null);
-        const loaded = await calendarApi.getAll(authToken!, weekDates[0].iso, weekDates[6].iso);
+        const loaded = await calendarApi.getAll(authToken!, rangeStart!, rangeEnd!);
         setEvents(loaded);
       } catch (error) {
         setEventsError(describeNetworkError(error));
@@ -173,7 +196,7 @@ export default function CalendarPage() {
       }
     }
     load();
-  }, [token, weekDates]);
+  }, [token, rangeStart, rangeEnd]);
 
   const lowerLoadDates = useMemo(
     () => new Set(getRecommendedLowLoadDays(forecast, 3).map((item) => normalizeForecastDate(item.date))),
@@ -226,12 +249,7 @@ export default function CalendarPage() {
 
   async function handleSubmitEdit(payload: { day: string; time: string; title: string }) {
     if (!editingTask || !token) return;
-    const map: Record<string, number> = {
-      Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6,
-      Lun: 0, Mar: 1, Mié: 2, Jue: 3, Vie: 4, Sáb: 5, Dom: 6,
-    };
-    const idx = map[payload.day] ?? 0;
-    const nextDate = weekDates[idx]?.iso ?? editingTask.eventDate;
+    const nextDate = /^\d{4}-\d{2}-\d{2}$/.test(payload.day) ? payload.day : editingTask.eventDate;
 
     setTaskActionError(null);
     const prev = events;
@@ -265,7 +283,7 @@ export default function CalendarPage() {
             <div>
               <h1 className="text-xl font-bold text-[#1e2040] sm:text-2xl">Calendario</h1>
               <p className="mt-0.5 text-sm text-gray-500">
-                Semana con clima y tareas en un solo listado · {businessCity}
+                Clima y tareas por día · {businessCity}
               </p>
             </div>
             <button
@@ -279,8 +297,8 @@ export default function CalendarPage() {
           </div>
 
           <SectionCard
-            title="Vista semanal"
-            subtitle="Cada fila es un día: primero el pronóstico operativo, después tus tareas."
+            title={extraWeeks > 0 ? `Próximos ${visibleDates.length} días` : "Vista semanal"}
+            subtitle={`Desde el lunes de esta semana: pronóstico y tareas. Al final puedes pulsar «Ver más» para cargar más días (hasta ${7 + MAX_EXTRA_WEEKS * 7}).`}
           >
             {forecastError && !loadingForecast && (
               <div className="mb-4 rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-600">
@@ -289,12 +307,12 @@ export default function CalendarPage() {
             )}
 
             <div className="space-y-4">
-              {weekDates.map((d, dayIndex) => {
+              {visibleDates.map((d, dayIndex) => {
                 const fc = forecastByIso.get(d.iso);
                 const dayEvents = eventsByDate.get(d.iso) ?? [];
                 const isToday = d.iso === todayStr;
-                const strip = DAY_STRIP[dayIndex] ?? DAY_STRIP[0];
-                const taskTone = TASK_CHIP[dayIndex] ?? TASK_CHIP[0];
+                const strip = DAY_STRIP[dayIndex % 7] ?? DAY_STRIP[0];
+                const taskTone = TASK_CHIP[dayIndex % 7] ?? TASK_CHIP[0];
                 const recommended = lowerLoadDates.has(d.iso);
                 const adverse = fc ? isAdverseWeather(fc) : false;
 
@@ -372,8 +390,7 @@ export default function CalendarPage() {
                               <p className="text-xs font-medium text-amber-800">{lowerSalesReason(fc)}</p>
                             ) : recommended ? (
                               <p className="text-xs font-medium text-emerald-800">
-                                Día con menor índice de la semana en el pronóstico (misma lógica que «Clima y menor
-                                volumen» en el panel).
+                                Día con menor índice entre los mostrados en el pronóstico (misma lógica que el panel).
                               </p>
                             ) : null}
                           </div>
@@ -455,6 +472,33 @@ export default function CalendarPage() {
               })}
             </div>
 
+            <div className="mt-6 flex flex-col items-center gap-2 border-t border-gray-100 pt-5">
+              <p className="text-center text-xs text-gray-500">
+                {visibleDates.length === 7 + MAX_EXTRA_WEEKS * 7
+                  ? `Mostrando los ${visibleDates.length} días disponibles.`
+                  : `Mostrando ${visibleDates.length} días.`}
+              </p>
+              {extraWeeks < MAX_EXTRA_WEEKS ? (
+                <button
+                  type="button"
+                  onClick={() => setExtraWeeks((w) => Math.min(w + 1, MAX_EXTRA_WEEKS))}
+                  className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-6 py-2.5 text-sm font-semibold text-[#1e2040] shadow-sm hover:bg-gray-50"
+                >
+                  <ChevronDown size={18} className="text-[#4f6ef7]" aria-hidden />
+                  Ver más
+                </button>
+              ) : null}
+              {extraWeeks > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setExtraWeeks(0)}
+                  className="text-xs font-semibold text-gray-500 underline-offset-2 hover:text-[#4f6ef7] hover:underline"
+                >
+                  Volver a mostrar solo esta semana
+                </button>
+              ) : null}
+            </div>
+
             {eventsError ? <p className="mt-3 text-xs text-amber-600">{eventsError}</p> : null}
             {taskActionError ? <p className="mt-1 text-xs text-amber-600">{taskActionError}</p> : null}
           </SectionCard>
@@ -462,15 +506,10 @@ export default function CalendarPage() {
           {showCreate && (
             <CreateCalendarTaskModal
               onClose={() => setShowCreate(false)}
-              days={[...DAYS]}
+              dayOptions={modalDayOptions}
               onCreate={async (payload: { day: string; time: string; title: string }) => {
                 if (!token) return;
-                const map: Record<string, number> = {
-                  Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6,
-                  Lun: 0, Mar: 1, Mié: 2, Jue: 3, Vie: 4, Sáb: 5, Dom: 6,
-                };
-                const idx = map[payload.day] ?? 0;
-                const date = weekDates[idx]?.iso ?? weekDates[0].iso;
+                const date = payload.day;
                 try {
                   const created = await calendarApi.create(token, {
                     title: payload.title,
@@ -486,13 +525,14 @@ export default function CalendarPage() {
           )}
           {editingTask && (
             <CreateCalendarTaskModal
+              key={`edit-${editingTask.id}`}
               onClose={() => setEditingTask(null)}
               submitLabel="Guardar cambios"
-              days={[...DAYS]}
+              dayOptions={editDayOptions}
               initial={{
                 title: editingTask.title,
                 time: (editingTask.eventTime ?? "09:00").slice(0, 5),
-                day: weekDates.find((wd) => wd.iso === editingTask.eventDate)?.label ?? DAYS[0],
+                day: editingTask.eventDate,
               }}
               onCreate={handleSubmitEdit}
             />

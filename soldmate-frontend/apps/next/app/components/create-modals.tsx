@@ -721,30 +721,52 @@ export function CreateProductModal({
 }
 
 export type CreateCalendarTaskPayload = { day: string; time: string; title: string };
+
+/** Opciones de día con valor estable (p. ej. fecha ISO) y etiqueta legible. */
+export type CalendarDayOption = { value: string; label: string };
+
 export function CreateCalendarTaskModal({
   onClose,
   onCreate,
   days,
+  dayOptions,
   initial,
   submitLabel = "Crear tarea",
 }: {
   onClose: () => void;
   onCreate: (payload: CreateCalendarTaskPayload) => void;
-  days: string[];
+  /** Modo clásico: solo etiquetas Lun…Dom (valor = etiqueta). */
+  days?: string[];
+  /** Modo extendido: `value` suele ser YYYY-MM-DD; prioridad sobre `days` si viene informado. */
+  dayOptions?: CalendarDayOption[];
   initial?: Partial<CreateCalendarTaskPayload>;
   submitLabel?: string;
 }) {
+  const options = dayOptions?.length ? dayOptions : (days ?? []).map((d) => ({ value: d, label: d }));
+  const defaultDay = initial?.day ?? options[0]?.value ?? "Mon";
+
   const [form, setForm] = useState<CreateCalendarTaskPayload>({
-    day: initial?.day ?? days[0] ?? "Mon",
+    day: defaultDay,
     time: initial?.time ?? "09:00",
     title: initial?.title ?? "",
   });
+
+  useEffect(() => {
+    if (!initial?.day) return;
+    setForm((s) => ({
+      ...s,
+      day: initial.day!,
+      time: initial.time ?? s.time,
+      title: initial.title ?? s.title,
+    }));
+  }, [initial?.day, initial?.time, initial?.title]);
+
   const set = (k: keyof CreateCalendarTaskPayload, v: string) => setForm((s) => ({ ...s, [k]: v }));
 
   return (
     <ModalShell
       title="Nueva tarea de calendario"
-      subtitle="Programa una tarea o evento semanal"
+      subtitle={dayOptions?.length ? "Elige la fecha en el rango visible del calendario." : "Programa una tarea o evento semanal"}
       onClose={onClose}
       submitLabel={submitLabel}
       onSubmit={(e) => {
@@ -759,7 +781,9 @@ export function CreateCalendarTaskModal({
         <div>
           <Label>Día</Label>
           <select value={form.day} onChange={(e) => set("day", e.target.value)} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-[#1e2040] outline-none focus:border-[#4f6ef7]">
-            {days.map((d) => <option key={d}>{d}</option>)}
+            {options.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
           </select>
         </div>
         <div><Label>Hora</Label><Input value={form.time} onChange={(e) => set("time", e.target.value)} placeholder="09:00" /></div>
