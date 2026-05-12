@@ -92,7 +92,7 @@ export function WebErpNavbar() {
       </button>
 
       <aside
-        className={`fixed md:sticky top-0 left-0 z-50 md:z-20 h-screen bg-white flex flex-col border-r border-gray-100 shadow-[2px_0_20px_rgba(149,157,165,0.10)] transition-all duration-200 ${
+        className={`fixed md:sticky top-0 left-0 z-50 md:z-20 h-full min-h-0 max-h-[100dvh] bg-white flex flex-col border-r border-gray-100 shadow-[2px_0_20px_rgba(149,157,165,0.10)] transition-all duration-200 ${
           collapsed ? "w-[76px]" : "w-[220px]"
         } ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
