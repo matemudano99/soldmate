@@ -65,7 +65,28 @@ public class JwtUtil {
     }
 
     public String extractEmail(String token)     { return extractAllClaims(token).getSubject(); }
-    public Long   extractCompanyId(String token) { return extractAllClaims(token).get("companyId", Long.class); }
+
+    /**
+     * El claim companyId puede llegar como Integer o Long según cómo se serializó el JWT;
+     * normalizamos a Long para evitar ClassCastException en runtime.
+     */
+    public Long extractCompanyId(String token) {
+        Claims claims = extractAllClaims(token);
+        Object raw = claims.get("companyId");
+        if (raw == null) {
+            return null;
+        }
+        if (raw instanceof Long l) {
+            return l;
+        }
+        if (raw instanceof Integer i) {
+            return i.longValue();
+        }
+        if (raw instanceof Number n) {
+            return n.longValue();
+        }
+        return Long.parseLong(String.valueOf(raw));
+    }
     public String extractRole(String token)      { return extractAllClaims(token).get("role", String.class); }
     public String extractTier(String token)      { return extractAllClaims(token).get("tier", String.class); }
 

@@ -4,8 +4,18 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Package, ChevronLeft, AlertTriangle, Minus, Plus, Trash2, Save, X, Tag } from "lucide-react";
-import { AppTopHeader, CreateProductModal, CreateInventoryCategoryModal, ErpPageShell, notify, useConfirm, EmptyState } from "../shared/ui";
+import {
+  AppTopHeader,
+  CreateProductModal,
+  InventoryCategoriesModal,
+  ErpPageShell,
+  notify,
+  useConfirm,
+  EmptyState,
+  PageListSearchField,
+} from "../shared/ui";
 import { inventoryApi, suppliersApi, type ProductResponse, type SupplierResponse } from "app/lib/api";
+import { compareProductsByCategoryThenName } from "app/lib/inventorySort";
 import { useAuthStore } from "app/lib/store";
 
 const UNIT_LABEL: Record<ProductResponse["unit"], string> = {
@@ -28,7 +38,6 @@ export default function InventoryPage() {
   const [authReady, setAuthReady] = useState(false);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
-  const [categoryAdminSearch, setCategoryAdminSearch] = useState("");
   const [showCreateProduct, setShowCreateProduct] = useState(false);
   const [showCreateCategory, setShowCreateCategory] = useState(false);
   const { confirm, dialog: confirmDialog } = useConfirm();
@@ -64,14 +73,10 @@ export default function InventoryPage() {
     [categoriesQuery.data],
   );
 
-  const adminCategories = useMemo(() => {
-    let list = categoriesQuery.data ?? [];
-    const s = categoryAdminSearch.trim().toLowerCase();
-    if (s) {
-      list = list.filter((c) => c.name.toLowerCase().includes(s));
-    }
-    return list;
-  }, [categoriesQuery.data, categoryAdminSearch]);
+  const categoriesErrorMessage = useMemo(() => {
+    if (!categoriesQuery.isError) return null;
+    return (categoriesQuery.error as Error)?.message ?? "No se pudieron cargar las categorías.";
+  }, [categoriesQuery.isError, categoriesQuery.error]);
 
   const stockMut = useMutation({
     mutationFn: ({ id, delta }: { id: number; delta: number }) => inventoryApi.updateStock(token!, id, delta),
@@ -130,7 +135,6 @@ export default function InventoryPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["inventory-categories"] });
       notify.success("Categoría creada");
-      setShowCreateCategory(false);
     },
     onError: (e: Error) => notify.error(e.message ?? "Error al crear categoría"),
   });
@@ -159,15 +163,16 @@ export default function InventoryPage() {
     if (search.trim()) {
       const s = search.toLowerCase();
       list = list.filter((p) => {
+        const name = (p.name ?? "").toLowerCase();
         const sup = (p.supplierName ?? "").toLowerCase();
         return (
-          p.name.toLowerCase().includes(s) ||
+          name.includes(s) ||
           productCategoryLabel(p).toLowerCase().includes(s) ||
           sup.includes(s)
         );
       });
     }
-    return list;
+    return [...list].sort(compareProductsByCategoryThenName);
   }, [query.data, search, categoryFilter]);
 
   const lowStock = useMemo(() => products.filter((p) => p.lowStock), [products]);
@@ -180,11 +185,7 @@ export default function InventoryPage() {
 
   return (
     <ErpPageShell>
-      <AppTopHeader
-        searchValue={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Buscar producto, categoría o proveedor del producto…"
-      />
+      <AppTopHeader />
       <main className="flex-1 min-h-0 overflow-y-auto pb-6">
         <div className="px-4 sm:px-6">
           <div className="flex items-center gap-3 mb-2">
@@ -207,15 +208,33 @@ export default function InventoryPage() {
               </p>
             </div>
             {isOwner && authReady && !query.isLoading && (
-              <button
-                type="button"
-                onClick={() => setShowCreateProduct(true)}
-                className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-[#4f6ef7] px-4 py-3 text-sm font-semibold text-white hover:bg-[#3d5ae0] sm:w-auto sm:py-2.5"
-              >
-                <Plus size={16} />
-                Nuevo producto
-              </button>
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateCategory(true)}
+                  className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-[#1e2040] hover:bg-gray-50 sm:w-auto sm:py-2.5"
+                >
+                  <Tag size={16} className="text-[#4f6ef7]" />
+                  Nueva categoría
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateProduct(true)}
+                  className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-[#4f6ef7] px-4 py-3 text-sm font-semibold text-white hover:bg-[#3d5ae0] sm:w-auto sm:py-2.5"
+                >
+                  <Plus size={16} />
+                  Nuevo producto
+                </button>
+              </div>
             )}
+          </div>
+
+          <div className="mb-5">
+            <PageListSearchField
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar producto, categoría o proveedor…"
+            />
           </div>
 
           {isOwner && showCreateProduct && (
@@ -229,10 +248,22 @@ export default function InventoryPage() {
           )}
 
           {isOwner && showCreateCategory && (
-            <CreateInventoryCategoryModal
+            <InventoryCategoriesModal
               onClose={() => setShowCreateCategory(false)}
-              submitting={createCategoryMut.isPending}
-              onCreate={(name) => createCategoryMut.mutate(name)}
+              categories={categoriesQuery.data ?? []}
+              categoriesLoading={categoriesQuery.isLoading}
+              categoriesError={categoriesErrorMessage}
+              onCreateCategory={(name) => createCategoryMut.mutate(name)}
+              createSubmitting={createCategoryMut.isPending}
+              deleteSubmitting={deleteCategoryMut.isPending}
+              onRequestDeleteCategory={async (id, name) => {
+                const ok = await confirm(
+                  `¿Eliminar la categoría «${name}»?`,
+                  "Los productos de esta categoría pasarán a «Ninguna».",
+                  "danger",
+                );
+                if (ok) deleteCategoryMut.mutate(id);
+              }}
             />
           )}
 
@@ -256,7 +287,7 @@ export default function InventoryPage() {
             </div>
           )}
 
-          {authReady && categoriesQuery.isError && (
+          {authReady && categoriesQuery.isError && !showCreateCategory && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 mb-4">
               {(categoriesQuery.error as Error)?.message ?? "No se pudieron cargar las categorías."}
             </div>
@@ -264,78 +295,6 @@ export default function InventoryPage() {
 
           {authReady && !query.isLoading && !query.isError && (
             <div className="space-y-8">
-              {isOwner && !categoriesQuery.isLoading && (
-                <section className="rounded-2xl border border-gray-100 bg-white p-4 shadow-[0_2px_16px_rgba(149,157,165,0.10)]">
-                  <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-2">
-                      <Tag size={18} className="text-[#4f6ef7]" />
-                      <h2 className="text-base font-semibold text-[#1e2040]">Categorías de inventario</h2>
-                    </div>
-                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-                      <input
-                        value={categoryAdminSearch}
-                        onChange={(e) => setCategoryAdminSearch(e.target.value)}
-                        placeholder="Buscar categoría…"
-                        className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm sm:max-w-xs"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowCreateCategory(true)}
-                        className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-xl bg-[#4f6ef7] px-4 text-sm font-semibold text-white hover:bg-[#3d5ae0]"
-                      >
-                        <Plus size={16} />
-                        Nueva categoría
-                      </button>
-                    </div>
-                  </div>
-                  <p className="mb-3 text-xs text-gray-500">
-                    Por defecto: Bebidas, Limpieza, Otro y Ninguna. Añade categorías desde el botón (el proveedor se
-                    asigna en cada producto). Puedes eliminar las que no uses; los productos pasan a «Ninguna».
-                  </p>
-                  <div className="overflow-x-auto rounded-xl border border-gray-100">
-                    <table className="w-full min-w-[320px] text-left text-sm">
-                      <thead className="border-b border-gray-100 bg-[#fafbff] text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        <tr>
-                          <th className="px-3 py-2">Categoría</th>
-                          <th className="px-3 py-2 w-28 text-right">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {adminCategories.map((row) => (
-                          <tr key={row.id} className="hover:bg-gray-50/80">
-                            <td className="px-3 py-2 font-medium text-[#1e2040]">{row.name}</td>
-                            <td className="px-3 py-2 text-right">
-                              {row.name !== "Ninguna" ? (
-                                <button
-                                  type="button"
-                                  disabled={deleteCategoryMut.isPending}
-                                  onClick={async () => {
-                                    const ok = await confirm(
-                                      `¿Eliminar la categoría «${row.name}»?`,
-                                      "Los productos de esta categoría pasarán a «Ninguna».",
-                                      "danger",
-                                    );
-                                    if (ok) deleteCategoryMut.mutate(row.id);
-                                  }}
-                                  className="text-xs font-semibold text-red-600 hover:underline"
-                                >
-                                  Eliminar
-                                </button>
-                              ) : (
-                                <span className="text-xs text-gray-400">—</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {adminCategories.length === 0 && (
-                      <p className="px-3 py-6 text-center text-sm text-gray-400">Sin categorías que coincidan.</p>
-                    )}
-                  </div>
-                </section>
-              )}
-
               <section>
                 <h2 className="mb-2 text-sm font-semibold text-[#1e2040]">Filtrar por categoría</h2>
                 <div className="flex flex-wrap gap-2">
@@ -537,17 +496,18 @@ function ProductRow({
   product: p,
   canManage,
   categoryNames,
-  categorySupplierName,
+  supplierOptions,
   onDelta,
   onUpdateMin,
   onCategoryChange,
+  onSupplierChange,
   onRemove,
   pending,
 }: {
   product: ProductResponse;
   canManage: boolean;
   categoryNames: string[];
-  categorySupplierName: string | null;
+  supplierOptions: SupplierResponse[];
   onDelta: (id: number, delta: number) => void;
   onUpdateMin: (
     id: number,
@@ -557,8 +517,10 @@ function ProductRow({
     unit: "KG" | "L" | "UNIT" | "BOX",
     category?: string | null,
     vatRate?: number | null,
+    supplierId?: number | null,
   ) => void;
   onCategoryChange: (id: number, category: string | null) => void;
+  onSupplierChange: (id: number, supplierId: number | null) => void;
   onRemove: (id: number, name: string) => void;
   pending: boolean;
 }) {
@@ -593,7 +555,7 @@ function ProductRow({
         </div>
         <div className="mt-1 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
           {canManage && selectOptions.length > 0 ? (
-            <div className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               <select
                 value={lab}
                 disabled={pending}
@@ -601,7 +563,7 @@ function ProductRow({
                   const v = e.target.value;
                   onCategoryChange(p.id, v === "Ninguna" ? "Ninguna" : v || "Ninguna");
                 }}
-                className="max-w-xs rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-[#1e2040]"
+                className="max-w-[200px] rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-[#1e2040]"
               >
                 {selectOptions.map((c) => (
                   <option key={c} value={c}>
@@ -609,15 +571,28 @@ function ProductRow({
                   </option>
                 ))}
               </select>
-              {categorySupplierName ? (
-                <span className="text-[10px] text-gray-400">Proveedor: {categorySupplierName}</span>
-              ) : null}
+              <select
+                value={p.supplierId != null ? String(p.supplierId) : ""}
+                disabled={pending}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  onSupplierChange(p.id, v === "" ? null : Number(v));
+                }}
+                className="max-w-[200px] rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-[#1e2040]"
+              >
+                <option value="">Proveedor…</option>
+                {supplierOptions.map((s) => (
+                  <option key={s.id} value={String(s.id)}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
             </div>
           ) : (
             <span className="text-xs text-gray-600">
               <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">{lab}</span>
-              {categorySupplierName ? (
-                <span className="ml-2 text-[10px] text-gray-400">· {categorySupplierName}</span>
+              {p.supplierName ? (
+                <span className="ml-2 text-[10px] text-gray-400">· {p.supplierName}</span>
               ) : null}
             </span>
           )}
@@ -691,6 +666,7 @@ function ProductRow({
                     p.unit,
                     p.category,
                     p.vatRate,
+                    p.supplierId ?? null,
                   );
                   setEditingMin(false);
                 }}

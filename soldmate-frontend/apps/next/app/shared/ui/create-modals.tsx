@@ -5,6 +5,6 @@ export {
   UploadDocumentModal,
   CreateCalendarTaskModal,
   CreateProductModal,
-  CreateInventoryCategoryModal,
+  InventoryCategoriesModal,
 } from "../../components/create-modals";
 

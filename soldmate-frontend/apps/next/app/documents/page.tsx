@@ -5,7 +5,7 @@ import {
   FileText, FileSpreadsheet, Image as ImageIcon, File, Upload,
   Search, Download, Eye, MoreVertical, ChevronRight, Trash2, Edit3, X
 } from "lucide-react";
-import { AppTopHeader, UploadDocumentModal, ErpPageShell, notify, useConfirm } from "../shared/ui";
+import { AppTopHeader, UploadDocumentModal, ErpPageShell, notify, useConfirm, PageListSearchField } from "../shared/ui";
 import { documentsApi, type DocumentResponse, type DocumentCategoryResponse, type DocumentStatsResponse } from "../shared/api";
 import { useAuthStore } from "app/lib/store";
 
@@ -142,11 +142,7 @@ export default function DocumentsPage() {
 
   return (
     <ErpPageShell>
-        <AppTopHeader 
-          searchValue={search}
-          onSearchChange={setSearch}
-          searchPlaceholder="Buscar documentos..."
-        />
+        <AppTopHeader />
         <main className="flex-1 min-h-0 overflow-y-auto pb-6">
         <div className="px-4 sm:px-6">
           {/* Header */}
@@ -162,6 +158,10 @@ export default function DocumentsPage() {
               <Upload size={15} />
               Subir documento
             </button>
+          </div>
+
+          <div className="mb-5">
+            <PageListSearchField value={search} onChange={setSearch} placeholder="Buscar documentos por nombre…" />
           </div>
 
           {/* Stats bar */}

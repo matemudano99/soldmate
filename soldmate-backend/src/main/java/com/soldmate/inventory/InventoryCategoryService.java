@@ -30,7 +30,7 @@ public class InventoryCategoryService {
         this.productRepository = productRepository;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<InventoryCategory> listEnsuringDefaults(Long companyId) {
         Company company = companyRepository.findById(companyId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Empresa no encontrada"));
@@ -62,7 +62,7 @@ public class InventoryCategoryService {
         if (name.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El nombre no puede estar vacío");
         }
-        if (categoryRepository.existsByCompanyIdAndNameIgnoreCase(companyId, name)) {
+        if (categoryRepository.countByCompanyIdAndNameIgnoreCase(companyId, name) > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe una categoría con ese nombre");
         }
         InventoryCategory c = new InventoryCategory();
@@ -79,7 +79,7 @@ public class InventoryCategoryService {
         if (rawNewName != null && !rawNewName.isBlank()) {
             String newName = normalizeName(rawNewName);
             if (!newName.equalsIgnoreCase(c.getName())
-                && categoryRepository.existsByCompanyIdAndNameIgnoreCase(companyId, newName)) {
+                && categoryRepository.countByCompanyIdAndNameIgnoreCase(companyId, newName) > 0) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe una categoría con ese nombre");
             }
             if (!newName.equals(c.getName())) {
