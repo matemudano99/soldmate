@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Mail, Phone, Tag, Plus, Pencil, Trash2 } from "lucide-react";
-import { AppTopHeader, CreateSupplierModal, WebErpNavbar, notify, useConfirm, EmptyState } from "../shared/ui";
+import { AppTopHeader, CreateSupplierModal, ErpPageShell, notify, useConfirm, EmptyState } from "../shared/ui";
 import { suppliersApi, type SupplierResponse } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
@@ -62,10 +62,9 @@ export default function SuppliersPage() {
   const contactOptions = (contactsQuery.data ?? []).map((c) => c.name).filter(Boolean);
 
   return (
-    <div className="flex min-h-screen bg-[#eef1f8]">
-      <WebErpNavbar />
-      <main className="flex-1 pb-6 overflow-y-auto">
+    <ErpPageShell>
         <AppTopHeader />
+        <main className="flex-1 min-h-0 overflow-y-auto pb-6">
         <div className="px-4 sm:px-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-5">
           <div className="min-w-0 w-full">
@@ -213,6 +212,6 @@ export default function SuppliersPage() {
         </div>
       </main>
       {confirmDialog}
-    </div>
+    </ErpPageShell>
   );
 }

@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Activity, ChevronLeft, Wrench, Circle, Clock, CheckCircle2, Package, Users, FileText, Calendar, PlusCircle, Edit3, Trash2, ShieldAlert, Truck } from "lucide-react";
-import { AppTopHeader, WebErpNavbar } from "../shared/ui";
+import { AppTopHeader, ErpPageShell, PageListSearchField } from "../shared/ui";
 import { activityApi, type ActivityItemResponse } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
@@ -81,24 +81,26 @@ export default function ActivityPage() {
     }
     if (search.trim()) {
       const s = search.toLowerCase();
-      list = list.filter((i) => 
-        i.details?.toLowerCase().includes(s) || 
-        i.userEmail?.toLowerCase().includes(s) ||
-        typeName(i.type).toLowerCase().includes(s)
-      );
+      list = list.filter((i) => {
+        const title = (i.title ?? "").toLowerCase();
+        const actor = (i.actorName ?? "").toLowerCase();
+        const email = (i.actorEmail ?? "").toLowerCase();
+        const typeLabel = typeName(i.type).toLowerCase();
+        return (
+          title.includes(s) ||
+          actor.includes(s) ||
+          email.includes(s) ||
+          typeLabel.includes(s)
+        );
+      });
     }
     return [...list].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 60);
   }, [query.data, filterType, search]);
 
   return (
-    <div className="flex min-h-screen bg-[#eef1f8] text-[#1e2040]">
-      <WebErpNavbar />
-      <main className="flex-1 pb-6 overflow-y-auto">
-        <AppTopHeader 
-          searchValue={search}
-          onSearchChange={setSearch}
-          searchPlaceholder="Filtrar registros..."
-        />
+    <ErpPageShell>
+        <AppTopHeader />
+        <main className="flex-1 min-h-0 overflow-y-auto pb-6">
         <div className="px-4 sm:px-6">
           <div className="flex items-center gap-3 mb-2">
             <Link
@@ -117,6 +119,14 @@ export default function ActivityPage() {
             <p className="text-sm text-gray-500 mt-1">
               Línea de tiempo con toda la actividad de la empresa: proveedores, usuarios, documentos, incidencias y más.
             </p>
+          </div>
+
+          <div className="mb-4">
+            <PageListSearchField
+              value={search}
+              onChange={setSearch}
+              placeholder="Filtrar por texto, usuario o tipo…"
+            />
           </div>
 
           <div className="flex gap-2 overflow-x-auto pb-4 mb-2 scrollbar-hide">
@@ -214,6 +224,6 @@ export default function ActivityPage() {
           )}
         </div>
       </main>
-    </div>
+    </ErpPageShell>
   );
 }

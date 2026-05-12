@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -61,6 +62,18 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(
             errorBody("FILE_TOO_LARGE", "El fichero supera el tamaño máximo permitido (10 MB)")
         );
+    }
+
+    // ─── Respuestas HTTP explícitas (p. ej. 404 desde servicios) ───────────────
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> handleResponseStatus(ResponseStatusException ex) {
+        String msg = ex.getReason() != null
+            ? ex.getReason()
+            : (HttpStatus.resolve(ex.getStatusCode().value()) != null
+                ? HttpStatus.resolve(ex.getStatusCode().value()).getReasonPhrase()
+                : "Error");
+        return ResponseEntity.status(ex.getStatusCode()).body(errorBody("HTTP_" + ex.getStatusCode().value(), msg));
     }
 
     // ─── 500 Internal Server Error ────────────────────────────────────────────

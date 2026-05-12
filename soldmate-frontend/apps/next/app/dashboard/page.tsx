@@ -1,13 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useMemo, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
   DollarSign, Wrench, Package, Users, TrendingUp,
   ChevronRight, Circle,
   CheckCircle2, Clock, Activity, CloudRain,
 } from "lucide-react";
-import { WebErpNavbar, AppTopHeader } from "../shared/ui";
+import { ErpPageShell, AppTopHeader, PageListSearchField } from "../shared/ui";
 import Link from "next/link";
 import { useAuthStore } from "app/lib/store";
 import {
@@ -24,6 +24,7 @@ import {
   type PredictiveDay,
   type ProductResponse,
 } from "app/lib/api";
+import { compareProductsByCategoryThenName } from "app/lib/inventorySort";
 import { getRecommendedLowLoadDays, isBusinessOpenNow } from "app/lib/weather";
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
@@ -77,13 +78,12 @@ export default function DashboardPage() {
   const token = useAuthStore((s) => s.token);
   const [summary, setSummary] = React.useState<DashboardSummaryResponse | null>(null);
   const [predictions, setPredictions] = React.useState<PredictiveDay[]>([]);
-  const [lowStockItems, setLowStockItems] = React.useState<ProductResponse[]>([]);
-  const [recentActivity, setRecentActivity] = React.useState<ActivityItemResponse[]>([]);
+  const [allLowStockProducts, setAllLowStockProducts] = React.useState<ProductResponse[]>([]);
+  const [activityFeedFull, setActivityFeedFull] = React.useState<ActivityItemResponse[]>([]);
   const [businessProfile, setBusinessProfile] = React.useState<BusinessProfileResponse | null>(null);
   const [weatherImpact, setWeatherImpact] = React.useState<any[]>([]);
   const [error, setError] = React.useState<string | null>(null);
-  const [globalSearch, setGlobalSearch] = React.useState("");
-
+  const [dashSearch, setDashSearch] = React.useState("");
   React.useEffect(() => {
     const authToken = token;
     if (!authToken) return;
@@ -101,8 +101,10 @@ export default function DashboardPage() {
         setSummary(summaryRes);
         setWeatherImpact(getRecommendedLowLoadDays(weatherRes, 3));
         setPredictions(predictionRes.slice(0, 3));
-        setLowStockItems(productsRes.filter((p) => p.lowStock).slice(0, 6));
-        setRecentActivity(activityRes.slice(0, 6));
+        setAllLowStockProducts(
+          [...productsRes].sort(compareProductsByCategoryThenName).filter((p) => p.lowStock),
+        );
+        setActivityFeedFull(activityRes);
         setBusinessProfile(businessRes);
       } catch (err) {
         setError(describeNetworkError(err));
@@ -152,17 +154,44 @@ export default function DashboardPage() {
 
   const recentIncidents = summary?.recentIncidents ?? [];
 
+  const dq = dashSearch.trim().toLowerCase();
+
+  const incidentsVisible = useMemo(() => {
+    if (!dq) return recentIncidents;
+    return recentIncidents.filter((inc) => {
+      const hay = `${inc.title} ${inc.priority} ${inc.status} ${inc.reportedBy ?? ""}`.toLowerCase();
+      return hay.includes(dq);
+    });
+  }, [recentIncidents, dq]);
+
+  const lowStockVisible = useMemo(() => {
+    let rows = allLowStockProducts;
+    if (dq) {
+      rows = rows.filter((p) => {
+        const name = (p.name ?? "").toLowerCase();
+        const cat = (p.category ?? "").toLowerCase();
+        const sup = (p.supplierName ?? "").toLowerCase();
+        return name.includes(dq) || cat.includes(dq) || sup.includes(dq);
+      });
+    }
+    return rows.slice(0, dq ? 40 : 6);
+  }, [allLowStockProducts, dq]);
+
+  const activityVisible = useMemo(() => {
+    if (!dq) return activityFeedFull.slice(0, 6);
+    return activityFeedFull
+      .filter((a) => {
+        const hay = `${a.title ?? ""} ${a.actorName ?? ""} ${a.actorEmail ?? ""} ${a.type}`.toLowerCase();
+        return hay.includes(dq);
+      })
+      .slice(0, 24);
+  }, [activityFeedFull, dq]);
+
   return (
-    <div className="flex min-h-[100dvh] overflow-hidden bg-[#eef1f8] text-[#1e2040]">
-      <WebErpNavbar />
+    <ErpPageShell>
+        <AppTopHeader />
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <AppTopHeader 
-          searchValue={globalSearch}
-          onSearchChange={setGlobalSearch}
-        />
-
-        <main className="flex-1 overflow-y-auto px-4 sm:px-7 pb-6 space-y-5">
+        <main className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-7 pb-6 space-y-5">
           {error && <p className="text-xs text-amber-600">{error}</p>}
           <p className="text-xs text-gray-500">
             Estado del negocio:{" "}
@@ -170,7 +199,13 @@ export default function DashboardPage() {
               {isBusinessOpenNow(businessProfile?.openingHours) ? "Abierto ahora" : "Fuera de horario"}
             </span>
           </p>
-          {/* KPI tiles */}
+
+          <PageListSearchField
+            value={dashSearch}
+            onChange={setDashSearch}
+            placeholder="Filtrar incidencias, stock bajo y actividad en esta página…"
+            className="max-w-xl"
+          />
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
             {kpis.map((k) => {
               const inner = (
@@ -282,7 +317,7 @@ export default function DashboardPage() {
                 </Link>
               </div>
               <div className="divide-y divide-gray-50">
-                {recentIncidents.map((inc) => {
+                {incidentsVisible.map((inc) => {
                   const s = STATUS_CFG[inc.status as keyof typeof STATUS_CFG];
                   return (
                     <div key={inc.id} className="px-5 py-3.5 hover:bg-[#fafbff] transition-colors">
@@ -312,7 +347,7 @@ export default function DashboardPage() {
                 <h2 className="text-base font-semibold text-[#1e2040]">Stock bajo</h2>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-semibold bg-red-50 text-red-500 px-2 py-0.5 rounded-full">
-                    {lowStockItems.length} items
+                    {allLowStockProducts.length} items
                   </span>
                   <Link href="/inventory" className="text-xs font-semibold text-[#4f6ef7] hover:underline flex items-center gap-0.5">
                     Inventario <ChevronRight size={12} />
@@ -320,8 +355,9 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div className="divide-y divide-gray-50">
-                {lowStockItems.map((s) => {
-                  const pct = Math.round((s.currentStock / s.minStock) * 100);
+                {lowStockVisible.map((s) => {
+                  const pct =
+                    s.minStock > 0 ? Math.round((Number(s.currentStock) / Number(s.minStock)) * 100) : 0;
                   return (
                     <div key={s.id} className="px-5 py-3 hover:bg-[#fafbff] transition-colors">
                       <div className="flex items-center justify-between mb-1">
@@ -351,7 +387,7 @@ export default function DashboardPage() {
                 </Link>
               </div>
               <div className="divide-y divide-gray-50">
-                {recentActivity.map((a) => (
+                {activityVisible.map((a) => (
                   <div key={a.id} className="px-5 py-3 flex items-start gap-3 hover:bg-[#fafbff] transition-colors">
                     {a.actorAvatarUrl ? (
                       <img src={a.actorAvatarUrl} alt={a.actorName} className="w-7 h-7 rounded-full flex-shrink-0 mt-0.5 object-cover" />
@@ -373,7 +409,6 @@ export default function DashboardPage() {
             </div>
           </div>
         </main>
-      </div>
-    </div>
+    </ErpPageShell>
   );
 }

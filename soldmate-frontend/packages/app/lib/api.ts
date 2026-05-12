@@ -51,6 +51,8 @@ export interface ProductResponse {
   minStock: number;
   unit: "KG" | "L" | "UNIT" | "BOX";
   category: string | null;
+  supplierId: number | null;
+  supplierName: string | null;
   vatRate: number;
   lowStock: boolean; // true si currentStock < minStock (igual al mínimo no cuenta como bajo)
 }
@@ -61,7 +63,13 @@ export interface ProductInput {
   minStock: number;
   unit: "KG" | "L" | "UNIT" | "BOX";
   category?: string | null;
+  supplierId?: number | null;
   vatRate?: number | null;
+}
+
+export interface InventoryCategoryResponse {
+  id: number;
+  name: string;
 }
 
 export interface IncidentResponse {
@@ -391,6 +399,39 @@ export const inventoryApi = {
 
   remove: async (token: string, productId: number): Promise<void> => {
     const res = await authFetch(`/api/v1/inventory/${productId}`, token, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const text = await res.text();
+      throw new Error(text || `Error ${res.status}`);
+    }
+  },
+
+  listCategories: async (token: string): Promise<InventoryCategoryResponse[]> => {
+    const res = await authFetch("/api/v1/inventory/categories", token);
+    return handleResponse<InventoryCategoryResponse[]>(res);
+  },
+
+  createCategory: async (token: string, body: { name: string }): Promise<InventoryCategoryResponse> => {
+    const res = await authFetch("/api/v1/inventory/categories", token, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return handleResponse<InventoryCategoryResponse>(res);
+  },
+
+  updateCategory: async (
+    token: string,
+    id: number,
+    body: { name?: string | null }
+  ): Promise<InventoryCategoryResponse> => {
+    const res = await authFetch(`/api/v1/inventory/categories/${id}`, token, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+    return handleResponse<InventoryCategoryResponse>(res);
+  },
+
+  deleteCategory: async (token: string, id: number): Promise<void> => {
+    const res = await authFetch(`/api/v1/inventory/categories/${id}`, token, { method: "DELETE" });
     if (!res.ok && res.status !== 204) {
       const text = await res.text();
       throw new Error(text || `Error ${res.status}`);
