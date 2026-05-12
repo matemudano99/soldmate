@@ -32,6 +32,19 @@ yarn-error.log*
 *.iml
 .cursor/
 
+# Android wrapper (Gradle / Studio / local SDK)
+soldmate-android-wrapper/local.properties
+soldmate-android-wrapper/.gradle/
+soldmate-android-wrapper/**/build/
+soldmate-android-wrapper/.idea/
+soldmate-android-wrapper/*.iml
+soldmate-android-wrapper/.externalNativeBuild/
+soldmate-android-wrapper/.cxx/
+soldmate-android-wrapper/.kotlin/
+soldmate-android-wrapper/*.apk
+soldmate-android-wrapper/*.aab
+soldmate-android-wrapper/captures/
+
 # OS files
 .DS_Store
 Thumbs.db
