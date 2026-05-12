@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -81,6 +82,10 @@ public class InventoryCategoryController {
     }
 
     private Long extractCompanyId(String authHeader) {
-        return jwtUtil.extractCompanyId(authHeader.substring(7));
+        Long companyId = jwtUtil.extractCompanyId(authHeader.substring(7));
+        if (companyId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Token sin empresa asociada");
+        }
+        return companyId;
     }
 }

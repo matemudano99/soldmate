@@ -8,7 +8,9 @@
 // Sin React Query tendrías que escribir todo eso manualmente con useState + useEffect.
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { inventoryApi, type ProductResponse } from "../lib/api";
+import { compareProductsByCategoryThenName } from "../lib/inventorySort";
 import { useAuthStore } from "../lib/store";
 
 export function useInventory() {
@@ -31,11 +33,16 @@ export function useInventory() {
     refetchOnWindowFocus: true,  // actualiza al volver a la app
   });
 
+  const sortedProducts = useMemo(
+    () => (products ? [...products].sort(compareProductsByCategoryThenName) : []),
+    [products],
+  );
+
   // Productos con stock bajo (para el panel de alertas del dashboard)
-  const lowStockProducts = products?.filter((p) => p.lowStock) ?? [];
+  const lowStockProducts = sortedProducts.filter((p) => p.lowStock);
 
   return {
-    products: products ?? [],
+    products: sortedProducts,
     lowStockProducts,
     isLoading,
     isError,

@@ -11,7 +11,7 @@ export type ErpPageShellProps = {
 
 /**
  * Marco común del ERP: altura de viewport (`100dvh`), sin scroll en el documento.
- * Coloca `AppTopHeader` y luego un `<main className="flex-1 min-h-0 overflow-y-auto …">` para que
+ * Coloca `AppTopHeader` (búsqueda global ⌘K) y luego un `<main className="flex-1 min-h-0 overflow-y-auto …">` para que
  * solo el contenido haga scroll; la sidebar queda alineada con el dashboard y el resto de vistas.
  */
 export function ErpPageShell({ children, className = "" }: ErpPageShellProps) {

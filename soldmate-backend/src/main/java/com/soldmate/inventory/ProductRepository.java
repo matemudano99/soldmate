@@ -2,6 +2,8 @@ package com.soldmate.inventory;
 
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -12,7 +14,15 @@ import java.util.Optional;
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
     @EntityGraph(attributePaths = {"supplier"})
-    List<Product> findByCompanyId(Long companyId);
+    @Query(
+            """
+                    SELECT p FROM Product p
+                    WHERE p.company.id = :companyId
+                    ORDER BY LOWER(COALESCE(NULLIF(TRIM(BOTH FROM p.category), ''), 'Ninguna')),
+                             LOWER(p.name),
+                             p.id
+                    """)
+    List<Product> findByCompanyId(@Param("companyId") Long companyId);
 
     List<Product> findByCompanyIdAndCategory(Long companyId, String category);
 

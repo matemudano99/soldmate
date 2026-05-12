@@ -8,7 +8,7 @@ import {
   Star, TrendingUp, Loader2, AlertCircle,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CreatePersonModal, AppTopHeader, ErpPageShell, notify, useConfirm, EmptyState } from "../shared/ui";
+import { CreatePersonModal, AppTopHeader, ErpPageShell, notify, useConfirm, EmptyState, PageListSearchField } from "../shared/ui";
 import {
   activityApi,
   usersApi,
@@ -292,7 +292,7 @@ function DetailPanel({
   };
 
   return (
-    <aside className="fixed inset-y-0 right-0 z-40 flex w-full max-w-lg flex-col overflow-y-auto bg-white shadow-2xl border-l border-gray-100 lg:relative lg:inset-auto lg:z-auto lg:max-w-none lg:w-72 lg:flex-shrink-0 lg:shadow-none">
+    <aside className="fixed inset-y-0 right-0 z-40 flex w-full max-w-lg flex-col overflow-y-auto bg-white shadow-2xl border-l border-gray-100 lg:static lg:inset-auto lg:z-auto lg:h-full lg:min-h-0 lg:max-h-full lg:w-80 lg:max-w-none lg:shrink-0 lg:rounded-none lg:shadow-none">
       {/* Header */}
       <div className="flex items-center justify-between gap-2 px-4 sm:px-5 pt-4 sm:pt-5 pb-3 border-b border-gray-50">
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Perfil</p>
@@ -697,9 +697,12 @@ export default function PeoplePage() {
   const filtered = useMemo(() => {
     let list = employees.filter((e) => {
       const matchDept   = activeDept === "Todos" || e.department === activeDept;
-      const matchSearch = e.name.toLowerCase().includes(search.toLowerCase()) ||
-                          e.email.toLowerCase().includes(search.toLowerCase()) ||
-                          e.role.toLowerCase().includes(search.toLowerCase());
+      const q = search.toLowerCase();
+      const matchSearch =
+        e.name.toLowerCase().includes(q) ||
+        e.email.toLowerCase().includes(q) ||
+        e.role.toLowerCase().includes(q) ||
+        (e.department ?? "").toLowerCase().includes(q);
       return matchDept && matchSearch;
     });
     list = [...list].sort((a, b) => {
@@ -779,13 +782,10 @@ export default function PeoplePage() {
 
   return (
     <ErpPageShell>
-        <AppTopHeader
-          searchValue={search}
-          onSearchChange={setSearch}
-          searchPlaceholder="Buscar usuarios..."
-        />
+        <AppTopHeader />
 
-        <main className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-7 pb-6">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+        <main className="flex-1 min-h-0 min-w-0 overflow-y-auto px-4 sm:px-7 pb-6">
           {/* Title + actions */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-5">
             <div className="min-w-0">
@@ -803,6 +803,14 @@ export default function PeoplePage() {
             >
               <Plus size={15} /> Añadir usuario
             </button>
+          </div>
+
+          <div className="mb-4">
+            <PageListSearchField
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar por nombre, email o rol…"
+            />
           </div>
 
           {/* Filters row */}
@@ -925,23 +933,24 @@ export default function PeoplePage() {
           )}
         </main>
 
-      {/* Detail Panel (overlay en móvil, columna en lg+) */}
-      {selectedEmp && (
-        <>
-          <button
-            type="button"
-            aria-label="Cerrar panel"
-            className="fixed inset-0 z-30 bg-black/25 backdrop-blur-[1px] lg:hidden"
-            onClick={() => setSelectedId(null)}
-          />
-          <DetailPanel
-            emp={selectedEmp}
-            recentActivity={selectedEmpActivity}
-            onUpdate={updateEmployee}
-            onClose={() => setSelectedId(null)}
-          />
-        </>
-      )}
+        {/* Detail Panel: cajón en móvil; a la derecha de la lista en lg+ (misma fila flex) */}
+        {selectedEmp && (
+          <>
+            <button
+              type="button"
+              aria-label="Cerrar panel"
+              className="fixed inset-0 z-30 bg-black/25 backdrop-blur-[1px] lg:hidden"
+              onClick={() => setSelectedId(null)}
+            />
+            <DetailPanel
+              emp={selectedEmp}
+              recentActivity={selectedEmpActivity}
+              onUpdate={updateEmployee}
+              onClose={() => setSelectedId(null)}
+            />
+          </>
+        )}
+        </div>
 
       {/* Add Modal */}
       {showModal && (

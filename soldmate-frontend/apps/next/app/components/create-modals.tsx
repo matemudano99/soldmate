@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { X } from "lucide-react";
+import { X, Loader2, Tag } from "lucide-react";
 import {
   incidentsApi,
   suppliersApi,
   type IncidentResponse,
+  type InventoryCategoryResponse,
   type ProductInput,
   type SupplierResponse,
 } from "app/lib/api";
@@ -14,10 +15,15 @@ type ModalShellProps = {
   title: string;
   subtitle: string;
   onClose: () => void;
-  onSubmit: (e: React.FormEvent) => void;
   children: React.ReactNode;
-  submitLabel: string;
+  /** Modo formulario: pie con Cancelar + acción principal. Modo panel: solo Cerrar (contenido sin envío global). */
+  mode?: "form" | "panel";
+  onSubmit?: (e: React.FormEvent) => void;
+  submitLabel?: string;
   submitting?: boolean;
+  panelCloseLabel?: string;
+  /** Clases del contenedor blanco (ej. max-w-2xl para tablas). */
+  boxClassName?: string;
 };
 
 function ModalShell({
@@ -26,33 +32,73 @@ function ModalShell({
   onClose,
   onSubmit,
   children,
-  submitLabel,
+  submitLabel = "Guardar",
   submitting = false,
+  mode = "form",
+  panelCloseLabel = "Cerrar",
+  boxClassName = "max-w-lg mx-4",
 }: ModalShellProps) {
+  if (mode === "form" && !onSubmit) {
+    throw new Error("ModalShell: onSubmit es obligatorio en mode=form");
+  }
+  const inner = <>{children}</>;
+  const footer =
+    mode === "panel" ? (
+      <div className="flex gap-3 border-t border-gray-50 px-4 sm:px-6 py-4">
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-full rounded-xl bg-[#4f6ef7] py-2.5 text-sm font-semibold text-white hover:bg-[#3d5ae0]"
+        >
+          {panelCloseLabel}
+        </button>
+      </div>
+    ) : (
+      <div className="flex gap-3 pt-1">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-500 hover:bg-gray-50"
+        >
+          Cancelar
+        </button>
+        <button
+          type="submit"
+          disabled={submitting}
+          className="flex-1 rounded-xl bg-[#4f6ef7] py-2.5 text-sm font-semibold text-white hover:bg-[#3d5ae0] disabled:opacity-60"
+        >
+          {submitting ? "Guardando..." : submitLabel}
+        </button>
+      </div>
+    );
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-50">
+      <div
+        className={`bg-white rounded-2xl shadow-2xl w-full ${boxClassName} overflow-hidden max-h-[90vh] flex flex-col`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-50">
           <div>
             <h2 className="text-base font-bold text-[#1e2040]">{title}</h2>
             <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100">
+          <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100">
             <X size={16} />
           </button>
         </div>
 
-        <form onSubmit={onSubmit} className="px-4 sm:px-6 py-5 space-y-4">
-          {children}
-          <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-200 text-gray-500 font-semibold py-2.5 text-sm hover:bg-gray-50">
-              Cancelar
-            </button>
-            <button type="submit" disabled={submitting} className="flex-1 rounded-xl bg-[#4f6ef7] text-white font-semibold py-2.5 text-sm hover:bg-[#3d5ae0] disabled:opacity-60">
-              {submitting ? "Guardando..." : submitLabel}
-            </button>
-          </div>
-        </form>
+        {mode === "panel" ? (
+          <>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-4">{inner}</div>
+            {footer}
+          </>
+        ) : (
+          <form onSubmit={onSubmit!} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-4">{inner}</div>
+            <div className="shrink-0 border-t border-gray-50 px-4 sm:px-6 py-4">{footer}</div>
+          </form>
+        )}
       </div>
     </div>
   );
@@ -422,34 +468,126 @@ export function UploadDocumentModal({ onClose, onCreate }: { onClose: () => void
   );
 }
 
-export function CreateInventoryCategoryModal({
+export function InventoryCategoriesModal({
   onClose,
-  onCreate,
-  submitting = false,
+  categories,
+  categoriesLoading,
+  categoriesError,
+  onCreateCategory,
+  createSubmitting,
+  onRequestDeleteCategory,
+  deleteSubmitting,
 }: {
   onClose: () => void;
-  onCreate: (name: string) => void;
-  submitting?: boolean;
+  categories: InventoryCategoryResponse[];
+  categoriesLoading: boolean;
+  categoriesError: string | null;
+  onCreateCategory: (name: string) => void;
+  createSubmitting: boolean;
+  onRequestDeleteCategory: (id: number, name: string) => void | Promise<void>;
+  deleteSubmitting: boolean;
 }) {
-  const [name, setName] = useState("");
+  const [categorySearch, setCategorySearch] = useState("");
+  const [newName, setNewName] = useState("");
+
+  const filtered = useMemo(() => {
+    const s = categorySearch.trim().toLowerCase();
+    let list = categories;
+    if (s) list = list.filter((c) => c.name.toLowerCase().includes(s));
+    return list;
+  }, [categories, categorySearch]);
 
   return (
     <ModalShell
-      title="Nueva categoría"
-      subtitle="Solo el nombre. El proveedor se asigna en cada producto."
+      mode="panel"
+      boxClassName="max-w-2xl mx-4"
+      title="Categorías de inventario"
+      subtitle="Por defecto: Bebidas, Limpieza, Otro y Ninguna. El proveedor se asigna en cada producto. Puedes eliminar las que no uses; los productos pasan a «Ninguna»."
       onClose={onClose}
-      submitLabel="Crear categoría"
-      submitting={submitting}
-      onSubmit={(e) => {
-        e.preventDefault();
-        const t = name.trim();
-        if (!t) return;
-        onCreate(t);
-      }}
     >
+      <div className="flex items-start gap-2 rounded-xl border border-gray-100 bg-[#fafbff] px-3 py-2">
+        <Tag size={18} className="mt-0.5 shrink-0 text-[#4f6ef7]" />
+        <p className="text-xs text-gray-600">Busca, añade o elimina categorías de tu empresa.</p>
+      </div>
+
+      {categoriesError ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{categoriesError}</div>
+      ) : null}
+
       <div>
-        <Label>Nombre *</Label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. Desechables" required />
+        <Label>Buscar categoría</Label>
+        <Input
+          value={categorySearch}
+          onChange={(e) => setCategorySearch(e.target.value)}
+          placeholder="Buscar categoría…"
+        />
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-gray-100">
+        {categoriesLoading ? (
+          <div className="flex items-center justify-center gap-2 py-12 text-sm text-gray-500">
+            <Loader2 className="animate-spin" size={18} />
+            Cargando categorías…
+          </div>
+        ) : (
+          <table className="w-full min-w-[280px] text-left text-sm">
+            <thead className="border-b border-gray-100 bg-[#fafbff] text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <tr>
+                <th className="px-3 py-2">Categoría</th>
+                <th className="w-28 px-3 py-2 text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filtered.map((row) => (
+                <tr key={row.id} className="hover:bg-gray-50/80">
+                  <td className="px-3 py-2 font-medium text-[#1e2040]">{row.name}</td>
+                  <td className="px-3 py-2 text-right">
+                    {row.name !== "Ninguna" ? (
+                      <button
+                        type="button"
+                        disabled={deleteSubmitting}
+                        onClick={() => void onRequestDeleteCategory(row.id, row.name)}
+                        className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-50"
+                      >
+                        Eliminar
+                      </button>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {!categoriesLoading && filtered.length === 0 ? (
+          <p className="px-3 py-6 text-center text-sm text-gray-400">Sin categorías que coincidan.</p>
+        ) : null}
+      </div>
+
+      <div className="space-y-2 border-t border-gray-100 pt-4">
+        <Label>Añadir categoría</Label>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+          <Input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Nombre de la nueva categoría"
+            className="min-w-0 flex-1"
+          />
+          <button
+            type="button"
+            disabled={createSubmitting || !newName.trim()}
+            onClick={() => {
+              const t = newName.trim();
+              if (!t) return;
+              onCreateCategory(t);
+              setNewName("");
+            }}
+            className="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-xl bg-[#4f6ef7] px-4 text-sm font-semibold text-white hover:bg-[#3d5ae0] disabled:opacity-50 sm:min-w-[120px]"
+          >
+            {createSubmitting ? "Añadiendo…" : "Añadir"}
+          </button>
+        </div>
       </div>
     </ModalShell>
   );
