@@ -1,5 +1,3 @@
-import { withExpo } from "@expo/next-adapter";
-
 // En GitHub Actions se pone GITHUB_PAGES=true para generar archivos estáticos.
 // En Docker / desarrollo local se usa el modo 'standalone' (servidor Node).
 const isGithubPages = process.env.GITHUB_PAGES === "true";
@@ -50,4 +48,4 @@ const nextConfig = {
   },
 };
 
-export default withExpo(nextConfig);
+export default nextConfig;

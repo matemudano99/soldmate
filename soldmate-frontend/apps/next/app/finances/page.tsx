@@ -6,7 +6,7 @@ import {
   Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import { TrendingUp, TrendingDown, DollarSign, Clock, Download, Plus, Trash2 } from "lucide-react";
-import { AppTopHeader, WebErpNavbar, notify } from "../shared/ui";
+import { AppTopHeader, ErpPageShell, notify } from "../shared/ui";
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
@@ -87,12 +87,10 @@ export default function FinancesPage() {
   });
 
   return (
-    <div className="flex min-h-screen bg-[#eef1f8] text-[#1e2040]">
-      <WebErpNavbar />
-
-      <main className="flex-1 overflow-y-auto pb-6">
+    <ErpPageShell>
         <AppTopHeader />
-        <div className="px-6">
+        <main className="flex-1 min-h-0 overflow-y-auto pb-6">
+        <div className="px-4 sm:px-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -245,6 +243,6 @@ export default function FinancesPage() {
         </div>
         </div>
       </main>
-    </div>
+    </ErpPageShell>
   );
 }

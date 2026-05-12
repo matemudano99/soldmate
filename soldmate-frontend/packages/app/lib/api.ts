@@ -7,9 +7,16 @@
 // y guardamos el JWT en un store de Zustand.
 
 // ─── URL del backend ────────────────────────────────────────────────────────
-// En desarrollo apunta a tu máquina local.
-// En producción cambia esto por tu URL de Render / Railway / etc.
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:28080";
+// Web (Next): NEXT_PUBLIC_API_URL
+// Fallback local para dev: http://localhost:28080
+function resolveApiBaseUrl(): string {
+  const webUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (webUrl) return webUrl;
+
+  return "http://localhost:28080";
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
 const BASE_URL = API_BASE_URL;
 
 /** Mensaje legible cuando fetch falla (backend parado, puerto mal, CORS raro en dev). */
@@ -19,7 +26,7 @@ export function describeNetworkError(err: unknown): string {
     /failed to fetch|networkerror|load failed|fetch/i.test(raw) ||
     /network request failed/i.test(raw);
   if (looksNetwork) {
-    return `No hay conexión con el API (${API_BASE_URL}). Arranca el backend (en la raíz del repo: docker compose up -d, puerto 28080). Con «npm run web»: apps/next/.env.local → NEXT_PUBLIC_API_URL.`;
+    return `No hay conexión con el API (${API_BASE_URL}). Arranca el backend (docker compose up -d, puerto 28080). Configura NEXT_PUBLIC_API_URL en apps/next/.env.local.`;
   }
   return raw || "Error de red.";
 }
@@ -44,8 +51,10 @@ export interface ProductResponse {
   minStock: number;
   unit: "KG" | "L" | "UNIT" | "BOX";
   category: string | null;
+  supplierId: number | null;
+  supplierName: string | null;
   vatRate: number;
-  lowStock: boolean; // el backend nos dice si está por debajo del mínimo
+  lowStock: boolean; // true si currentStock < minStock (igual al mínimo no cuenta como bajo)
 }
 
 export interface ProductInput {
@@ -54,7 +63,13 @@ export interface ProductInput {
   minStock: number;
   unit: "KG" | "L" | "UNIT" | "BOX";
   category?: string | null;
+  supplierId?: number | null;
   vatRate?: number | null;
+}
+
+export interface InventoryCategoryResponse {
+  id: number;
+  name: string;
 }
 
 export interface IncidentResponse {
@@ -384,6 +399,39 @@ export const inventoryApi = {
 
   remove: async (token: string, productId: number): Promise<void> => {
     const res = await authFetch(`/api/v1/inventory/${productId}`, token, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const text = await res.text();
+      throw new Error(text || `Error ${res.status}`);
+    }
+  },
+
+  listCategories: async (token: string): Promise<InventoryCategoryResponse[]> => {
+    const res = await authFetch("/api/v1/inventory/categories", token);
+    return handleResponse<InventoryCategoryResponse[]>(res);
+  },
+
+  createCategory: async (token: string, body: { name: string }): Promise<InventoryCategoryResponse> => {
+    const res = await authFetch("/api/v1/inventory/categories", token, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return handleResponse<InventoryCategoryResponse>(res);
+  },
+
+  updateCategory: async (
+    token: string,
+    id: number,
+    body: { name?: string | null }
+  ): Promise<InventoryCategoryResponse> => {
+    const res = await authFetch(`/api/v1/inventory/categories/${id}`, token, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+    return handleResponse<InventoryCategoryResponse>(res);
+  },
+
+  deleteCategory: async (token: string, id: number): Promise<void> => {
+    const res = await authFetch(`/api/v1/inventory/categories/${id}`, token, { method: "DELETE" });
     if (!res.ok && res.status !== 204) {
       const text = await res.text();
       throw new Error(text || `Error ${res.status}`);

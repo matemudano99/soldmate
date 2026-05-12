@@ -66,7 +66,7 @@ public class ForecastController {
     public List<ImpactDay> getImpactForCoordinates(double lat, double lon) {
         String url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat +
             "&longitude=" + lon +
-            "&daily=temperature_2m_max,precipitation_sum,wind_speed_10m_max&forecast_days=7&timezone=auto";
+            "&daily=temperature_2m_max,precipitation_sum,wind_speed_10m_max&forecast_days=7&past_days=6&timezone=auto";
 
         @SuppressWarnings("unchecked")
         Map<String, Object> body = restTemplate.getForObject(url, Map.class);

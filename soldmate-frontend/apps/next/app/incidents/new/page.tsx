@@ -3,9 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { WebErpNavbar } from "../../components/web-erp-navbar";
+import { ErpPageShell, AppTopHeader } from "../../shared/ui";
 import { CreateIncidentModal } from "../../components/create-modals";
-import { AppTopHeader } from "../../shared/ui";
 import { useAuthStore } from "app/lib/store";
 
 export default function NewIncidentPage() {
@@ -28,11 +27,11 @@ export default function NewIncidentPage() {
   }, [authReady, token, router]);
 
   return (
-    <div className="flex min-h-screen bg-[#eef1f8]">
-      <WebErpNavbar />
-      <main className="flex-1 pb-6 overflow-y-auto">
+    <>
+      <ErpPageShell>
         <AppTopHeader />
-        <div className="px-6">
+        <main className="flex-1 min-h-0 overflow-y-auto pb-6">
+        <div className="px-4 sm:px-6">
         <h1 className="text-2xl font-bold text-[#1e2040] mb-2">Nueva incidencia</h1>
         <p className="text-sm text-gray-500 mb-5 max-w-lg">
           Completa el formulario. Si eliges una imagen, el backend la sube al bucket <code className="text-xs bg-gray-100 px-1 rounded">incidents</code> en
@@ -40,6 +39,7 @@ export default function NewIncidentPage() {
         </p>
         </div>
       </main>
+      </ErpPageShell>
       {authReady && token ? (
         <CreateIncidentModal
           onClose={() => router.push("/incidents")}
@@ -55,6 +55,6 @@ export default function NewIncidentPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

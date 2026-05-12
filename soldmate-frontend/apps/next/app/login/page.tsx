@@ -13,9 +13,6 @@ const FEATURES = [
   { Icon: BarChart2, text: "Analítica operativa avanzada" },
 ];
 
-const DEMO_EMAIL    = "owner.demo@soldmate.local";
-const DEMO_PASSWORD = "Demo12345!";
-
 export default function LoginPage() {
   const router  = useRouter();
   const storeLogin = useAuthStore((s) => s.login);
@@ -23,6 +20,7 @@ export default function LoginPage() {
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [showPwd,  setShowPwd]  = useState(false);
+  const [remember, setRemember] = useState(true);
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState<string | null>(null);
 
@@ -31,7 +29,7 @@ export default function LoginPage() {
     setError(null);
     try {
       const data = await authApi.login(e, p);
-      storeLogin(data);
+      storeLogin(data, remember);
       router.push("/dashboard");
     } catch (err: unknown) {
       setError(describeNetworkError(err));
@@ -43,8 +41,6 @@ export default function LoginPage() {
   const handleSubmit = () => {
     doLogin(email, password);
   };
-
-  const handleDemoLogin = () => doLogin(DEMO_EMAIL, DEMO_PASSWORD);
 
   return (
     <div className="flex min-h-screen bg-white">
@@ -173,6 +169,8 @@ export default function LoginPage() {
               <input
                 id="remember"
                 type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
                 className="w-4 h-4 rounded border-gray-300 text-[#4f6ef7] accent-[#4f6ef7]"
               />
               <label htmlFor="remember" className="text-xs text-gray-500">Recordarme en este dispositivo</label>
@@ -217,21 +215,19 @@ export default function LoginPage() {
             ))}
           </div>
 
-          <button
-            type="button"
-            onClick={handleDemoLogin}
-            disabled={loading}
-            className="mt-3 w-full rounded-xl border border-dashed border-[#4f6ef7]/40 bg-[#f0f3ff] py-2.5 text-xs font-medium text-[#4f6ef7] hover:bg-[#e8edff] transition-all disabled:opacity-60"
-          >
-            ⚡ Acceso demo — owner.demo@soldmate.local
-          </button>
-
           <p className="mt-5 text-center text-xs text-gray-400">
             ¿No tienes cuenta?{" "}
             <Link href="/register" className="font-semibold text-[#4f6ef7] hover:text-[#3d5ae0]">
               Crea tu negocio gratis
             </Link>
           </p>
+          <div className="mt-3 text-center text-[11px] text-gray-400 flex items-center justify-center gap-3">
+            <Link href="/legal/terms" className="hover:text-[#4f6ef7]">Términos</Link>
+            <span>·</span>
+            <Link href="/legal/privacy" className="hover:text-[#4f6ef7]">Privacidad</Link>
+            <span>·</span>
+            <Link href="/legal/cookies" className="hover:text-[#4f6ef7]">Cookies</Link>
+          </div>
         </div>
       </div>
     </div>

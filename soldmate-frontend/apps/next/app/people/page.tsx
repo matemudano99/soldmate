@@ -8,8 +8,14 @@ import {
   Star, TrendingUp, Loader2, AlertCircle,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CreatePersonModal, AppTopHeader, WebErpNavbar, notify, useConfirm, EmptyState } from "../shared/ui";
-import { usersApi, type UserListResponse, type UserUpsertInput } from "app/lib/api";
+import { CreatePersonModal, AppTopHeader, ErpPageShell, notify, useConfirm, EmptyState, PageListSearchField } from "../shared/ui";
+import {
+  activityApi,
+  usersApi,
+  type ActivityItemResponse,
+  type UserListResponse,
+  type UserUpsertInput,
+} from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -114,6 +120,19 @@ function Avatar({ emp, size = 56 }: { emp: Employee; size?: number }) {
       <User className="text-blue-200" size={size * 0.5} />
     </div>
   );
+}
+
+function formatRelativeTime(isoDate: string): string {
+  const d = new Date(isoDate);
+  const diff = Date.now() - d.getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "Ahora";
+  if (min < 60) return `Hace ${min}m`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `Hace ${h}h`;
+  const days = Math.floor(h / 24);
+  if (days === 1) return "Ayer";
+  return `Hace ${days}d`;
 }
 
 // ─── Employee Card (grid view) ────────────────────────────────────────────────
@@ -246,10 +265,12 @@ function EmployeeRow({
 
 function DetailPanel({
   emp,
+  recentActivity,
   onUpdate,
   onClose,
 }: {
   emp: Employee;
+  recentActivity: ActivityItemResponse[];
   onUpdate: (updated: Employee) => void;
   onClose: () => void;
 }) {
@@ -271,39 +292,45 @@ function DetailPanel({
   };
 
   return (
-    <aside className="w-72 flex-shrink-0 bg-white border-l border-gray-100 flex flex-col overflow-y-auto">
+    <aside className="fixed inset-y-0 right-0 z-40 flex w-full max-w-lg flex-col overflow-y-auto bg-white shadow-2xl border-l border-gray-100 lg:static lg:inset-auto lg:z-auto lg:h-full lg:min-h-0 lg:max-h-full lg:w-80 lg:max-w-none lg:shrink-0 lg:rounded-none lg:shadow-none">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-50">
+      <div className="flex items-center justify-between gap-2 px-4 sm:px-5 pt-4 sm:pt-5 pb-3 border-b border-gray-50">
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Perfil</p>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           {editing ? (
             <>
               <button
+                type="button"
                 onClick={save}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#4f6ef7] text-white text-xs font-semibold hover:bg-[#3d5ae0] transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#4f6ef7] text-white text-xs font-semibold hover:bg-[#3d5ae0] transition-colors min-h-[40px]"
               >
-                <Check size={11} /> Guardar
+                <Check size={12} /> Guardar
               </button>
               <button
+                type="button"
                 onClick={() => { setDraft(emp); setEditing(false); }}
-                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors"
+                className="p-2.5 rounded-xl text-gray-400 hover:bg-gray-100 transition-colors min-w-[40px] min-h-[40px] inline-flex items-center justify-center"
+                aria-label="Cancelar edición"
               >
-                <X size={13} />
+                <X size={16} />
               </button>
             </>
           ) : (
             <>
               <button
+                type="button"
                 onClick={() => setEditing(true)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-gray-200 text-gray-500 text-xs font-medium hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-gray-600 text-xs font-medium hover:bg-gray-50 transition-colors min-h-[40px]"
               >
-                <Pencil size={10} /> Editar
+                <Pencil size={12} /> Editar
               </button>
               <button
+                type="button"
                 onClick={onClose}
-                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors"
+                className="p-2.5 rounded-xl text-gray-500 hover:bg-gray-100 transition-colors min-w-[40px] min-h-[40px] inline-flex items-center justify-center"
+                aria-label="Cerrar perfil"
               >
-                <X size={13} />
+                <X size={16} />
               </button>
             </>
           )}
@@ -428,19 +455,27 @@ function DetailPanel({
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Actividad reciente</p>
         </div>
         <div className="space-y-2">
-          {[
-            { action: "Completó revisión de diseño",     time: "Hace 2h",  color: "bg-green-400" },
-            { action: "Comentó en Brand Redesign",       time: "Hace 5h",  color: "bg-blue-400" },
-            { action: "Actualizó documentación",          time: "Ayer",     color: "bg-violet-400" },
-          ].map((a) => (
-            <div key={a.action} className="flex items-start gap-2.5">
-              <div className={`w-1.5 h-1.5 rounded-full ${a.color} mt-1.5 flex-shrink-0`} />
-              <div>
-                <p className="text-xs text-gray-600 leading-tight">{a.action}</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">{a.time}</p>
-              </div>
-            </div>
-          ))}
+          {recentActivity.length ? (
+            recentActivity.map((a, idx) => {
+              const color =
+                a.status === "ELIMINADO" ? "bg-red-400"
+                : a.status === "MODIFICADO" ? "bg-amber-400"
+                : "bg-green-400";
+              return (
+                <div key={`${a.id}-${idx}`} className="flex items-start gap-2.5">
+                  <div className={`w-1.5 h-1.5 rounded-full ${color} mt-1.5 flex-shrink-0`} />
+                  <div>
+                    <p className="text-xs text-gray-600 leading-tight line-clamp-2">
+                      {a.title}
+                    </p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{formatRelativeTime(a.createdAt)}</p>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <p className="text-xs text-gray-400">Sin actividad reciente para este usuario.</p>
+          )}
         </div>
       </div>
 
@@ -486,7 +521,7 @@ function AddModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-50">
           <div>
             <h2 className="text-base font-bold text-[#1e2040]">Añadir persona</h2>
             <p className="text-xs text-gray-400 mt-0.5">Completa los datos del nuevo miembro</p>
@@ -496,7 +531,7 @@ function AddModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+        <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-5 space-y-4">
           {/* Name */}
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -616,6 +651,12 @@ export default function PeoplePage() {
     enabled: !!token,
   });
 
+  const { data: allActivity = [] } = useQuery({
+    queryKey: ["activity-feed", token],
+    queryFn: () => activityApi.getAll(token!),
+    enabled: !!token,
+  });
+
   const employees = useMemo(() => users.map(mapUser), [users]);
 
   // ─── Mutations ─────────────────────────────────────────────────────────────
@@ -640,13 +681,28 @@ export default function PeoplePage() {
 
   // ─── Derived state ─────────────────────────────────────────────────────────
   const selectedEmp = employees.find((e) => e.id === selectedId) ?? null;
+  const selectedEmpActivity = useMemo(() => {
+    if (!selectedEmp) return [];
+    const nameLc = selectedEmp.name.toLowerCase();
+    const emailLc = selectedEmp.email.toLowerCase();
+    return allActivity
+      .filter((a) => {
+        const actorEmail = (a.actorEmail ?? "").toLowerCase();
+        const actorName = (a.actorName ?? "").toLowerCase();
+        return (emailLc && actorEmail === emailLc) || (!!nameLc && actorName.includes(nameLc));
+      })
+      .slice(0, 3);
+  }, [allActivity, selectedEmp]);
 
   const filtered = useMemo(() => {
     let list = employees.filter((e) => {
       const matchDept   = activeDept === "Todos" || e.department === activeDept;
-      const matchSearch = e.name.toLowerCase().includes(search.toLowerCase()) ||
-                          e.email.toLowerCase().includes(search.toLowerCase()) ||
-                          e.role.toLowerCase().includes(search.toLowerCase());
+      const q = search.toLowerCase();
+      const matchSearch =
+        e.name.toLowerCase().includes(q) ||
+        e.email.toLowerCase().includes(q) ||
+        e.role.toLowerCase().includes(q) ||
+        (e.department ?? "").toLowerCase().includes(q);
       return matchDept && matchSearch;
     });
     list = [...list].sort((a, b) => {
@@ -687,23 +743,21 @@ export default function PeoplePage() {
   // ─── Loading / Error states ────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="flex h-screen overflow-hidden bg-[#eef1f8] text-[#1e2040]">
-        <WebErpNavbar />
-        <div className="flex-1 flex items-center justify-center">
+      <ErpPageShell>
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
           <div className="flex flex-col items-center gap-3 text-gray-400">
             <Loader2 size={32} className="animate-spin text-[#4f6ef7]" />
             <p className="text-sm">Cargando usuarios...</p>
           </div>
         </div>
-      </div>
+      </ErpPageShell>
     );
   }
 
   if (isError) {
     return (
-      <div className="flex h-screen overflow-hidden bg-[#eef1f8] text-[#1e2040]">
-        <WebErpNavbar />
-        <div className="flex-1 flex items-center justify-center">
+      <ErpPageShell>
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
           <div className="flex flex-col items-center gap-4 text-center max-w-sm">
             <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center">
               <AlertCircle size={24} className="text-red-400" />
@@ -722,39 +776,41 @@ export default function PeoplePage() {
             </button>
           </div>
         </div>
-      </div>
+      </ErpPageShell>
     );
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#eef1f8] text-[#1e2040]">
-      <WebErpNavbar />
+    <ErpPageShell>
+        <AppTopHeader />
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top bar */}
-        <AppTopHeader
-          searchValue={search}
-          onSearchChange={setSearch}
-          searchPlaceholder="Buscar usuarios..."
-        />
-
-        {/* Content */}
-        <main className="flex-1 overflow-y-auto px-7 pb-6">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+        <main className="flex-1 min-h-0 min-w-0 overflow-y-auto px-4 sm:px-7 pb-6">
           {/* Title + actions */}
-          <div className="flex items-end justify-between mb-5">
-            <div>
-              <h1 className="text-3xl font-bold text-[#1e2040]">Usuarios</h1>
-              <p className="text-sm text-gray-400 mt-0.5">
-                {teamStats.total} usuarios · {teamStats.online} activos ahora · {teamStats.avgProgress}% progreso medio
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-5">
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-bold text-[#1e2040]">Usuarios</h1>
+              <p className="text-xs sm:text-sm text-gray-400 mt-1 leading-relaxed">
+                <span className="block sm:inline">{teamStats.total} usuarios · {teamStats.online} activos ahora</span>
+                <span className="hidden sm:inline"> · </span>
+                <span className="block sm:inline">{teamStats.avgProgress}% progreso medio</span>
               </p>
             </div>
             <button
+              type="button"
               onClick={() => setShowModal(true)}
-              className="flex items-center gap-2 bg-[#4f6ef7] text-white rounded-xl px-4 py-2.5 text-sm font-semibold shadow-[0_4px_12px_rgba(79,110,247,0.30)] hover:bg-[#3d5ae0] transition-all"
+              className="inline-flex w-full sm:w-auto items-center justify-center gap-2 bg-[#4f6ef7] text-white rounded-xl px-4 py-3 sm:py-2.5 text-sm font-semibold shadow-[0_4px_12px_rgba(79,110,247,0.30)] hover:bg-[#3d5ae0] transition-all shrink-0 min-h-[44px]"
             >
               <Plus size={15} /> Añadir usuario
             </button>
+          </div>
+
+          <div className="mb-4">
+            <PageListSearchField
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar por nombre, email o rol…"
+            />
           </div>
 
           {/* Filters row */}
@@ -876,16 +932,25 @@ export default function PeoplePage() {
             </div>
           )}
         </main>
-      </div>
 
-      {/* Detail Panel */}
-      {selectedEmp && (
-        <DetailPanel
-          emp={selectedEmp}
-          onUpdate={updateEmployee}
-          onClose={() => setSelectedId(null)}
-        />
-      )}
+        {/* Detail Panel: cajón en móvil; a la derecha de la lista en lg+ (misma fila flex) */}
+        {selectedEmp && (
+          <>
+            <button
+              type="button"
+              aria-label="Cerrar panel"
+              className="fixed inset-0 z-30 bg-black/25 backdrop-blur-[1px] lg:hidden"
+              onClick={() => setSelectedId(null)}
+            />
+            <DetailPanel
+              emp={selectedEmp}
+              recentActivity={selectedEmpActivity}
+              onUpdate={updateEmployee}
+              onClose={() => setSelectedId(null)}
+            />
+          </>
+        )}
+        </div>
 
       {/* Add Modal */}
       {showModal && (
@@ -910,6 +975,6 @@ export default function PeoplePage() {
           }
         />
       )}
-    </div>
+    </ErpPageShell>
   );
 }

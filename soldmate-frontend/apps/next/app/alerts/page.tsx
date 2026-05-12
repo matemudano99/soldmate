@@ -2,24 +2,14 @@
 
 import React from "react";
 import { SectionCard } from "../components/web-ui";
-import { WebErpNavbar } from "../components/web-erp-navbar";
-import { AppTopHeader } from "../shared/ui";
+import { AppTopHeader, ErpPageShell } from "../shared/ui";
 import { AlertTriangle, Clock, CheckCircle, LifeBuoy, Mail, Phone } from "lucide-react";
 import { alertsApi, describeNetworkError, type AlertResponse } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
-const ALERTS = [
-  { text: "Stock crítico en bebidas",     type: "critical", icon: AlertTriangle },
-  { text: "Incidencia abierta > 24h",     type: "warning",  icon: Clock },
-  { text: "3 tareas vencen hoy",          type: "warning",  icon: Clock },
-  { text: "Proveedor confirmado",         type: "success",  icon: CheckCircle },
-];
-
 export default function AlertsPage() {
   const token = useAuthStore((s) => s.token);
-  const [alerts, setAlerts] = React.useState<AlertResponse[]>(
-    ALERTS.map((a) => ({ text: a.text, type: a.type as AlertResponse["type"], source: "mock" })),
-  );
+  const [alerts, setAlerts] = React.useState<AlertResponse[]>([]);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -37,12 +27,11 @@ export default function AlertsPage() {
   }, [token]);
 
   return (
-    <div className="flex min-h-screen bg-[#eef1f8]">
-      <WebErpNavbar />
-      <main className="flex-1 pb-6 overflow-y-auto">
+    <ErpPageShell>
         <AppTopHeader />
-        <div className="px-6">
-        <h1 className="text-2xl font-bold text-[#1e2040] mb-5">Support</h1>
+        <main className="flex-1 min-h-0 overflow-y-auto pb-6">
+        <div className="px-4 sm:px-6">
+        <h1 className="text-2xl font-bold text-[#1e2040] mb-5">Alertas y soporte</h1>
         <div className="max-w-4xl grid gap-4 lg:grid-cols-[1.5fr_1fr]">
           <SectionCard title="Alertas recientes" subtitle="Estado operativo">
             <div className="flex flex-col gap-2">
@@ -92,6 +81,6 @@ export default function AlertsPage() {
         </div>
         </div>
       </main>
-    </div>
+    </ErpPageShell>
   );
 }

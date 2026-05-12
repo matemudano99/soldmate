@@ -17,15 +17,11 @@ function formatTodayEs(): string {
   return dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
 }
 
-export function AppTopHeader({
-  searchValue,
-  onSearchChange,
-  searchPlaceholder = "Buscar...",
-}: {
-  searchValue?: string;
-  onSearchChange?: (val: string) => void;
-  searchPlaceholder?: string;
-}) {
+/**
+ * Cabecera ERP: fecha, negocio, búsqueda global (⌘K / foco → modal), alertas y menú de usuario.
+ * El campo de búsqueda no filtra la página actual; abre siempre `GlobalSearchModal`.
+ */
+export function AppTopHeader() {
   const token = useAuthStore((s) => s.token);
   const firstName = useAuthStore((s) => s.firstName);
   const lastName = useAuthStore((s) => s.lastName);
@@ -66,35 +62,29 @@ export function AppTopHeader({
     };
   }, [token]);
 
+  const openSearch = () => setSearchOpen(true);
+
   return (
-    <header className="flex-shrink-0 px-7 py-4 flex items-center justify-between gap-4">
+    <header className="flex flex-shrink-0 items-center justify-between gap-4 py-4 pl-16 pr-7 md:px-7">
       <div>
         <p className="text-xs text-gray-400">{todayCap}</p>
         <h1 className="text-xl font-bold text-[#1e2040]">{displayName}</h1>
       </div>
       <div className="flex items-center gap-3">
-        <div className="relative max-w-52 w-full hidden md:flex items-center">
-          {onSearchChange ? (
-            <>
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              <input
-                value={searchValue}
-                onChange={(e) => onSearchChange?.(e.target.value)}
-                className="w-full bg-white border border-gray-100 rounded-xl pl-9 pr-4 py-2 text-sm placeholder:text-gray-400 shadow-sm outline-none focus:border-[#4f6ef7] transition-colors"
-                placeholder={searchPlaceholder}
-              />
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setSearchOpen(true)}
-              className="w-full flex items-center gap-2 bg-white border border-gray-100 rounded-xl pl-3 pr-4 py-2 text-sm text-gray-400 shadow-sm hover:border-[#4f6ef7] hover:text-[#4f6ef7] transition-colors"
-            >
-              <Search size={13} />
-              <span className="flex-1 text-left">Buscar...</span>
-              <kbd className="text-[10px] border border-gray-200 rounded px-1 py-0.5 bg-gray-50">⌘K</kbd>
-            </button>
-          )}
+        <div className="relative hidden w-full max-w-56 cursor-text items-center md:flex">
+          <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            readOnly
+            aria-haspopup="dialog"
+            aria-expanded={searchOpen}
+            onFocus={openSearch}
+            onClick={openSearch}
+            className="w-full cursor-pointer rounded-xl border border-gray-100 bg-white py-2 pl-9 pr-16 text-sm shadow-sm outline-none transition-colors placeholder:text-gray-400 focus:border-[#4f6ef7]"
+            placeholder="Buscar..."
+          />
+          <kbd className="pointer-events-none absolute right-2 rounded border border-gray-200 bg-gray-50 px-1 py-0.5 text-[10px] text-gray-400">
+            ⌘K
+          </kbd>
         </div>
         <AlertsBellPopover />
         <UserProfileMenu />

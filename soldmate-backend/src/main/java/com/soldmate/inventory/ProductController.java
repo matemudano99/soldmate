@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -20,15 +21,18 @@ public class ProductController {
 
     private final ProductRepository productRepository;
     private final CompanyRepository companyRepository;
+    private final SupplierRepository supplierRepository;
     private final JwtUtil jwtUtil;
     private final com.soldmate.activity.ActivityLogger activityLogger;
 
     public ProductController(ProductRepository productRepository,
                              CompanyRepository companyRepository,
+                             SupplierRepository supplierRepository,
                              JwtUtil jwtUtil,
                              com.soldmate.activity.ActivityLogger activityLogger) {
         this.productRepository = productRepository;
         this.companyRepository = companyRepository;
+        this.supplierRepository = supplierRepository;
         this.jwtUtil = jwtUtil;
         this.activityLogger = activityLogger;
     }
@@ -40,10 +44,14 @@ public class ProductController {
         BigDecimal minStock,
         String unit,
         String category,
+        Long supplierId,
+        String supplierName,
         BigDecimal vatRate,
         boolean lowStock
     ) {
         public static ProductResponse from(Product p) {
+            Long sid = p.getSupplier() != null ? p.getSupplier().getId() : null;
+            String sname = p.getSupplier() != null ? p.getSupplier().getName() : null;
             return new ProductResponse(
                 p.getId(),
                 p.getName(),
@@ -51,6 +59,8 @@ public class ProductController {
                 p.getMinStock(),
                 p.getUnit().name(),
                 p.getCategory(),
+                sid,
+                sname,
                 p.getVatRate(),
                 p.isLowStock()
             );
@@ -63,6 +73,7 @@ public class ProductController {
         @NotNull BigDecimal minStock,
         @NotNull Product.Unit unit,
         String category,
+        Long supplierId,
         BigDecimal vatRate
     ) {}
 
@@ -96,6 +107,7 @@ public class ProductController {
         product.setCategory(req.category());
         product.setVatRate(req.vatRate() != null ? req.vatRate() : new BigDecimal("10.00"));
         product.setCompany(company);
+        product.setSupplier(resolveSupplier(companyId, req.supplierId()));
 
         Product saved = productRepository.save(product);
         String userEmail = jwtUtil.extractEmail(authHeader.substring(7));
@@ -138,6 +150,7 @@ public class ProductController {
         product.setUnit(req.unit());
         product.setCategory(req.category());
         product.setVatRate(req.vatRate() != null ? req.vatRate() : product.getVatRate());
+        product.setSupplier(resolveSupplier(companyId, req.supplierId()));
 
         Product updated = productRepository.save(product);
         String userEmail = jwtUtil.extractEmail(authHeader.substring(7));
@@ -166,5 +179,17 @@ public class ProductController {
 
     private Long extractCompanyId(String authHeader) {
         return jwtUtil.extractCompanyId(authHeader.substring(7));
+    }
+
+    private Supplier resolveSupplier(Long companyId, Long supplierId) {
+        if (supplierId == null) {
+            return null;
+        }
+        Supplier s = supplierRepository.findByIdAndCompanyId(supplierId, companyId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Proveedor no válido"));
+        if (!s.isActive() || s.getSupplierType() != Supplier.SupplierType.SUPPLIER) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El contacto seleccionado no es un proveedor activo");
+        }
+        return s;
     }
 }

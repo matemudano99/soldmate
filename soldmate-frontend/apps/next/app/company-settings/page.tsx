@@ -2,12 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import { SectionCard } from "../components/web-ui";
-import { WebErpNavbar } from "../components/web-erp-navbar";
-import { AppTopHeader } from "../shared/ui";
+import { ErpPageShell, AppTopHeader, notify } from "../shared/ui";
 import { authApi, businessProfileApi, type BusinessProfileResponse, describeNetworkError } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 import { Building2, Camera, MapPin, Settings2, UserRound } from "lucide-react";
-import { notify } from "../shared/ui";
 
 const COUNTRY_OPTIONS = [
   { code: "ES", name: "España" },
@@ -194,11 +192,10 @@ export default function CompanySettingsPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#eef1f8]">
-      <WebErpNavbar />
-      <main className="flex-1 pb-6 overflow-y-auto">
+    <ErpPageShell>
         <AppTopHeader />
-        <div className="px-6">
+        <main className="flex-1 min-h-0 overflow-y-auto pb-6">
+        <div className="px-4 sm:px-6">
         <h1 className="text-2xl font-bold text-[#1e2040] mb-5">Ajustes</h1>
         <div className="max-w-4xl grid gap-4">
           <SectionCard title="Mi perfil" subtitle="Datos del usuario autenticado">
@@ -410,6 +407,6 @@ export default function CompanySettingsPage() {
         </div>
         </div>
       </main>
-    </div>
+    </ErpPageShell>
   );
 }
