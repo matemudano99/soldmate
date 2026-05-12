@@ -703,6 +703,46 @@ export const predictionsApi = {
   },
 };
 
+/** Cierre diario manual: un registro por empresa y día (ingresos + gastos del día). */
+export interface DailyFinanceEntryResponse {
+  id: number;
+  entryDate: string;
+  revenue: number;
+  expenses: number;
+  notes: string | null;
+  updatedAt: string;
+}
+
+export const financeApi = {
+  listDaily: async (token: string, from: string, to: string): Promise<DailyFinanceEntryResponse[]> => {
+    const q = new URLSearchParams({ from, to });
+    const res = await authFetch(`/api/v1/finance/daily?${q}`, token);
+    return handleResponse<DailyFinanceEntryResponse[]>(res);
+  },
+  upsertDaily: async (
+    token: string,
+    date: string,
+    body: { revenue: number; expenses: number; notes?: string | null },
+  ): Promise<DailyFinanceEntryResponse> => {
+    const res = await authFetch(`/api/v1/finance/daily/${date}`, token, {
+      method: "PUT",
+      body: JSON.stringify({
+        revenue: body.revenue,
+        expenses: body.expenses,
+        notes: body.notes ?? null,
+      }),
+    });
+    return handleResponse<DailyFinanceEntryResponse>(res);
+  },
+  deleteDaily: async (token: string, date: string): Promise<void> => {
+    const res = await authFetch(`/api/v1/finance/daily/${date}`, token, { method: "DELETE" });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || `Error ${res.status}`);
+    }
+  },
+};
+
 export const businessProfileApi = {
   get: async (token: string): Promise<BusinessProfileResponse> => {
     const res = await authFetch("/api/v1/business-profile", token);

@@ -52,7 +52,8 @@ public class SchemaMigrationRunner implements ApplicationRunner {
             new MigrationStep("009", "Create search indexes for global search", this::addSearchIndexes),
             new MigrationStep("010", "Sync users.role constraint with backend enum", this::syncUsersRoleConstraint),
             new MigrationStep("011", "Create inventory_categories for product taxonomy", this::createInventoryCategoriesTable),
-            new MigrationStep("012", "Product supplier FK and inventory_categories hardening", this::migrateProductSupplierAndInventoryCategories)
+            new MigrationStep("012", "Product supplier FK and inventory_categories hardening", this::migrateProductSupplierAndInventoryCategories),
+            new MigrationStep("013", "Create daily_finance_entries for manual daily totals", this::createDailyFinanceEntriesTable)
         );
 
         for (MigrationStep step : steps) {
@@ -306,6 +307,24 @@ public class SchemaMigrationRunner implements ApplicationRunner {
               END IF;
             END $$
             """);
+    }
+
+    private void createDailyFinanceEntriesTable() {
+        jdbcTemplate.execute("""
+            CREATE TABLE IF NOT EXISTS daily_finance_entries (
+                id BIGSERIAL PRIMARY KEY,
+                company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+                entry_date DATE NOT NULL,
+                revenue NUMERIC(14,2) NOT NULL DEFAULT 0,
+                expenses NUMERIC(14,2) NOT NULL DEFAULT 0,
+                notes VARCHAR(500),
+                updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                CONSTRAINT ux_daily_finance_company_date UNIQUE (company_id, entry_date)
+            )
+            """);
+        jdbcTemplate.execute(
+                "CREATE INDEX IF NOT EXISTS idx_daily_finance_company_date ON daily_finance_entries(company_id, entry_date DESC)"
+        );
     }
 
     private void addConstraintIfMissing(String constraintName, String addConstraintSql) {
