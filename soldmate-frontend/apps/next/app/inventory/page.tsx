@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Package, ChevronLeft, AlertTriangle, Minus, Plus, Trash2, Save, X } from "lucide-react";
-import { AppTopHeader, WebErpNavbar, notify, useConfirm, SkeletonTable, EmptyState } from "../shared/ui";
+import { AppTopHeader, CreateProductModal, WebErpNavbar, notify, useConfirm, EmptyState } from "../shared/ui";
 import { inventoryApi, type ProductResponse } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 
@@ -22,6 +22,7 @@ export default function InventoryPage() {
   const qc = useQueryClient();
   const [authReady, setAuthReady] = useState(false);
   const [search, setSearch] = useState("");
+  const [showCreateProduct, setShowCreateProduct] = useState(false);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   useEffect(() => {
@@ -44,15 +45,12 @@ export default function InventoryPage() {
     onError: (e: Error) => notify.error(e.message ?? "Error al actualizar stock"),
   });
   const createMut = useMutation({
-    mutationFn: (payload: {
-      name: string;
-      currentStock: number;
-      minStock: number;
-      unit: "KG" | "L" | "UNIT" | "BOX";
-      category?: string | null;
-      vatRate?: number | null;
-    }) => inventoryApi.create(token!, payload),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["inventory"] }); notify.success("Producto creado"); },
+    mutationFn: (payload: Parameters<typeof inventoryApi.create>[1]) => inventoryApi.create(token!, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["inventory"] });
+      notify.success("Producto creado");
+      setShowCreateProduct(false);
+    },
     onError: (e: Error) => notify.error(e.message ?? "Error al crear producto"),
   });
   const updateMut = useMutation({
@@ -113,7 +111,7 @@ export default function InventoryPage() {
             Dashboard
           </Link>
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Package className="text-[#4f6ef7]" size={26} />
@@ -123,12 +121,23 @@ export default function InventoryPage() {
               Productos de tu empresa · puedes agregar, eliminar y ajustar mínimos necesarios.
             </p>
           </div>
+          {isOwner && authReady && !query.isLoading && (
+            <button
+              type="button"
+              onClick={() => setShowCreateProduct(true)}
+              className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-[#4f6ef7] px-4 py-3 text-sm font-semibold text-white hover:bg-[#3d5ae0] sm:w-auto sm:py-2.5"
+            >
+              <Plus size={16} />
+              Nuevo producto
+            </button>
+          )}
         </div>
 
-        {isOwner && authReady && !query.isLoading && (
-          <AddProductCard
+        {isOwner && showCreateProduct && (
+          <CreateProductModal
+            onClose={() => setShowCreateProduct(false)}
+            submitting={createMut.isPending}
             onCreate={(payload) => createMut.mutate(payload)}
-            pending={createMut.isPending}
           />
         )}
 
@@ -212,7 +221,11 @@ export default function InventoryPage() {
               <EmptyState
                 icon={Package}
                 title="Sin productos"
-                description="Añade tu primer producto al catálogo usando el formulario de arriba."
+                description={
+                  isOwner
+                    ? "Añade tu primer producto con el botón «Nuevo producto»."
+                    : "Aún no hay artículos en el inventario."
+                }
               />
             )}
           </div>
@@ -220,98 +233,6 @@ export default function InventoryPage() {
         </div>
       </main>
       {confirmDialog}
-    </div>
-  );
-}
-
-function AddProductCard({
-  onCreate,
-  pending,
-}: {
-  onCreate: (payload: {
-    name: string;
-    currentStock: number;
-    minStock: number;
-    unit: "KG" | "L" | "UNIT" | "BOX";
-    category?: string | null;
-    vatRate?: number | null;
-  }) => void;
-  pending: boolean;
-}) {
-  const [name, setName] = useState("");
-  const [currentStock, setCurrentStock] = useState("0");
-  const [minStock, setMinStock] = useState("10");
-  const [unit, setUnit] = useState<"KG" | "L" | "UNIT" | "BOX">("UNIT");
-  const [category, setCategory] = useState("");
-
-  return (
-    <div className="mb-6 bg-white rounded-2xl border border-gray-100 shadow-[0_2px_16px_rgba(149,157,165,0.10)] p-4">
-      <p className="text-sm font-semibold text-[#1e2040] mb-3">Agregar producto</p>
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Nombre"
-          className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-        />
-        <input
-          value={currentStock}
-          onChange={(e) => setCurrentStock(e.target.value.replace(/[^0-9]/g, ""))}
-          type="number"
-          step="1"
-          min="0"
-          placeholder="Stock actual"
-          className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-        />
-        <input
-          value={minStock}
-          onChange={(e) => setMinStock(e.target.value.replace(/[^0-9]/g, ""))}
-          type="number"
-          step="1"
-          min="0"
-          placeholder="Mínimo necesario"
-          className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-        />
-        <select
-          value={unit}
-          onChange={(e) => setUnit(e.target.value as "KG" | "L" | "UNIT" | "BOX")}
-          className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-        >
-          <option value="UNIT">ud</option>
-          <option value="KG">kg</option>
-          <option value="L">L</option>
-          <option value="BOX">cajas</option>
-        </select>
-        <input
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          placeholder="Categoría"
-          className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-        />
-      </div>
-      <div className="mt-3">
-        <button
-          type="button"
-          disabled={pending || !name.trim()}
-          onClick={() => {
-            onCreate({
-              name: name.trim(),
-              currentStock: Math.floor(Number(currentStock || 0)),
-              minStock: Math.floor(Number(minStock || 0)),
-              unit,
-              category: category.trim() || null,
-              vatRate: 10,
-            });
-            setName("");
-            setCurrentStock("0");
-            setMinStock("10");
-            setCategory("");
-          }}
-          className="rounded-xl bg-[#4f6ef7] text-white px-4 py-2 text-sm font-semibold disabled:opacity-60"
-        >
-          {pending ? "Guardando..." : "Agregar"}
-        </button>
-      </div>
     </div>
   );
 }

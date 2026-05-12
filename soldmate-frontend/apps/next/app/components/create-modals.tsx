@@ -2,7 +2,13 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { X } from "lucide-react";
-import { incidentsApi, suppliersApi, type IncidentResponse, type SupplierResponse } from "app/lib/api";
+import {
+  incidentsApi,
+  suppliersApi,
+  type IncidentResponse,
+  type ProductInput,
+  type SupplierResponse,
+} from "app/lib/api";
 
 type ModalShellProps = {
   title: string;
@@ -412,6 +418,90 @@ export function UploadDocumentModal({ onClose, onCreate }: { onClose: () => void
         </div>
       </div>
       <div><Label>Tamaño</Label><Input value={form.size} onChange={(e) => set("size", e.target.value)} placeholder="Ej: 300 KB" /></div>
+    </ModalShell>
+  );
+}
+
+export function CreateProductModal({
+  onClose,
+  onCreate,
+  submitting = false,
+}: {
+  onClose: () => void;
+  onCreate: (payload: ProductInput) => void;
+  submitting?: boolean;
+}) {
+  const [name, setName] = useState("");
+  const [currentStock, setCurrentStock] = useState("0");
+  const [minStock, setMinStock] = useState("10");
+  const [unit, setUnit] = useState<ProductInput["unit"]>("UNIT");
+  const [category, setCategory] = useState("");
+
+  return (
+    <ModalShell
+      title="Nuevo producto"
+      subtitle="Nombre, stock, mínimo de alerta y unidad de medida"
+      onClose={onClose}
+      submitLabel="Crear producto"
+      submitting={submitting}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!name.trim()) return;
+        onCreate({
+          name: name.trim(),
+          currentStock: Math.floor(Number(currentStock || 0)),
+          minStock: Math.floor(Number(minStock || 0)),
+          unit,
+          category: category.trim() || null,
+          vatRate: 10,
+        });
+      }}
+    >
+      <div>
+        <Label>Nombre *</Label>
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. Harina 00" required />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label>Stock actual</Label>
+          <Input
+            value={currentStock}
+            onChange={(e) => setCurrentStock(e.target.value.replace(/[^0-9]/g, ""))}
+            inputMode="numeric"
+            min={0}
+            placeholder="0"
+          />
+        </div>
+        <div>
+          <Label>Mínimo necesario</Label>
+          <Input
+            value={minStock}
+            onChange={(e) => setMinStock(e.target.value.replace(/[^0-9]/g, ""))}
+            inputMode="numeric"
+            min={0}
+            placeholder="10"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label>Unidad</Label>
+          <select
+            value={unit}
+            onChange={(e) => setUnit(e.target.value as ProductInput["unit"])}
+            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-[#1e2040] outline-none focus:border-[#4f6ef7]"
+          >
+            <option value="UNIT">Unidades (ud)</option>
+            <option value="KG">Kilogramos (kg)</option>
+            <option value="L">Litros (L)</option>
+            <option value="BOX">Cajas</option>
+          </select>
+        </div>
+        <div>
+          <Label>Categoría</Label>
+          <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Opcional" />
+        </div>
+      </div>
     </ModalShell>
   );
 }

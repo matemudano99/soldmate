@@ -7,6 +7,7 @@ export {
   CreatePersonModal,
   UploadDocumentModal,
   CreateCalendarTaskModal,
+  CreateProductModal,
 } from "./create-modals";
 export { AlertsBellPopover, HelpCenterPopover } from "./alerts-help-popovers";
 export { notify } from "./notify";
