@@ -25,20 +25,39 @@ const NAV_MAIN = [
   { href: "/calendar",   label: "Calendario",   Icon: Calendar        },
 ] as const;
 
-export function WebErpNavbar() {
-  const [collapsed, setCollapsed] = React.useState(false);
+const LS_NAV_COLLAPSED = "sm_navbar_collapsed";
 
-  React.useEffect(() => {
-    const saved = localStorage.getItem("sm_navbar_collapsed");
-    if (saved) {
-      setCollapsed(saved === "true");
-    }
+/** Preferencia en memoria: sobrevive al desmontaje de la navbar al cambiar de ruta (cada página monta su propio shell). */
+let navbarCollapsedMem: boolean | null = null;
+
+function readNavbarCollapsedFromStorage(): boolean {
+  try {
+    return localStorage.getItem(LS_NAV_COLLAPSED) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function WebErpNavbar() {
+  const [collapsed, setCollapsed] = React.useState(() =>
+    navbarCollapsedMem !== null ? navbarCollapsedMem : false
+  );
+
+  React.useLayoutEffect(() => {
+    const fromLs = readNavbarCollapsedFromStorage();
+    navbarCollapsedMem = fromLs;
+    setCollapsed((prev) => (prev === fromLs ? prev : fromLs));
   }, []);
 
   const toggleCollapse = () => {
     setCollapsed((prev) => {
       const next = !prev;
-      localStorage.setItem("sm_navbar_collapsed", String(next));
+      navbarCollapsedMem = next;
+      try {
+        localStorage.setItem(LS_NAV_COLLAPSED, String(next));
+      } catch {
+        /* ignore */
+      }
       return next;
     });
   };
@@ -179,7 +198,7 @@ export function WebErpNavbar() {
             {!collapsed ? <span className="text-sm font-medium">Configuración del negocio</span> : null}
           </Link>
         ) : null}
-        {!collapsed ? <HelpCenterPopover /> : null}
+        <HelpCenterPopover compact={collapsed} />
 
         <div className={`pt-3 flex items-center px-3 ${collapsed ? "justify-center" : "gap-2"}`}>
           <button

@@ -144,7 +144,12 @@ export function AlertsBellPopover() {
   );
 }
 
-export function HelpCenterPopover() {
+export type HelpCenterPopoverProps = {
+  /** Solo icono (p. ej. navbar colapsada), panel anclado a la derecha del botón. */
+  compact?: boolean;
+};
+
+export function HelpCenterPopover({ compact = false }: HelpCenterPopoverProps) {
   const [open, setOpen] = React.useState(false);
   const rootRef = React.useRef<HTMLDivElement>(null);
   useOutsideClose(rootRef, () => setOpen(false));
@@ -154,13 +159,23 @@ export function HelpCenterPopover() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-[#9095a0] hover:bg-gray-50 hover:text-gray-600 w-full"
+        title={compact ? "Centro de ayuda" : undefined}
+        aria-label="Centro de ayuda"
+        className={
+          compact
+            ? "relative flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-[#9095a0] transition-colors hover:bg-gray-50 hover:text-gray-600"
+            : "relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[#9095a0] transition-colors hover:bg-gray-50 hover:text-gray-600"
+        }
       >
         <HelpCircle size={16} strokeWidth={1.8} />
-        <span className="text-sm font-medium">Centro de ayuda</span>
+        {!compact ? <span className="text-sm font-medium">Centro de ayuda</span> : null}
       </button>
       {open ? (
-        <div className="absolute left-0 bottom-12 z-50 w-[320px] rounded-2xl border border-gray-100 bg-white p-3 shadow-[0_8px_28px_rgba(149,157,165,0.24)]">
+        <div
+          className={`absolute z-50 w-[min(320px,calc(100vw-6rem))] rounded-2xl border border-gray-100 bg-white p-3 shadow-[0_8px_28px_rgba(149,157,165,0.24)] ${
+            compact ? "left-full bottom-0 ml-2" : "bottom-12 left-0"
+          }`}
+        >
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Soporte</p>
           <div className="space-y-2">
             <div className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 p-3.5 text-blue-700">

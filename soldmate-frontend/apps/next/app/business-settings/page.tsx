@@ -6,7 +6,7 @@ import { SectionCard } from "../components/web-ui";
 import { ErpPageShell, AppTopHeader, notify } from "../shared/ui";
 import { businessProfileApi, type BusinessProfileResponse, describeNetworkError } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
-import { Building2, MapPin } from "lucide-react";
+import { Building2 } from "lucide-react";
 
 const COUNTRY_OPTIONS = [
   { code: "ES", name: "España" },
@@ -164,26 +164,26 @@ export default function BusinessSettingsPage() {
             Configuración del negocio
           </h1>
           <p className="text-sm text-gray-500 mb-5">
-            Datos generales del negocio actual (nombre, contacto, coordenadas, horario). Si tu usuario opera en varios negocios distintos, elige el activo en la cabecera con el desplegable «Negocio activo».
+            Datos generales del negocio actual (nombre, contacto, ubicación y horario). Si tu usuario opera en varios negocios distintos, elige el activo en la cabecera con el menú junto al nombre del negocio.
           </p>
           <div className="max-w-4xl grid gap-4">
             <SectionCard title="Identificación y plan" subtitle="Datos fiscales del negocio activo (solo lectura)">
               <div className="grid sm:grid-cols-3 gap-3 text-sm">
                 <div className="rounded-xl border border-gray-100 bg-[#f8f9fc] p-4">
-                  <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1">NIF / CIF</p>
+                  <span className="mb-1 block text-xs font-semibold text-gray-500">NIF / CIF</span>
                   <p className="font-mono font-semibold text-[#1e2040]">{business.taxId?.trim() || "—"}</p>
-                  <p className="text-[10px] text-gray-400 mt-2">Se asigna en el alta del negocio. Para corregirlo contacta con soporte.</p>
+                  <p className="mt-2 text-[10px] text-gray-400">Se asigna en el alta del negocio. Para corregirlo contacta con soporte.</p>
                 </div>
                 <div className="rounded-xl border border-gray-100 bg-[#f8f9fc] p-4">
-                  <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1">Plan</p>
+                  <span className="mb-1 block text-xs font-semibold text-gray-500">Plan de suscripción</span>
                   <p className="font-semibold text-[#1e2040]">
                     {business.subscriptionTier === "PREMIUM" ? "Premium" : "Gratuito"}
                   </p>
                 </div>
                 <div className="rounded-xl border border-gray-100 bg-[#f8f9fc] p-4">
-                  <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1">Moneda contable</p>
+                  <span className="mb-1 block text-xs font-semibold text-gray-500">Moneda contable</span>
                   <p className="font-semibold text-[#1e2040]">{business.currency ?? "EUR"}</p>
-                  <p className="text-[10px] text-gray-400 mt-2">Editable abajo con el resto de datos generales.</p>
+                  <p className="mt-2 text-[10px] text-gray-400">Editable abajo con el resto de datos generales.</p>
                 </div>
               </div>
             </SectionCard>
@@ -199,95 +199,131 @@ export default function BusinessSettingsPage() {
             >
               <form onSubmit={onSaveBusiness} className="space-y-3">
                 <div className="grid sm:grid-cols-2 gap-3">
-                  <input
-                    value={business.businessName}
-                    onChange={(e) => setBusiness((b) => ({ ...b, businessName: e.target.value }))}
-                    placeholder="Nombre del negocio"
-                    className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
-                  />
-                  <input
-                    value={business.phone ?? ""}
-                    onChange={(e) => setBusiness((b) => ({ ...b, phone: e.target.value }))}
-                    placeholder="Teléfono"
-                    className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
-                  />
-                  <input
-                    value={business.email ?? ""}
-                    onChange={(e) => setBusiness((b) => ({ ...b, email: e.target.value }))}
-                    placeholder="Email de negocio"
-                    className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
-                  />
-                  <input
-                    value={business.address ?? ""}
-                    onChange={(e) => setBusiness((b) => ({ ...b, address: e.target.value }))}
-                    placeholder="Dirección (sede fiscal o principal)"
-                    className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
-                  />
-                  <input
-                    value={business.city ?? ""}
-                    onChange={(e) => setBusiness((b) => ({ ...b, city: e.target.value }))}
-                    placeholder="Ciudad"
-                    className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
-                  />
-                  <input
-                    value={business.postalCode ?? ""}
-                    onChange={(e) => setBusiness((b) => ({ ...b, postalCode: e.target.value }))}
-                    placeholder="Código postal"
-                    className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
-                  />
-                  <select
-                    value={business.country ?? "ES"}
-                    onChange={(e) => setBusiness((b) => ({ ...b, country: e.target.value }))}
-                    className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
-                  >
-                    {COUNTRY_OPTIONS.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={business.currency ?? "EUR"}
-                    onChange={(e) => setBusiness((b) => ({ ...b, currency: e.target.value }))}
-                    className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
-                    title="Moneda ISO para importes y cierres"
-                  >
-                    {CURRENCY_OPTIONS.map((cur) => (
-                      <option key={cur} value={cur}>
-                        {cur}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={preferences.timezone}
-                    onChange={(e) => setPreferences((p) => ({ ...p, timezone: e.target.value }))}
-                    className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
-                  >
-                    {TIMEZONE_OPTIONS.map((tz) => (
-                      <option key={tz} value={tz}>
-                        {tz}
-                      </option>
-                    ))}
-                  </select>
-                  <label className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm flex items-center gap-2">
-                    <MapPin size={14} className="text-gray-400" />
+                  <div>
+                    <label htmlFor="business-name" className="mb-1 block text-xs font-semibold text-gray-500">
+                      Nombre del negocio
+                    </label>
                     <input
-                      type="number"
-                      step="0.0001"
-                      value={business.latitude ?? 0}
-                      onChange={(e) => setBusiness((b) => ({ ...b, latitude: Number(e.target.value) }))}
-                      placeholder="Latitud"
-                      className="w-full outline-none"
+                      id="business-name"
+                      value={business.businessName}
+                      onChange={(e) => setBusiness((b) => ({ ...b, businessName: e.target.value }))}
+                      placeholder="Ej. Soldmate Madrid"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
                     />
-                  </label>
-                  <input
-                    type="number"
-                    step="0.0001"
-                    value={business.longitude ?? 0}
-                    onChange={(e) => setBusiness((b) => ({ ...b, longitude: Number(e.target.value) }))}
-                    placeholder="Longitud"
-                    className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
-                  />
+                  </div>
+                  <div>
+                    <label htmlFor="business-phone" className="mb-1 block text-xs font-semibold text-gray-500">
+                      Teléfono
+                    </label>
+                    <input
+                      id="business-phone"
+                      value={business.phone ?? ""}
+                      onChange={(e) => setBusiness((b) => ({ ...b, phone: e.target.value }))}
+                      placeholder="+34 …"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="business-email" className="mb-1 block text-xs font-semibold text-gray-500">
+                      Email de negocio
+                    </label>
+                    <input
+                      id="business-email"
+                      type="email"
+                      value={business.email ?? ""}
+                      onChange={(e) => setBusiness((b) => ({ ...b, email: e.target.value }))}
+                      placeholder="contacto@empresa.com"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="business-address" className="mb-1 block text-xs font-semibold text-gray-500">
+                      Dirección
+                    </label>
+                    <input
+                      id="business-address"
+                      value={business.address ?? ""}
+                      onChange={(e) => setBusiness((b) => ({ ...b, address: e.target.value }))}
+                      placeholder="Calle, número, piso…"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="business-city" className="mb-1 block text-xs font-semibold text-gray-500">
+                      Ciudad
+                    </label>
+                    <input
+                      id="business-city"
+                      value={business.city ?? ""}
+                      onChange={(e) => setBusiness((b) => ({ ...b, city: e.target.value }))}
+                      placeholder="Ciudad"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="business-postal" className="mb-1 block text-xs font-semibold text-gray-500">
+                      Código postal
+                    </label>
+                    <input
+                      id="business-postal"
+                      value={business.postalCode ?? ""}
+                      onChange={(e) => setBusiness((b) => ({ ...b, postalCode: e.target.value }))}
+                      placeholder="28001"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="business-country" className="mb-1 block text-xs font-semibold text-gray-500">
+                      País
+                    </label>
+                    <select
+                      id="business-country"
+                      value={business.country ?? "ES"}
+                      onChange={(e) => setBusiness((b) => ({ ...b, country: e.target.value }))}
+                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+                    >
+                      {COUNTRY_OPTIONS.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="business-currency" className="mb-1 block text-xs font-semibold text-gray-500">
+                      Moneda contable (ISO)
+                    </label>
+                    <select
+                      id="business-currency"
+                      value={business.currency ?? "EUR"}
+                      onChange={(e) => setBusiness((b) => ({ ...b, currency: e.target.value }))}
+                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+                      title="Moneda para importes y cierres"
+                    >
+                      {CURRENCY_OPTIONS.map((cur) => (
+                        <option key={cur} value={cur}>
+                          {cur}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label htmlFor="business-timezone" className="mb-1 block text-xs font-semibold text-gray-500">
+                      Zona horaria
+                    </label>
+                    <select
+                      id="business-timezone"
+                      value={preferences.timezone}
+                      onChange={(e) => setPreferences((p) => ({ ...p, timezone: e.target.value }))}
+                      className="w-full max-w-md rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+                    >
+                      {TIMEZONE_OPTIONS.map((tz) => (
+                        <option key={tz} value={tz}>
+                          {tz}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs text-gray-500 font-semibold mb-2">Horario por día</label>
@@ -304,10 +340,13 @@ export default function BusinessSettingsPage() {
                       const isClosed = val === "CLOSED";
                       return (
                         <div key={day} className="flex items-center gap-3">
-                          <span className="w-8 text-xs font-semibold text-gray-500">{label}</span>
+                          <span className="w-10 text-xs font-semibold text-gray-600" id={`oh-day-${day}`}>
+                            {label}
+                          </span>
                           <input
                             type="checkbox"
                             checked={!isClosed}
+                            aria-label={`Abierto el ${label}`}
                             onChange={(e) => {
                               let p: Record<string, string> = {};
                               try {
@@ -323,6 +362,8 @@ export default function BusinessSettingsPage() {
                           {!isClosed ? (
                             <input
                               value={val}
+                              aria-labelledby={`oh-day-${day}`}
+                              aria-label={`Franja horaria (${label})`}
                               onChange={(e) => {
                                 let p: Record<string, string> = {};
                                 try {

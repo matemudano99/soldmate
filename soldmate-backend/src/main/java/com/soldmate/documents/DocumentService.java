@@ -4,7 +4,9 @@ import com.soldmate.auth.User;
 import com.soldmate.auth.UserRepository;
 import com.soldmate.company.Company;
 import com.soldmate.company.CompanyRepository;
+import com.soldmate.notifications.IncidentDocumentNotificationPublisher;
 import com.soldmate.storage.SupabaseStorageService;
+import com.soldmate.transaction.AfterCommitRunner;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -31,19 +33,25 @@ public class DocumentService {
     private final CompanyRepository          companyRepository;
     private final com.soldmate.activity.ActivityLogger activityLogger;
     private final SupabaseStorageService storageService;
+    private final AfterCommitRunner afterCommitRunner;
+    private final IncidentDocumentNotificationPublisher notificationPublisher;
 
     public DocumentService(DocumentRepository documentRepository,
                            DocumentCategoryRepository categoryRepository,
                            UserRepository userRepository,
                            CompanyRepository companyRepository,
                            com.soldmate.activity.ActivityLogger activityLogger,
-                           SupabaseStorageService storageService) {
+                           SupabaseStorageService storageService,
+                           AfterCommitRunner afterCommitRunner,
+                           IncidentDocumentNotificationPublisher notificationPublisher) {
         this.documentRepository = documentRepository;
         this.categoryRepository  = categoryRepository;
         this.userRepository      = userRepository;
         this.companyRepository   = companyRepository;
         this.activityLogger      = activityLogger;
         this.storageService      = storageService;
+        this.afterCommitRunner   = afterCommitRunner;
+        this.notificationPublisher = notificationPublisher;
     }
 
     // ─── Documentos ──────────────────────────────────────────────────────────
@@ -105,6 +113,11 @@ public class DocumentService {
 
         doc = documentRepository.save(doc);
         activityLogger.log(companyId, uploaderEmail, "DOCUMENT", "CREADO", "Subido: " + doc.getName());
+        String nameForNotify = doc.getName();
+        String typeForNotify = doc.getDocType();
+        afterCommitRunner.runAfterCommit(
+            () -> notificationPublisher.publishDocumentUploaded(companyId, nameForNotify, typeForNotify)
+        );
         return doc;
     }
 

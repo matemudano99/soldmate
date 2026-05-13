@@ -4,10 +4,21 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "app/lib/store";
 import { authApi, businessProfileApi, describeNetworkError } from "app/lib/api";
-import { Search } from "lucide-react";
+import { ChevronDown, Loader2, Search } from "lucide-react";
 import { AlertsBellPopover } from "./alerts-help-popovers";
 import { UserProfileMenu } from "./user-profile-menu";
 import { GlobalSearchModal } from "./global-search";
+
+function useOutsideClose(ref: React.RefObject<HTMLDivElement | null>, onClose: () => void) {
+  React.useEffect(() => {
+    function onPointerDown(event: MouseEvent) {
+      if (!ref.current) return;
+      if (!ref.current.contains(event.target as Node)) onClose();
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [ref, onClose]);
+}
 
 function formatTodayEs(): string {
   const dateStr = new Intl.DateTimeFormat("es-ES", {
@@ -36,6 +47,10 @@ export function AppTopHeader() {
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [switching, setSwitching] = React.useState(false);
   const [switchError, setSwitchError] = React.useState<string | null>(null);
+  const [companyMenuOpen, setCompanyMenuOpen] = React.useState(false);
+  const companyMenuRef = React.useRef<HTMLDivElement>(null);
+
+  useOutsideClose(companyMenuRef, () => setCompanyMenuOpen(false));
 
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
   const fromLinks = linkedCompanies.find((c) => c.companyId === companyId)?.companyName?.trim();
@@ -93,14 +108,17 @@ export function AppTopHeader() {
 
   const openSearch = () => setSearchOpen(true);
 
-  const onCompanyChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const nextId = Number(e.target.value);
-    if (!token || !Number.isFinite(nextId) || nextId === companyId) return;
+  const selectCompany = async (nextId: number) => {
+    if (!token || !Number.isFinite(nextId) || nextId === companyId) {
+      setCompanyMenuOpen(false);
+      return;
+    }
     setSwitchError(null);
     setSwitching(true);
     try {
       const data = await authApi.switchCompany(token, nextId);
       switchCompanySession(data);
+      setCompanyMenuOpen(false);
       router.refresh();
     } catch (err) {
       setSwitchError(describeNetworkError(err));
@@ -113,26 +131,56 @@ export function AppTopHeader() {
     <header className="flex flex-shrink-0 items-center justify-between gap-4 py-4 pl-16 pr-7 md:px-7">
       <div>
         <p className="text-xs text-gray-400">{todayCap}</p>
-        <h1 className="text-xl font-bold text-[#1e2040]">{displayName}</h1>
-        {showCompanyPicker ? (
-          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-gray-500">Negocio activo</span>
-            <select
-              value={companyId ?? ""}
-              onChange={onCompanyChange}
-              disabled={switching}
-              className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-[#1e2040] outline-none focus:border-[#4f6ef7] disabled:opacity-50"
-              aria-label="Cambiar de negocio"
-            >
-              {linkedCompanies.map((c) => (
-                <option key={c.companyId} value={c.companyId}>
-                  {c.companyName}
-                </option>
-              ))}
-            </select>
-            {switchError ? <span className="text-xs text-red-500">{switchError}</span> : null}
-          </div>
-        ) : null}
+        <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1">
+          <h1 className="min-w-0 truncate text-xl font-bold text-[#1e2040]">{displayName}</h1>
+          {showCompanyPicker ? (
+            <div className="relative shrink-0" ref={companyMenuRef}>
+              <button
+                type="button"
+                onClick={() => setCompanyMenuOpen((v) => !v)}
+                disabled={switching}
+                className="inline-flex items-center justify-center rounded-lg p-1 text-[#1e2040] outline-none transition hover:bg-white/80 focus-visible:ring-2 focus-visible:ring-[#4f6ef7]/40 disabled:opacity-50"
+                aria-haspopup="listbox"
+                aria-expanded={companyMenuOpen}
+                aria-label="Cambiar de negocio"
+                title="Cambiar de negocio"
+              >
+                {switching ? (
+                  <Loader2 className="size-5 animate-spin text-gray-500" aria-hidden />
+                ) : (
+                  <ChevronDown
+                    className={`size-5 text-gray-500 transition-transform ${companyMenuOpen ? "rotate-180" : ""}`}
+                    aria-hidden
+                  />
+                )}
+              </button>
+              {companyMenuOpen && !switching ? (
+                <ul
+                  role="listbox"
+                  aria-label="Negocios vinculados"
+                  className="absolute left-0 top-full z-50 mt-1 min-w-[12rem] max-w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-gray-100 bg-white py-1 shadow-lg"
+                >
+                  {linkedCompanies.map((c) => (
+                    <li key={c.companyId} role="presentation">
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={c.companyId === companyId}
+                        onClick={() => void selectCompany(c.companyId)}
+                        className={`flex w-full items-center px-3 py-2 text-left text-sm font-medium outline-none transition hover:bg-gray-50 ${
+                          c.companyId === companyId ? "bg-[#eef1f8] text-[#4f6ef7]" : "text-[#1e2040]"
+                        }`}
+                      >
+                        <span className="truncate">{c.companyName}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+        {switchError ? <p className="mt-1 text-xs text-red-500">{switchError}</p> : null}
       </div>
       <div className="flex items-center gap-3">
         <div className="relative hidden w-full max-w-56 cursor-text items-center md:flex">

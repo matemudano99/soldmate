@@ -4,7 +4,9 @@ import com.soldmate.auth.User;
 import com.soldmate.auth.UserRepository;
 import com.soldmate.company.Company;
 import com.soldmate.company.CompanyRepository;
+import com.soldmate.notifications.IncidentDocumentNotificationPublisher;
 import com.soldmate.storage.SupabaseStorageService;
+import com.soldmate.transaction.AfterCommitRunner;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -31,17 +33,23 @@ public class IncidentService {
     private final CompanyRepository  companyRepository;
     private final com.soldmate.activity.ActivityLogger activityLogger;
     private final SupabaseStorageService storageService;
+    private final AfterCommitRunner afterCommitRunner;
+    private final IncidentDocumentNotificationPublisher notificationPublisher;
 
     public IncidentService(IncidentRepository incidentRepository,
                            UserRepository userRepository,
                            CompanyRepository companyRepository,
                            com.soldmate.activity.ActivityLogger activityLogger,
-                           SupabaseStorageService storageService) {
+                           SupabaseStorageService storageService,
+                           AfterCommitRunner afterCommitRunner,
+                           IncidentDocumentNotificationPublisher notificationPublisher) {
         this.incidentRepository = incidentRepository;
         this.userRepository     = userRepository;
         this.companyRepository  = companyRepository;
         this.activityLogger     = activityLogger;
         this.storageService     = storageService;
+        this.afterCommitRunner  = afterCommitRunner;
+        this.notificationPublisher = notificationPublisher;
     }
 
     // ─── Lectura ─────────────────────────────────────────────────────────────
@@ -93,6 +101,7 @@ public class IncidentService {
 
         incident = incidentRepository.save(incident);
         activityLogger.log(companyId, reportedBy, "INCIDENT", "CREADO", incident.getTitle());
+        scheduleIncidentCreatedNotification(companyId, incident.getTitle(), false);
         return incident;
     }
 
@@ -130,6 +139,7 @@ public class IncidentService {
 
         incident = incidentRepository.save(incident);
         activityLogger.log(companyId, reportedBy, "INCIDENT", "CREADO", incident.getTitle());
+        scheduleIncidentCreatedNotification(companyId, incident.getTitle(), true);
         return incident;
     }
 
@@ -168,6 +178,13 @@ public class IncidentService {
             .orElseThrow(() -> new RuntimeException("Incidencia no encontrada"));
         incidentRepository.delete(incident);
         activityLogger.log(companyId, null, "INCIDENT", "ELIMINADO", incident.getTitle());
+    }
+
+    /** Tras commit: notificación en hilo del pool {@code soldmateAsyncExecutor} (no bloquea la respuesta). */
+    private void scheduleIncidentCreatedNotification(Long companyId, String title, boolean withPhoto) {
+        afterCommitRunner.runAfterCommit(
+            () -> notificationPublisher.publishIncidentCreated(companyId, title, withPhoto)
+        );
     }
 
 }

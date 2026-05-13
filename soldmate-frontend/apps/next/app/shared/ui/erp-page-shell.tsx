@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useAuthStore } from "app/lib/store";
 import { WebErpNavbar } from "../../components/web-erp-navbar";
 
 export type ErpPageShellProps = {
@@ -15,12 +16,18 @@ export type ErpPageShellProps = {
  * solo el contenido haga scroll; la sidebar queda alineada con el dashboard y el resto de vistas.
  */
 export function ErpPageShell({ children, className = "" }: ErpPageShellProps) {
+  const companyId = useAuthStore((s) => s.companyId);
   return (
     <div
       className={`flex h-[100dvh] min-h-0 overflow-hidden bg-[#eef1f8] text-[#1e2040] ${className}`.trim()}
     >
       <WebErpNavbar />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
+      <div
+        key={companyId ?? "no-company"}
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+      >
+        {children}
+      </div>
     </div>
   );
 }
