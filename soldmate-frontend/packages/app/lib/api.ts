@@ -33,6 +33,12 @@ export function describeNetworkError(err: unknown): string {
 
 // ─── Tipos que coinciden con los DTOs del backend ───────────────────────────
 
+export interface LinkedCompany {
+  companyId: number;
+  companyName: string;
+  role: string;
+}
+
 export interface AuthResponse {
   token: string;
   email: string;
@@ -42,6 +48,8 @@ export interface AuthResponse {
   firstName: string | null;
   lastName: string | null;
   avatarUrl?: string | null;
+  /** Negocios vinculados al mismo usuario (cada uno aislado por tenant). */
+  linkedCompanies: LinkedCompany[];
 }
 
 export interface ProductResponse {
@@ -256,6 +264,11 @@ export interface BusinessProfileResponse {
   latitude: number | null;
   longitude: number | null;
   openingHours: string | null;
+  /** NIF/CIF del negocio (solo lectura en UI salvo flujos futuros). */
+  taxId?: string | null;
+  /** ISO 4217 (EUR, USD, …). */
+  currency?: string;
+  subscriptionTier?: "FREE" | "PREMIUM";
 }
 
 export interface BusinessProfileInput extends BusinessProfileResponse {}
@@ -307,6 +320,13 @@ async function handleResponse<T>(res: Response): Promise<T> {
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
+function normalizeAuthResponse(data: AuthResponse): AuthResponse {
+  return {
+    ...data,
+    linkedCompanies: Array.isArray(data.linkedCompanies) ? data.linkedCompanies : [],
+  };
+}
+
 export const authApi = {
   /** Registra empresa + usuario dueño. Devuelve JWT. */
   register: async (data: RegisterRequest): Promise<AuthResponse> => {
@@ -315,7 +335,7 @@ export const authApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    return handleResponse<AuthResponse>(res);
+    return normalizeAuthResponse(await handleResponse<AuthResponse>(res));
   },
 
   /** Login con email + contraseña. Devuelve JWT. */
@@ -325,12 +345,20 @@ export const authApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-    return handleResponse<AuthResponse>(res);
+    return normalizeAuthResponse(await handleResponse<AuthResponse>(res));
   },
 
   me: async (token: string): Promise<AuthResponse> => {
     const res = await authFetch("/api/v1/auth/me", token);
-    return handleResponse<AuthResponse>(res);
+    return normalizeAuthResponse(await handleResponse<AuthResponse>(res));
+  },
+
+  switchCompany: async (token: string, companyId: number): Promise<AuthResponse> => {
+    const res = await authFetch("/api/v1/auth/switch-company", token, {
+      method: "POST",
+      body: JSON.stringify({ companyId }),
+    });
+    return normalizeAuthResponse(await handleResponse<AuthResponse>(res));
   },
 
   updateProfile: async (
@@ -341,7 +369,20 @@ export const authApi = {
       method: "PUT",
       body: JSON.stringify(data),
     });
-    return handleResponse<AuthResponse>(res);
+    return normalizeAuthResponse(await handleResponse<AuthResponse>(res));
+  },
+  changePassword: async (
+    token: string,
+    body: { currentPassword: string; newPassword: string }
+  ): Promise<void> => {
+    const res = await authFetch("/api/v1/auth/password", token, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || `Error ${res.status}`);
+    }
   },
   uploadAvatar: async (token: string, photo: File): Promise<{ avatarUrl: string }> => {
     const formData = new FormData();

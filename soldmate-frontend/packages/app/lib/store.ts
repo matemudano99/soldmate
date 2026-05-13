@@ -9,7 +9,7 @@
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import type { AuthResponse } from "./api";
+import type { AuthResponse, LinkedCompany } from "./api";
 import type { StateStorage } from "zustand/middleware";
 
 // ─── Tipos del estado ────────────────────────────────────────────────────────
@@ -24,6 +24,8 @@ interface AuthState {
   firstName: string | null;
   lastName: string | null;
   avatarUrl: string | null;
+  /** Negocios (tenants) vinculados al mismo usuario. */
+  linkedCompanies: LinkedCompany[];
 
   // ¿El usuario está autenticado?
   isAuthenticated: boolean;
@@ -34,6 +36,10 @@ interface AuthState {
   login: (data: AuthResponse, remember?: boolean) => void;
   logout: () => void;
   setProfile: (data: Pick<AuthResponse, "firstName" | "lastName" | "avatarUrl">) => void;
+  /** Actualiza token/rol/empresa/lista desde login, switch o /me. */
+  syncSession: (data: AuthResponse) => void;
+  /** Tras cambiar de negocio: nuevo JWT y contexto (misma cookie de sesión). */
+  switchCompany: (data: AuthResponse) => void;
   toggleEditMode: () => void;
   setEditMode: (value: boolean) => void;
 }
@@ -93,6 +99,11 @@ function getWebStorages() {
   return { local, session };
 }
 
+function isRememberLocalStorage(): boolean {
+  const { local } = getWebStorages();
+  return local?.getItem("soldmate-auth-storage") === "local";
+}
+
 // ─── Store ───────────────────────────────────────────────────────────────────
 
 export const useAuthStore = create<AuthState>()(
@@ -107,6 +118,7 @@ export const useAuthStore = create<AuthState>()(
   firstName: null,
   lastName: null,
   avatarUrl: null,
+  linkedCompanies: [],
   isAuthenticated: false,
   editMode: false,
 
@@ -136,7 +148,36 @@ export const useAuthStore = create<AuthState>()(
       firstName: data.firstName ?? null,
       lastName: data.lastName ?? null,
       avatarUrl: data.avatarUrl ?? null,
+      linkedCompanies: data.linkedCompanies ?? [],
       isAuthenticated: true,
+      editMode: false,
+    });
+  },
+
+  syncSession: (data: AuthResponse) => {
+    setCookie("sm_token", data.token, isRememberLocalStorage() ? 86400 : undefined);
+    set({
+      token: data.token,
+      email: data.email,
+      role: data.role,
+      tier: data.tier,
+      companyId: data.companyId ?? null,
+      firstName: data.firstName ?? null,
+      lastName: data.lastName ?? null,
+      avatarUrl: data.avatarUrl ?? null,
+      linkedCompanies: data.linkedCompanies ?? [],
+      isAuthenticated: true,
+    });
+  },
+
+  switchCompany: (data: AuthResponse) => {
+    setCookie("sm_token", data.token, isRememberLocalStorage() ? 86400 : undefined);
+    set({
+      token: data.token,
+      role: data.role,
+      tier: data.tier,
+      companyId: data.companyId ?? null,
+      linkedCompanies: data.linkedCompanies ?? [],
       editMode: false,
     });
   },
@@ -157,6 +198,7 @@ export const useAuthStore = create<AuthState>()(
       firstName: null,
       lastName: null,
       avatarUrl: null,
+      linkedCompanies: [],
       isAuthenticated: false,
       editMode: false,
     });
@@ -179,6 +221,11 @@ export const useAuthStore = create<AuthState>()(
     {
       name: "soldmate-auth",
       storage: createJSONStorage(resolvePersistStorage),
+      onRehydrateStorage: () => (state) => {
+        if (state && !Array.isArray(state.linkedCompanies)) {
+          state.linkedCompanies = [];
+        }
+      },
     }
   )
 );

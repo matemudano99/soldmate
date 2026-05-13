@@ -1,6 +1,8 @@
 package com.soldmate.seed;
 
 import com.soldmate.auth.User;
+import com.soldmate.auth.UserCompanyMembership;
+import com.soldmate.auth.UserCompanyMembershipRepository;
 import com.soldmate.auth.UserRepository;
 import com.soldmate.company.Company;
 import com.soldmate.company.CompanyRepository;
@@ -26,6 +28,7 @@ public class DemoDataSeeder implements CommandLineRunner {
 
     private final CompanyRepository companyRepository;
     private final UserRepository userRepository;
+    private final UserCompanyMembershipRepository membershipRepository;
     private final SupplierRepository supplierRepository;
     private final ProductRepository productRepository;
     private final IncidentRepository incidentRepository;
@@ -38,6 +41,7 @@ public class DemoDataSeeder implements CommandLineRunner {
 
     public DemoDataSeeder(CompanyRepository companyRepository,
                           UserRepository userRepository,
+                          UserCompanyMembershipRepository membershipRepository,
                           SupplierRepository supplierRepository,
                           ProductRepository productRepository,
                           IncidentRepository incidentRepository,
@@ -46,6 +50,7 @@ public class DemoDataSeeder implements CommandLineRunner {
                           PasswordEncoder passwordEncoder) {
         this.companyRepository = companyRepository;
         this.userRepository = userRepository;
+        this.membershipRepository = membershipRepository;
         this.supplierRepository = supplierRepository;
         this.productRepository = productRepository;
         this.incidentRepository = incidentRepository;
@@ -131,16 +136,20 @@ public class DemoDataSeeder implements CommandLineRunner {
     }
 
     private User ensureUser(Company company, String email, String firstName, String lastName, User.Role role) {
-        return userRepository.findByEmail(email).orElseGet(() -> {
-            User user = new User();
-            user.setCompany(company);
-            user.setEmail(email);
-            user.setFirstName(firstName);
-            user.setLastName(lastName);
-            user.setRole(role);
-            user.setPassword(passwordEncoder.encode("Demo12345!"));
-            return userRepository.save(user);
+        User user = userRepository.findByEmail(email).orElseGet(() -> {
+            User u = new User();
+            u.setCompany(company);
+            u.setEmail(email);
+            u.setFirstName(firstName);
+            u.setLastName(lastName);
+            u.setRole(role);
+            u.setPassword(passwordEncoder.encode("Demo12345!"));
+            return userRepository.save(u);
         });
+        if (!membershipRepository.existsByUser_IdAndCompany_Id(user.getId(), company.getId())) {
+            membershipRepository.save(UserCompanyMembership.of(user, company, role));
+        }
+        return user;
     }
 
     private void ensureSupplier(Company company, String name, String category) {

@@ -1,6 +1,8 @@
 package com.soldmate.crm;
 
 import com.soldmate.auth.User;
+import com.soldmate.auth.UserCompanyMembership;
+import com.soldmate.auth.UserCompanyMembershipRepository;
 import com.soldmate.auth.UserRepository;
 import com.soldmate.company.Company;
 import com.soldmate.company.CompanyRepository;
@@ -18,15 +20,18 @@ public class ContactService {
     private final ContactRepository contactRepository;
     private final CompanyRepository companyRepository;
     private final UserRepository userRepository;
+    private final UserCompanyMembershipRepository membershipRepository;
     private final PasswordEncoder passwordEncoder;
 
     public ContactService(ContactRepository contactRepository,
                           CompanyRepository companyRepository,
                           UserRepository userRepository,
+                          UserCompanyMembershipRepository membershipRepository,
                           PasswordEncoder passwordEncoder) {
         this.contactRepository = contactRepository;
         this.companyRepository = companyRepository;
         this.userRepository = userRepository;
+        this.membershipRepository = membershipRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -130,6 +135,7 @@ public class ContactService {
         user.setCompany(company);
         user.setRole(resolveRole(req.role()));
         userRepository.save(user);
+        membershipRepository.save(UserCompanyMembership.of(user, company, user.getRole()));
     }
 
     private User.Role resolveRole(String rawRole) {

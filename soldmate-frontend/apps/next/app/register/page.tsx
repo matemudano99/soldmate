@@ -62,6 +62,7 @@ export default function RegisterPage() {
       router.push("/dashboard");
     } catch (err: unknown) {
       setError(describeNetworkError(err));
+    } finally {
       setLoading(false);
     }
   };
@@ -91,7 +92,7 @@ export default function RegisterPage() {
             Empieza en<br />menos de 2 min
           </h1>
           <p className="text-slate-300 text-sm leading-relaxed max-w-xs">
-            Crea tu cuenta OWNER, añade a tu equipo y empieza a gestionar tu negocio hoy mismo.
+            Crea tu cuenta OWNER o, si ya tienes email en Soldmate, registra <strong>otro negocio</strong> con la misma contraseña (nombre y NIF nuevos, distintos de los ya dados de alta).
           </p>
 
           {/* Steps preview */}
@@ -248,6 +249,9 @@ export default function RegisterPage() {
                     placeholder="maria@mirestaurante.com"
                     className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-[#1e2040] outline-none focus:border-[#4f6ef7] focus:ring-2 focus:ring-[#4f6ef7]/10 shadow-sm"
                   />
+                  <p className="text-[11px] text-gray-500 leading-snug mt-1.5">
+                    ¿Ya tienes cuenta? Mismo email y tu contraseña: se creará un <strong>nuevo negocio</strong> vinculado a ti. El nombre comercial no puede coincidir con otro de tus negocios; el NIF/CIF debe ser único en la plataforma.
+                  </p>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1.5 flex items-center gap-1.5">

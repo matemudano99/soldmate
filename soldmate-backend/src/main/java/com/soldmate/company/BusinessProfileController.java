@@ -1,6 +1,7 @@
 package com.soldmate.company;
 
 import com.soldmate.auth.JwtUtil;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -29,7 +30,10 @@ public class BusinessProfileController {
         String timezone,
         Double latitude,
         Double longitude,
-        String openingHours
+        String openingHours,
+        String taxId,
+        String currency,
+        String subscriptionTier
     ) {
         public static BusinessProfileResponse from(Company c) {
             return new BusinessProfileResponse(
@@ -43,7 +47,10 @@ public class BusinessProfileController {
                 c.getTimezone(),
                 c.getLatitude(),
                 c.getLongitude(),
-                c.getOpeningHoursJson()
+                c.getOpeningHoursJson(),
+                c.getTaxId(),
+                c.getCurrency(),
+                c.getSubscriptionTier().name()
             );
         }
     }
@@ -59,7 +66,8 @@ public class BusinessProfileController {
         String timezone,
         Double latitude,
         Double longitude,
-        String openingHours
+        String openingHours,
+        String currency
     ) {}
 
     @GetMapping
@@ -75,7 +83,7 @@ public class BusinessProfileController {
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<BusinessProfileResponse> updateProfile(
         @RequestHeader("Authorization") String authHeader,
-        @RequestBody UpdateBusinessProfileRequest req
+        @RequestBody @Valid UpdateBusinessProfileRequest req
     ) {
         Long companyId = jwtUtil.extractCompanyId(authHeader.substring(7));
         Company company = companyRepository.findById(companyId).orElseThrow();
@@ -91,6 +99,9 @@ public class BusinessProfileController {
         company.setLatitude(req.latitude());
         company.setLongitude(req.longitude());
         company.setOpeningHoursJson(req.openingHours());
+        if (req.currency() != null && !req.currency().isBlank() && req.currency().length() == 3) {
+            company.setCurrency(req.currency().toUpperCase());
+        }
 
         companyRepository.save(company);
         return ResponseEntity.ok(BusinessProfileResponse.from(company));

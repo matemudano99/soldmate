@@ -8,6 +8,7 @@ import com.soldmate.storage.SupabaseStorageService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
@@ -15,50 +16,49 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 /**
- * AuthController: registro y login.
- *
- * Diferencia respecto a la versión anterior:
- *   - Al registrar, llamamos a settingsService.createDefaultSettings(company)
- *     para que cada empresa nueva tenga sus ajustes de IVA y categorías listos.
+ * AuthController: registro, login y cambio de negocio activo (JWT con otro {@code companyId}).
  */
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
-    private final UserRepository          userRepository;
-    private final CompanyRepository       companyRepository;
-    private final PasswordEncoder         passwordEncoder;
-    private final JwtUtil                 jwtUtil;
-    private final AuthRateLimiter         authRateLimiter;
-    private final NifCifValidator         nifCifValidator;
-    private final CompanySettingsService  settingsService;
-    private final SupabaseStorageService  storageService;
+    private final UserRepository userRepository;
+    private final CompanyRepository companyRepository;
+    private final UserCompanyMembershipRepository membershipRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
+    private final AuthRateLimiter authRateLimiter;
+    private final NifCifValidator nifCifValidator;
+    private final CompanySettingsService settingsService;
+    private final SupabaseStorageService storageService;
 
     public AuthController(UserRepository userRepository,
                           CompanyRepository companyRepository,
+                          UserCompanyMembershipRepository membershipRepository,
                           PasswordEncoder passwordEncoder,
                           JwtUtil jwtUtil,
                           AuthRateLimiter authRateLimiter,
                           NifCifValidator nifCifValidator,
                           CompanySettingsService settingsService,
                           SupabaseStorageService storageService) {
-        this.userRepository   = userRepository;
+        this.userRepository = userRepository;
         this.companyRepository = companyRepository;
-        this.passwordEncoder  = passwordEncoder;
-        this.jwtUtil          = jwtUtil;
-        this.authRateLimiter  = authRateLimiter;
-        this.nifCifValidator  = nifCifValidator;
-        this.settingsService  = settingsService;
-        this.storageService   = storageService;
+        this.membershipRepository = membershipRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtUtil = jwtUtil;
+        this.authRateLimiter = authRateLimiter;
+        this.nifCifValidator = nifCifValidator;
+        this.settingsService = settingsService;
+        this.storageService = storageService;
     }
-
-    // ─── DTOs ────────────────────────────────────────────────────────────────
 
     public record RegisterRequest(
         @NotBlank String companyName,
@@ -80,16 +80,49 @@ public class AuthController {
         @NotBlank String lastName
     ) {}
 
+    public record ChangePasswordRequest(
+        @NotBlank String currentPassword,
+        @NotBlank @Size(min = 8) String newPassword
+    ) {}
+
+    public record LinkedCompany(long companyId, String companyName, String role) {}
+
     public record AuthResponse(
         String token,
         String email,
         String role,
         String tier,
-        Long   companyId,
+        Long companyId,
         String firstName,
         String lastName,
-        String avatarUrl
+        String avatarUrl,
+        List<LinkedCompany> linkedCompanies
     ) {}
+
+    public record SwitchCompanyRequest(@NotNull Long companyId) {}
+
+    private List<LinkedCompany> linkedCompaniesFor(User user) {
+        return membershipRepository.findByUser_IdOrderByCompany_NameAsc(user.getId()).stream()
+            .map(m -> new LinkedCompany(m.getCompany().getId(), m.getCompany().getName(), m.getRole().name()))
+            .toList();
+    }
+
+    private UserCompanyMembership membershipForActiveCompany(User user) {
+        Long companyId = user.getCompany().getId();
+        return membershipRepository.findByUser_IdAndCompany_Id(user.getId(), companyId)
+            .orElseThrow(() -> new IllegalStateException("Usuario sin membresía en el negocio principal"));
+    }
+
+    private boolean userAlreadyHasCompanyNameIgnoreCase(User user, String companyName) {
+        String n = companyName == null ? "" : companyName.trim();
+        if (n.isEmpty()) {
+            return false;
+        }
+        return membershipRepository.findByUser_IdOrderByCompany_NameAsc(user.getId()).stream()
+            .map(m -> m.getCompany().getName())
+            .filter(name -> name != null && !name.isBlank())
+            .anyMatch(name -> name.trim().equalsIgnoreCase(n));
+    }
 
     // ─── POST /api/v1/auth/register ──────────────────────────────────────────
 
@@ -103,34 +136,84 @@ public class AuthController {
             return ResponseEntity.badRequest().body("La contraseña debe incluir mayúscula, minúscula y número.");
         }
 
-
-        // 1. Validar NIF/CIF para empresas españolas
         if (!nifCifValidator.isValid(req.taxId(), req.country())) {
             return ResponseEntity.badRequest()
                 .body("NIF/CIF inválido para el país: " + req.country());
         }
 
-        // 2. Email único
-        if (userRepository.existsByEmail(req.email())) {
+        String normalizedTaxId = req.taxId().toUpperCase().trim();
+        if (companyRepository.findByTaxId(normalizedTaxId).isPresent()) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body("Ya existe un usuario con ese email");
+                .body("Ya existe un negocio registrado con ese NIF/CIF.");
         }
 
-        // 3. Crear empresa
+        String email = req.email().toLowerCase().trim();
+        var existingUserOpt = userRepository.findByEmail(email);
+
+        if (existingUserOpt.isPresent()) {
+            User user = existingUserOpt.get();
+            if (!passwordEncoder.matches(req.password(), user.getPassword())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("La contraseña no coincide con la cuenta de este email. Inténtalo de nuevo o recupera el acceso.");
+            }
+            if (userAlreadyHasCompanyNameIgnoreCase(user, req.companyName())) {
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("Ya tienes otro negocio vinculado con ese nombre comercial. Elige un nombre distinto.");
+            }
+
+            Company company = new Company();
+            company.setName(req.companyName().trim());
+            company.setTaxId(normalizedTaxId);
+            company.setCountry(req.country().toUpperCase());
+            company.setCurrency("EUR");
+            companyRepository.save(company);
+
+            settingsService.createDefaultSettings(company);
+
+            membershipRepository.save(UserCompanyMembership.of(user, company, User.Role.OWNER));
+            user.setCompany(company);
+            if (req.firstName() != null && !req.firstName().isBlank()) {
+                user.setFirstName(req.firstName().trim());
+            }
+            if (req.lastName() != null && !req.lastName().isBlank()) {
+                user.setLastName(req.lastName().trim());
+            }
+            userRepository.save(user);
+
+            UserCompanyMembership active = membershipForActiveCompany(user);
+            String token = jwtUtil.generateToken(
+                user.getEmail(),
+                company.getId(),
+                active.getRole().name(),
+                company.getSubscriptionTier().name()
+            );
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(
+                new AuthResponse(
+                    token,
+                    user.getEmail(),
+                    active.getRole().name(),
+                    company.getSubscriptionTier().name(),
+                    company.getId(),
+                    user.getFirstName(),
+                    user.getLastName(),
+                    user.getAvatarUrl(),
+                    linkedCompaniesFor(user)
+                )
+            );
+        }
+
         Company company = new Company();
-        company.setName(req.companyName());
-        company.setTaxId(req.taxId().toUpperCase().trim());
+        company.setName(req.companyName().trim());
+        company.setTaxId(normalizedTaxId);
         company.setCountry(req.country().toUpperCase());
-        company.setCurrency("EUR"); // por ahora EUR por defecto
+        company.setCurrency("EUR");
         companyRepository.save(company);
 
-        // 4. Crear ajustes por defecto (IVA, categorías, estados de pedido)
-        // Esto se ejecuta dentro de una transacción: si falla, se deshace todo
         settingsService.createDefaultSettings(company);
 
-        // 5. Crear usuario dueño
         User user = new User();
-        user.setEmail(req.email().toLowerCase().trim());
+        user.setEmail(email);
         user.setPassword(passwordEncoder.encode(req.password()));
         user.setFirstName(req.firstName());
         user.setLastName(req.lastName());
@@ -138,18 +221,28 @@ public class AuthController {
         user.setCompany(company);
         userRepository.save(user);
 
-        // 6. Generar JWT y responder
+        membershipRepository.save(UserCompanyMembership.of(user, company, User.Role.OWNER));
+
+        UserCompanyMembership active = membershipForActiveCompany(user);
         String token = jwtUtil.generateToken(
             user.getEmail(),
             company.getId(),
-            user.getRole().name(),
+            active.getRole().name(),
             company.getSubscriptionTier().name()
         );
 
         return ResponseEntity.status(HttpStatus.CREATED).body(
-            new AuthResponse(token, user.getEmail(), user.getRole().name(),
-                             company.getSubscriptionTier().name(), company.getId(),
-                             user.getFirstName(), user.getLastName(), user.getAvatarUrl())
+            new AuthResponse(
+                token,
+                user.getEmail(),
+                active.getRole().name(),
+                company.getSubscriptionTier().name(),
+                company.getId(),
+                user.getFirstName(),
+                user.getLastName(),
+                user.getAvatarUrl(),
+                linkedCompaniesFor(user)
+            )
         );
     }
 
@@ -161,27 +254,71 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .body("Demasiados intentos de login. Inténtalo de nuevo en unos minutos.");
         }
-        User user = userRepository.findByEmail(req.email().toLowerCase().trim())
-            .orElse(null);
+        User user = userRepository.findByEmail(req.email().toLowerCase().trim()).orElse(null);
 
-        // Mismo mensaje para email y contraseña incorrectos (evita enumeración)
         if (user == null || !passwordEncoder.matches(req.password(), user.getPassword())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body("Credenciales incorrectas");
         }
 
-        Company company = user.getCompany();
+        UserCompanyMembership active = membershipForActiveCompany(user);
+        Company company = active.getCompany();
         String token = jwtUtil.generateToken(
             user.getEmail(),
             company.getId(),
-            user.getRole().name(),
+            active.getRole().name(),
             company.getSubscriptionTier().name()
         );
 
         return ResponseEntity.ok(
-            new AuthResponse(token, user.getEmail(), user.getRole().name(),
-                             company.getSubscriptionTier().name(), company.getId(),
-                             user.getFirstName(), user.getLastName(), user.getAvatarUrl())
+            new AuthResponse(
+                token,
+                user.getEmail(),
+                active.getRole().name(),
+                company.getSubscriptionTier().name(),
+                company.getId(),
+                user.getFirstName(),
+                user.getLastName(),
+                user.getAvatarUrl(),
+                linkedCompaniesFor(user)
+            )
+        );
+    }
+
+    // ─── POST /api/v1/auth/switch-company ────────────────────────────────────
+
+    @PostMapping("/switch-company")
+    public ResponseEntity<AuthResponse> switchCompany(
+        @RequestHeader("Authorization") String authHeader,
+        @Valid @RequestBody SwitchCompanyRequest req
+    ) {
+        String tokenIn = authHeader.substring(7);
+        String email = jwtUtil.extractEmail(tokenIn);
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+
+        UserCompanyMembership mem = membershipRepository.findByUser_IdAndCompany_Id(user.getId(), req.companyId())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Sin acceso a ese negocio"));
+
+        Company company = mem.getCompany();
+        String newToken = jwtUtil.generateToken(
+            user.getEmail(),
+            company.getId(),
+            mem.getRole().name(),
+            company.getSubscriptionTier().name()
+        );
+
+        return ResponseEntity.ok(
+            new AuthResponse(
+                newToken,
+                user.getEmail(),
+                mem.getRole().name(),
+                company.getSubscriptionTier().name(),
+                company.getId(),
+                user.getFirstName(),
+                user.getLastName(),
+                user.getAvatarUrl(),
+                linkedCompaniesFor(user)
+            )
         );
     }
 
@@ -189,23 +326,28 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<?> me(@RequestHeader("Authorization") String authHeader) {
-        String email = jwtUtil.extractEmail(authHeader.substring(7));
+        String token = authHeader.substring(7);
+        String email = jwtUtil.extractEmail(token);
         User user = userRepository.findByEmail(email).orElse(null);
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Usuario no encontrado");
         }
 
-        Company company = user.getCompany();
+        Long companyId = jwtUtil.extractCompanyId(token);
+        UserCompanyMembership mem = membershipRepository.findByUser_IdAndCompany_Id(user.getId(), companyId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sesión inválida para el negocio"));
+
         return ResponseEntity.ok(
             new AuthResponse(
-                authHeader.substring(7),
+                token,
                 user.getEmail(),
-                user.getRole().name(),
-                company.getSubscriptionTier().name(),
-                company.getId(),
+                mem.getRole().name(),
+                mem.getCompany().getSubscriptionTier().name(),
+                companyId,
                 user.getFirstName(),
                 user.getLastName(),
-                user.getAvatarUrl()
+                user.getAvatarUrl(),
+                linkedCompaniesFor(user)
             )
         );
     }
@@ -217,7 +359,8 @@ public class AuthController {
         @RequestHeader("Authorization") String authHeader,
         @Valid @RequestBody UpdateProfileRequest req
     ) {
-        String email = jwtUtil.extractEmail(authHeader.substring(7));
+        String token = authHeader.substring(7);
+        String email = jwtUtil.extractEmail(token);
         User user = userRepository.findByEmail(email).orElse(null);
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Usuario no encontrado");
@@ -227,19 +370,51 @@ public class AuthController {
         user.setLastName(req.lastName().trim());
         userRepository.save(user);
 
-        Company company = user.getCompany();
+        Long companyId = jwtUtil.extractCompanyId(token);
+        UserCompanyMembership mem = membershipRepository.findByUser_IdAndCompany_Id(user.getId(), companyId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+
         return ResponseEntity.ok(
             new AuthResponse(
-                authHeader.substring(7),
+                token,
                 user.getEmail(),
-                user.getRole().name(),
-                company.getSubscriptionTier().name(),
-                company.getId(),
+                mem.getRole().name(),
+                mem.getCompany().getSubscriptionTier().name(),
+                companyId,
                 user.getFirstName(),
                 user.getLastName(),
-                user.getAvatarUrl()
+                user.getAvatarUrl(),
+                linkedCompaniesFor(user)
             )
         );
+    }
+
+    // ─── PUT /api/v1/auth/password ───────────────────────────────────────────
+
+    @PutMapping("/password")
+    public ResponseEntity<?> changePassword(
+        @RequestHeader("Authorization") String authHeader,
+        @Valid @RequestBody ChangePasswordRequest req
+    ) {
+        String token = authHeader.substring(7);
+        String email = jwtUtil.extractEmail(token);
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Usuario no encontrado");
+        }
+        if (!passwordEncoder.matches(req.currentPassword(), user.getPassword())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("La contraseña actual no es correcta.");
+        }
+        if (!isPasswordStrong(req.newPassword())) {
+            return ResponseEntity.badRequest()
+                .body("La nueva contraseña debe tener al menos 8 caracteres e incluir mayúscula, minúscula y número.");
+        }
+        if (passwordEncoder.matches(req.newPassword(), user.getPassword())) {
+            return ResponseEntity.badRequest().body("La nueva contraseña debe ser distinta de la actual.");
+        }
+        user.setPassword(passwordEncoder.encode(req.newPassword()));
+        userRepository.save(user);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping(value = "/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -247,7 +422,8 @@ public class AuthController {
         @RequestHeader("Authorization") String authHeader,
         @RequestParam("photo") MultipartFile photo
     ) {
-        String email = jwtUtil.extractEmail(authHeader.substring(7));
+        String token = authHeader.substring(7);
+        String email = jwtUtil.extractEmail(token);
         User user = userRepository.findByEmail(email).orElse(null);
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Usuario no encontrado");
@@ -261,8 +437,10 @@ public class AuthController {
             return ResponseEntity.badRequest().body("La imagen no puede superar 5 MB");
         }
 
+        Long companyId = jwtUtil.extractCompanyId(token);
+
         try {
-            String avatarUrl = storageService.upload(photo, user.getCompany().getId(), ".jpg", "incidents", "avatars");
+            String avatarUrl = storageService.upload(photo, companyId, ".jpg", "incidents", "avatars");
             user.setAvatarUrl(avatarUrl);
             userRepository.save(user);
             return ResponseEntity.ok(Map.of("avatarUrl", avatarUrl));

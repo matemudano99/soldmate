@@ -172,11 +172,13 @@ export function RegisterScreen() {
       login(data);
       router.replace("/dashboard");
     } catch (err: any) {
-      setError(err.message ?? "Error al crear la cuenta");
-      // Volvemos al paso con error para que el usuario lo corrija
-      if (err.message?.toLowerCase().includes("nif") ||
-          err.message?.toLowerCase().includes("cif")) {
+      const msg = err.message ?? "Error al crear la cuenta";
+      setError(msg);
+      const lower = msg.toLowerCase();
+      if (lower.includes("nif") || lower.includes("cif") || lower.includes("nombre comercial")) {
         setStep(1);
+      } else if (lower.includes("contraseña no coincide")) {
+        setStep(2);
       }
     } finally {
       setLoading(false);
@@ -303,6 +305,9 @@ export function RegisterScreen() {
               autoCapitalize="none"
               keyboardType="email-address"
             />
+            <Text className="text-slate-500 text-xs -mt-2">
+              Si ya tienes cuenta, mismo email y contraseña: nuevo negocio (nombre distinto a tus otros negocios y NIF/CIF no usado antes).
+            </Text>
             <Input
               label="Contraseña"
               value={form.password}

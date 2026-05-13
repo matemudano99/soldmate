@@ -7,7 +7,7 @@ import Image from "next/image";
 import {
   LayoutDashboard, Users, CreditCard, BarChart2,
   FileText, Calendar, Power, ChevronDown, PanelLeftClose, PanelLeftOpen, X,
-  Wrench, Truck, Package, Activity, ChevronLeft, ChevronRight
+  Wrench, Truck, Package, Activity, ChevronLeft, ChevronRight, Building2
 } from "lucide-react";
 import { useAuthStore } from "app/lib/store";
 import { HelpCenterPopover } from "../shared/ui/alerts-help-popovers";
@@ -161,6 +161,24 @@ export function WebErpNavbar() {
 
       {/* Bottom */}
       <div className="px-3 pb-5 pt-3 border-t border-gray-50 space-y-0.5">
+        {role === "OWNER" ? (
+          <Link
+            href="/business-settings"
+            onClick={() => setMobileOpen(false)}
+            className={`relative flex items-center ${collapsed ? "justify-center" : "gap-3"} px-3 py-2.5 rounded-xl transition-colors ${
+              pathname.startsWith("/business-settings")
+                ? "bg-[#f0f3ff] text-[#4f6ef7]"
+                : "text-[#9095a0] hover:bg-gray-50 hover:text-gray-600"
+            }`}
+            title="Configuración del negocio"
+          >
+            {pathname.startsWith("/business-settings") && (
+              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-[#4f6ef7] rounded-r-full" />
+            )}
+            <Building2 size={16} strokeWidth={pathname.startsWith("/business-settings") ? 2.2 : 1.8} />
+            {!collapsed ? <span className="text-sm font-medium">Configuración del negocio</span> : null}
+          </Link>
+        ) : null}
         {!collapsed ? <HelpCenterPopover /> : null}
 
         <div className={`pt-3 flex items-center px-3 ${collapsed ? "justify-center" : "gap-2"}`}>
