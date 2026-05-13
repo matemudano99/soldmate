@@ -8,15 +8,13 @@ import java.util.List;
  */
 public record DailyFinanceUpsertCommand(
         BigDecimal cashOpening,
-        BigDecimal incomeDataphone,
-        BigDecimal incomeJustEat,
-        BigDecimal incomeGlovo,
-        BigDecimal incomeUberEats,
+        List<DailyFinanceIncomeChannel> incomeChannels,
         BigDecimal cashClosing,
         String notes,
         List<DailyFinanceExpenseLine> expenseLines
 ) {
     public DailyFinanceUpsertCommand {
+        incomeChannels = incomeChannels == null ? List.of() : List.copyOf(incomeChannels);
         expenseLines = expenseLines == null ? List.of() : List.copyOf(expenseLines);
     }
 }

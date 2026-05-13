@@ -55,7 +55,9 @@ public class SchemaMigrationRunner implements ApplicationRunner {
             new MigrationStep("012", "Product supplier FK and inventory_categories hardening", this::migrateProductSupplierAndInventoryCategories),
             new MigrationStep("013", "Create daily_finance_entries for manual daily totals", this::createDailyFinanceEntriesTable),
             new MigrationStep("014", "Extend daily_finance_entries and add daily_finance_lines", this::extendDailyFinanceAndCreateLines),
-            new MigrationStep("015", "Cash register daily model and fix Europe/Malaga timezone", this::migrateFinanceCashRegisterDailyModel)
+            new MigrationStep("015", "Cash register daily model and fix Europe/Malaga timezone", this::migrateFinanceCashRegisterDailyModel),
+            new MigrationStep("016", "Finance dynamic income channels json", this::migrateFinanceIncomeChannelsJson),
+            new MigrationStep("017", "Company income channel name templates for daily finance", this::migrateCompanyIncomeChannelTemplates)
         );
 
         for (MigrationStep step : steps) {
@@ -469,6 +471,60 @@ public class SchemaMigrationRunner implements ApplicationRunner {
         jdbcTemplate.execute("ALTER TABLE daily_finance_entries ALTER COLUMN cash_closing SET NOT NULL");
         jdbcTemplate.execute("ALTER TABLE daily_finance_entries ALTER COLUMN expense_lines_json SET DEFAULT '[]'");
         jdbcTemplate.execute("ALTER TABLE daily_finance_entries ALTER COLUMN expense_lines_json SET NOT NULL");
+    }
+
+    private void migrateFinanceIncomeChannelsJson() {
+        jdbcTemplate.execute("""
+            ALTER TABLE daily_finance_entries
+              ADD COLUMN IF NOT EXISTS income_channels_json TEXT
+            """);
+        jdbcTemplate.execute("""
+            UPDATE daily_finance_entries SET income_channels_json = '[]'
+            WHERE income_channels_json IS NULL OR trim(income_channels_json) = ''
+            """);
+        jdbcTemplate.execute("""
+            UPDATE daily_finance_entries
+            SET income_channels_json = (
+              '[' ||
+              CASE WHEN COALESCE(income_dataphone,0) > 0
+                THEN '{"name":"Datáfono (TPV)","amount":' || trim(to_char(income_dataphone, 'FM9999999999990.00')) || '}'
+                ELSE '' END ||
+              CASE WHEN COALESCE(income_just_eat,0) > 0
+                THEN CASE WHEN COALESCE(income_dataphone,0) > 0 THEN ',' ELSE '' END ||
+                     '{"name":"Just Eat","amount":' || trim(to_char(income_just_eat, 'FM9999999999990.00')) || '}'
+                ELSE '' END ||
+              CASE WHEN COALESCE(income_glovo,0) > 0
+                THEN CASE WHEN COALESCE(income_dataphone,0) > 0 OR COALESCE(income_just_eat,0) > 0 THEN ',' ELSE '' END ||
+                     '{"name":"Glovo","amount":' || trim(to_char(income_glovo, 'FM9999999999990.00')) || '}'
+                ELSE '' END ||
+              CASE WHEN COALESCE(income_uber_eats,0) > 0
+                THEN CASE WHEN COALESCE(income_dataphone,0) > 0 OR COALESCE(income_just_eat,0) > 0 OR COALESCE(income_glovo,0) > 0 THEN ',' ELSE '' END ||
+                     '{"name":"Uber Eats","amount":' || trim(to_char(income_uber_eats, 'FM9999999999990.00')) || '}'
+                ELSE '' END ||
+              ']'
+            )
+            WHERE income_channels_json = '[]'
+            """);
+        jdbcTemplate.execute("""
+            UPDATE daily_finance_entries
+            SET income_channels_json = '[{"name":"Datáfono (TPV)","amount":0.00}]'
+            WHERE income_channels_json = '[]'
+            """);
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries ALTER COLUMN income_channels_json SET DEFAULT '[]'");
+        jdbcTemplate.execute("ALTER TABLE daily_finance_entries ALTER COLUMN income_channels_json SET NOT NULL");
+    }
+
+    private void migrateCompanyIncomeChannelTemplates() {
+        jdbcTemplate.execute("""
+            ALTER TABLE companies
+              ADD COLUMN IF NOT EXISTS income_channel_templates_json TEXT
+            """);
+        jdbcTemplate.execute("""
+            UPDATE companies SET income_channel_templates_json = '[]'
+            WHERE income_channel_templates_json IS NULL OR trim(income_channel_templates_json) = ''
+            """);
+        jdbcTemplate.execute("ALTER TABLE companies ALTER COLUMN income_channel_templates_json SET DEFAULT '[]'");
+        jdbcTemplate.execute("ALTER TABLE companies ALTER COLUMN income_channel_templates_json SET NOT NULL");
     }
 
     private boolean columnExists(String table, String column) {

@@ -25,31 +25,32 @@ public class FinanceController {
 
     private final DailyFinanceService dailyFinanceService;
     private final CompanySettingsService companySettingsService;
+    private final FinanceIncomeChannelTemplateService incomeChannelTemplateService;
     private final JwtUtil jwtUtil;
     private final ActivityLogger activityLogger;
 
     public FinanceController(
             DailyFinanceService dailyFinanceService,
             CompanySettingsService companySettingsService,
+            FinanceIncomeChannelTemplateService incomeChannelTemplateService,
             JwtUtil jwtUtil,
             ActivityLogger activityLogger
     ) {
         this.dailyFinanceService = dailyFinanceService;
         this.companySettingsService = companySettingsService;
+        this.incomeChannelTemplateService = incomeChannelTemplateService;
         this.jwtUtil = jwtUtil;
         this.activityLogger = activityLogger;
     }
 
     public record DailyFinanceExpenseLineResponse(String detail, BigDecimal amount) {}
+    public record DailyFinanceIncomeChannelResponse(String name, BigDecimal amount) {}
 
     public record DailyFinanceResponse(
             Long id,
             String entryDate,
             BigDecimal cashOpening,
-            BigDecimal incomeDataphone,
-            BigDecimal incomeJustEat,
-            BigDecimal incomeGlovo,
-            BigDecimal incomeUberEats,
+            List<DailyFinanceIncomeChannelResponse> incomeChannels,
             BigDecimal cashClosing,
             BigDecimal revenue,
             BigDecimal expenses,
@@ -67,12 +68,14 @@ public class FinanceController {
             @NotNull @DecimalMin("0.00") @DecimalMax("99999999.99") BigDecimal amount
     ) {}
 
+    public record DailyFinanceIncomeChannelRequest(
+            @NotBlank @Size(max = 80) String name,
+            @NotNull @DecimalMin("0.00") @DecimalMax("99999999.99") BigDecimal amount
+    ) {}
+
     public record DailyFinanceUpsertRequest(
             @NotNull @DecimalMin("0.00") @DecimalMax("99999999.99") BigDecimal cashOpening,
-            @NotNull @DecimalMin("0.00") @DecimalMax("99999999.99") BigDecimal incomeDataphone,
-            @NotNull @DecimalMin("0.00") @DecimalMax("99999999.99") BigDecimal incomeJustEat,
-            @NotNull @DecimalMin("0.00") @DecimalMax("99999999.99") BigDecimal incomeGlovo,
-            @NotNull @DecimalMin("0.00") @DecimalMax("99999999.99") BigDecimal incomeUberEats,
+            List<@Valid DailyFinanceIncomeChannelRequest> incomeChannels,
             @NotNull @DecimalMin("0.00") @DecimalMax("99999999.99") BigDecimal cashClosing,
             String notes,
             List<@Valid DailyFinanceExpenseLineRequest> expenseLines
@@ -80,19 +83,23 @@ public class FinanceController {
 
     public record DailyFinanceUpsertResponse(DailyFinanceResponse data, List<String> warnings) {}
 
+    public record IncomeChannelTemplatesPutRequest(
+            @NotNull @Size(max = 30) List<@NotBlank @Size(max = 80) String> names
+    ) {}
+
     private static DailyFinanceResponse toResponse(DailyFinanceEntry e, DailyFinanceService service) {
         List<DailyFinanceExpenseLine> lines = service.readExpenseLines(e);
         List<DailyFinanceExpenseLineResponse> lr = lines.stream()
                 .map(l -> new DailyFinanceExpenseLineResponse(l.detail(), l.amount()))
                 .toList();
+        List<DailyFinanceIncomeChannelResponse> channels = service.readIncomeChannels(e).stream()
+                .map(c -> new DailyFinanceIncomeChannelResponse(c.name(), c.amount()))
+                .toList();
         return new DailyFinanceResponse(
                 e.getId(),
                 e.getEntryDate().toString(),
                 e.getCashOpening(),
-                e.getIncomeDataphone(),
-                e.getIncomeJustEat(),
-                e.getIncomeGlovo(),
-                e.getIncomeUberEats(),
+                channels,
                 e.getCashClosing(),
                 e.getRevenue(),
                 e.getExpenses(),
@@ -107,6 +114,11 @@ public class FinanceController {
     }
 
     private static DailyFinanceUpsertCommand toCommand(DailyFinanceUpsertRequest body) {
+        List<DailyFinanceIncomeChannel> channels = body.incomeChannels() == null
+                ? List.of()
+                : body.incomeChannels().stream()
+                .map(r -> new DailyFinanceIncomeChannel(r.name(), r.amount()))
+                .toList();
         List<DailyFinanceExpenseLine> expenses = body.expenseLines() == null
                 ? List.of()
                 : body.expenseLines().stream()
@@ -114,10 +126,7 @@ public class FinanceController {
                 .toList();
         return new DailyFinanceUpsertCommand(
                 body.cashOpening(),
-                body.incomeDataphone(),
-                body.incomeJustEat(),
-                body.incomeGlovo(),
-                body.incomeUberEats(),
+                channels,
                 body.cashClosing(),
                 body.notes(),
                 expenses
@@ -154,6 +163,23 @@ public class FinanceController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/income-channel-templates")
+    public ResponseEntity<List<String>> listIncomeChannelTemplates(@RequestHeader("Authorization") String authHeader) {
+        Long companyId = jwtUtil.extractCompanyId(authHeader.substring(7));
+        return ResponseEntity.ok(incomeChannelTemplateService.listNames(companyId));
+    }
+
+    @PutMapping("/income-channel-templates")
+    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
+    public ResponseEntity<List<String>> replaceIncomeChannelTemplates(
+            @RequestHeader("Authorization") String authHeader,
+            @Valid @RequestBody IncomeChannelTemplatesPutRequest body
+    ) {
+        Long companyId = jwtUtil.extractCompanyId(authHeader.substring(7));
+        incomeChannelTemplateService.replaceNames(companyId, body.names());
+        return ResponseEntity.ok(incomeChannelTemplateService.listNames(companyId));
+    }
+
     @GetMapping("/daily")
     public ResponseEntity<List<DailyFinanceResponse>> listDaily(
             @RequestHeader("Authorization") String authHeader,
@@ -184,7 +210,7 @@ public class FinanceController {
                 companyId, date, email, toCommand(body), ownerBypass);
         DailyFinanceResponse data = toResponse(result.entry(), dailyFinanceService);
         activityLogger.log(companyId, email, "FINANCE", "MODIFICADO",
-                "Cierre caja " + date + " · canales " + body.incomeDataphone() + " / saldo " + data.finalBalance());
+                "Cierre caja " + date + " · canales " + data.revenue() + " / saldo " + data.finalBalance());
         return ResponseEntity.ok(new DailyFinanceUpsertResponse(data, result.warnings()));
     }
 

@@ -711,20 +711,22 @@ export interface DailyFinanceExpenseLineResponse {
   amount: number;
 }
 
+export interface DailyFinanceIncomeChannelResponse {
+  name: string;
+  amount: number;
+}
+
 export interface DailyFinanceEntryResponse {
   id: number;
   entryDate: string;
   cashOpening: number;
-  incomeDataphone: number;
-  incomeJustEat: number;
-  incomeGlovo: number;
-  incomeUberEats: number;
+  incomeChannels: DailyFinanceIncomeChannelResponse[];
   cashClosing: number;
-  /** Suma ingresos datáfono + apps (sin efectivo apertura/cierre). */
+  /** Suma de todos los canales de ingreso. */
   revenue: number;
   /** Suma líneas de gastos/sueldos. */
   expenses: number;
-  /** efectivo_apertura + ingresos_canales − gastos − efectivo_cierre */
+  /** -efectivo_apertura + ingresos_canales + gastos + efectivo_cierre */
   finalBalance: number;
   expenseLines: DailyFinanceExpenseLineResponse[];
   notes: string | null;
@@ -739,12 +741,14 @@ export interface DailyFinanceUpsertExpenseLineBody {
   amount: number;
 }
 
+export interface DailyFinanceIncomeChannelBody {
+  name: string;
+  amount: number;
+}
+
 export interface DailyFinanceUpsertBody {
   cashOpening: number;
-  incomeDataphone: number;
-  incomeJustEat: number;
-  incomeGlovo: number;
-  incomeUberEats: number;
+  incomeChannels: DailyFinanceIncomeChannelBody[];
   cashClosing: number;
   notes?: string | null;
   expenseLines?: DailyFinanceUpsertExpenseLineBody[] | null;
@@ -763,6 +767,17 @@ export const financeApi = {
   },
   listLockedMonths: async (token: string): Promise<string[]> => {
     const res = await authFetch("/api/v1/finance/locked-months", token);
+    return handleResponse<string[]>(res);
+  },
+  listIncomeChannelTemplates: async (token: string): Promise<string[]> => {
+    const res = await authFetch("/api/v1/finance/income-channel-templates", token);
+    return handleResponse<string[]>(res);
+  },
+  putIncomeChannelTemplates: async (token: string, names: string[]): Promise<string[]> => {
+    const res = await authFetch("/api/v1/finance/income-channel-templates", token, {
+      method: "PUT",
+      body: JSON.stringify({ names }),
+    });
     return handleResponse<string[]>(res);
   },
   lockMonth: async (token: string, yearMonth: string): Promise<void> => {
@@ -788,10 +803,7 @@ export const financeApi = {
       method: "PUT",
       body: JSON.stringify({
         cashOpening: body.cashOpening,
-        incomeDataphone: body.incomeDataphone,
-        incomeJustEat: body.incomeJustEat,
-        incomeGlovo: body.incomeGlovo,
-        incomeUberEats: body.incomeUberEats,
+        incomeChannels: body.incomeChannels?.length ? body.incomeChannels : [{ name: "Datáfono (TPV)", amount: 0 }],
         cashClosing: body.cashClosing,
         notes: body.notes ?? null,
         expenseLines: body.expenseLines?.length ? body.expenseLines : [],

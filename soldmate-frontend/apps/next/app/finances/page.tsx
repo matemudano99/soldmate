@@ -77,13 +77,10 @@ function monthKeyFromEntryDate(entryDate: string): string {
 function normalizeEntry(r: DailyFinanceEntryResponse): DailyFinanceEntryResponse {
   return {
     ...r,
+    incomeChannels: r.incomeChannels ?? [],
     expenseLines: r.expenseLines ?? [],
     finalBalance: num(r.finalBalance),
     cashOpening: num(r.cashOpening),
-    incomeDataphone: num(r.incomeDataphone),
-    incomeJustEat: num(r.incomeJustEat),
-    incomeGlovo: num(r.incomeGlovo),
-    incomeUberEats: num(r.incomeUberEats),
     cashClosing: num(r.cashClosing),
     revenue: num(r.revenue),
     expenses: num(r.expenses),
@@ -155,10 +152,7 @@ function exportDailyCSV(rows: DailyFinanceEntryResponse[]) {
   const headers = [
     "Fecha",
     "Efectivo_apertura",
-    "Ingresos_datáfono",
-    "Ingresos_JustEat",
-    "Ingresos_Glovo",
-    "Ingresos_UberEats",
+    "Canales",
     "Ingresos_canales_total",
     "Gastos_total",
     "Efectivo_cierre",
@@ -176,10 +170,7 @@ function exportDailyCSV(rows: DailyFinanceEntryResponse[]) {
       return [
         r.entryDate,
         num(r.cashOpening),
-        num(r.incomeDataphone),
-        num(r.incomeJustEat),
-        num(r.incomeGlovo),
-        num(r.incomeUberEats),
+        `"${(r.incomeChannels ?? []).map((c) => `${c.name}: ${num(c.amount)}`).join(" | ").replace(/"/g, '""')}"`,
         num(r.revenue),
         num(r.expenses),
         num(r.cashClosing),
@@ -270,10 +261,17 @@ export default function FinancesPage() {
     enabled: authReady && !!token,
   });
 
+  const incomeChannelTemplatesQuery = useQuery({
+    queryKey: ["finance-income-channel-templates", token],
+    queryFn: () => financeApi.listIncomeChannelTemplates(token!),
+    enabled: authReady && !!token,
+  });
+
   const upsertMut = useMutation({
     mutationFn: async (p: { date: string; body: DailyFinanceUpsertBody }) => financeApi.upsertDaily(token!, p.date, p.body),
     onSuccess: (res) => {
       void qc.invalidateQueries({ queryKey: ["finance-daily", token] });
+      void qc.invalidateQueries({ queryKey: ["finance-income-channel-templates", token] });
       if (res.warnings?.length) {
         notify.info(res.warnings.join(" · "));
       }
@@ -632,10 +630,12 @@ export default function FinancesPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 border-b border-gray-50 px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400 sm:grid-cols-[1fr_auto_auto_auto_auto_auto] sm:gap-4 sm:px-5">
+                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 border-b border-gray-50 px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400 sm:grid-cols-[1.2fr_auto_auto_auto_auto_auto_auto] sm:gap-4 sm:px-5">
                       <span>Fecha / notas</span>
+                      <span className="hidden text-right sm:block">Apertura</span>
                       <span className="text-right">Canales</span>
                       <span className="text-right">Gastos</span>
+                      <span className="hidden text-right sm:block">Cierre</span>
                       <span className="hidden text-right sm:block">Saldo final</span>
                       <span className="text-right"> </span>
                     </div>
@@ -654,7 +654,7 @@ export default function FinancesPage() {
                         return (
                           <div
                             key={row.id}
-                            className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-2 px-3 py-3.5 transition-colors hover:bg-[#fafbff] sm:grid-cols-[1fr_auto_auto_auto_auto_auto] sm:gap-4 sm:px-5"
+                            className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-2 px-3 py-3.5 transition-colors hover:bg-[#fafbff] sm:grid-cols-[1.2fr_auto_auto_auto_auto_auto_auto] sm:gap-4 sm:px-5"
                           >
                             <div className="min-w-0">
                               <p className="text-sm font-medium capitalize text-[#1e2040]">
@@ -662,6 +662,9 @@ export default function FinancesPage() {
                                 {nExp > 0 && (
                                   <span className="ml-2 text-[10px] font-normal text-[#4f6ef7]">({nExp} gastos)</span>
                                 )}
+                                <span className="ml-2 text-[10px] font-normal text-gray-400">
+                                  ({row.incomeChannels?.length ?? 0} canales)
+                                </span>
                               </p>
                               {row.notes ? (
                                 <p className="mt-0.5 truncate text-xs text-gray-400">{row.notes}</p>
@@ -669,11 +672,17 @@ export default function FinancesPage() {
                                 <p className="mt-0.5 text-xs text-gray-300">—</p>
                               )}
                             </div>
+                            <span className="hidden whitespace-nowrap text-right text-xs font-medium text-gray-500 sm:block">
+                              {formatEuro(num(row.cashOpening))}
+                            </span>
                             <span className="whitespace-nowrap text-right text-sm font-semibold text-emerald-600">
                               {formatEuro(rev)}
                             </span>
                             <span className="whitespace-nowrap text-right text-sm font-semibold text-red-500">
                               {formatEuro(exp)}
+                            </span>
+                            <span className="hidden whitespace-nowrap text-right text-xs font-medium text-gray-500 sm:block">
+                              {formatEuro(num(row.cashClosing))}
                             </span>
                             <span
                               className={`hidden whitespace-nowrap text-right text-sm font-bold sm:block ${saldo >= 0 ? "text-emerald-600" : "text-red-500"}`}
@@ -715,14 +724,22 @@ export default function FinancesPage() {
         </div>
       </main>
 
-      {modal && (
+      {modal && token && (
         <DailyFinanceModal
+          key={`${modal.mode}-${modal.initial?.entryDate ?? "new"}`}
           mode={modal.mode}
           initial={modal.initial ?? undefined}
           submitting={upsertMut.isPending}
           onClose={() => setModal(null)}
           recentEntries={entries}
           confirmOutlier={confirmOutlier}
+          incomeChannelTemplateNames={incomeChannelTemplatesQuery.data ?? []}
+          incomeChannelTemplatesLoading={incomeChannelTemplatesQuery.isLoading}
+          token={token}
+          onIncomeChannelTemplatesUpdated={() =>
+            void qc.invalidateQueries({ queryKey: ["finance-income-channel-templates", token] })
+          }
+          canSaveIncomeTemplates={canWrite}
           onSubmit={async (payload) => {
             await upsertMut.mutateAsync({ date: payload.date, body: payload.body });
           }}

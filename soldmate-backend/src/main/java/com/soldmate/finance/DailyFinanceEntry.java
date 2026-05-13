@@ -58,6 +58,9 @@ public class DailyFinanceEntry {
     @Column(name = "expense_lines_json", nullable = false, columnDefinition = "TEXT")
     private String expenseLinesJson = "[]";
 
+    @Column(name = "income_channels_json", nullable = false, columnDefinition = "TEXT")
+    private String incomeChannelsJson = "[]";
+
     @Column(length = 500)
     private String notes;
 

@@ -27,23 +27,28 @@ public class DailyFinanceService {
     public static final BigDecimal MAX_DAILY_AMOUNT = new BigDecimal("99999999.99");
     private static final int MAX_YEARS_PAST = 10;
     private static final int MAX_FUTURE_DAYS = 1;
+    private static final int MAX_INCOME_CHANNELS = 30;
+    private static final int MAX_INCOME_CHANNEL_NAME_LEN = 80;
     private static final int MAX_EXPENSE_LINES = 100;
     private static final int MAX_EXPENSE_DETAIL_LEN = 200;
 
     private final DailyFinanceEntryRepository repository;
     private final CompanyRepository companyRepository;
     private final CompanySettingsService companySettingsService;
+    private final FinanceIncomeChannelTemplateService incomeChannelTemplateService;
     private final ObjectMapper objectMapper;
 
     public DailyFinanceService(
             DailyFinanceEntryRepository repository,
             CompanyRepository companyRepository,
             CompanySettingsService companySettingsService,
+            FinanceIncomeChannelTemplateService incomeChannelTemplateService,
             ObjectMapper objectMapper
     ) {
         this.repository = repository;
         this.companyRepository = companyRepository;
         this.companySettingsService = companySettingsService;
+        this.incomeChannelTemplateService = incomeChannelTemplateService;
         this.objectMapper = objectMapper;
     }
 
@@ -72,12 +77,20 @@ public class DailyFinanceService {
         }
     }
 
+    public List<DailyFinanceIncomeChannel> readIncomeChannels(DailyFinanceEntry e) {
+        try {
+            List<DailyFinanceIncomeChannel> list = objectMapper.readValue(
+                    e.getIncomeChannelsJson(),
+                    new TypeReference<>() {}
+            );
+            return list == null ? List.of() : list;
+        } catch (Exception ex) {
+            return List.of();
+        }
+    }
+
     public static BigDecimal computeFinalBalance(DailyFinanceEntry e) {
-        BigDecimal channels = e.getIncomeDataphone()
-                .add(e.getIncomeJustEat())
-                .add(e.getIncomeGlovo())
-                .add(e.getIncomeUberEats());
-        return e.getCashOpening().add(channels).subtract(e.getExpenses()).subtract(e.getCashClosing());
+        return e.getRevenue().add(e.getExpenses()).add(e.getCashClosing()).subtract(e.getCashOpening());
     }
 
     @Transactional
@@ -101,11 +114,8 @@ public class DailyFinanceService {
         }
 
         BigDecimal cashOpening = requireMoney(cmd.cashOpening(), "Efectivo al abrir");
-        BigDecimal incomeDataphone = requireMoney(cmd.incomeDataphone(), "Ingresos datáfono");
-        BigDecimal incomeJustEat = requireMoney(cmd.incomeJustEat(), "Ingresos Just Eat");
-        BigDecimal incomeGlovo = requireMoney(cmd.incomeGlovo(), "Ingresos Glovo");
-        BigDecimal incomeUberEats = requireMoney(cmd.incomeUberEats(), "Ingresos Uber Eats");
         BigDecimal cashClosing = requireMoney(cmd.cashClosing(), "Efectivo al cierre");
+        List<DailyFinanceIncomeChannel> incomeChannels = validateAndNormalizeIncomeChannels(cmd.incomeChannels());
 
         List<DailyFinanceExpenseLine> expenseLines = validateAndNormalizeExpenseLines(cmd.expenseLines());
         BigDecimal expenseTotal = sumExpenseLines(expenseLines);
@@ -113,7 +123,7 @@ public class DailyFinanceService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La suma de gastos supera el máximo permitido");
         }
 
-        BigDecimal channelTotal = incomeDataphone.add(incomeJustEat).add(incomeGlovo).add(incomeUberEats);
+        BigDecimal channelTotal = sumIncomeChannels(incomeChannels);
         if (channelTotal.compareTo(MAX_DAILY_AMOUNT) > 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La suma de ingresos por canales supera el máximo permitido");
         }
@@ -133,18 +143,19 @@ public class DailyFinanceService {
         }
 
         row.setCashOpening(cashOpening);
-        row.setIncomeDataphone(incomeDataphone);
-        row.setIncomeJustEat(incomeJustEat);
-        row.setIncomeGlovo(incomeGlovo);
-        row.setIncomeUberEats(incomeUberEats);
+        row.setIncomeDataphone(sumChannelsByName(incomeChannels, "datáfono", "datáfono (tpv)", "tpv", "datafono"));
+        row.setIncomeJustEat(sumChannelsByName(incomeChannels, "just eat", "justeat"));
+        row.setIncomeGlovo(sumChannelsByName(incomeChannels, "glovo"));
+        row.setIncomeUberEats(sumChannelsByName(incomeChannels, "uber eats", "ubereats"));
         row.setCashClosing(cashClosing);
         row.setRevenue(channelTotal);
         row.setExpenses(expenseTotal);
 
         try {
             row.setExpenseLinesJson(objectMapper.writeValueAsString(expenseLines));
+            row.setIncomeChannelsJson(objectMapper.writeValueAsString(incomeChannels));
         } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "No se pudo serializar gastos");
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "No se pudo serializar líneas de caja");
         }
 
         String n = cmd.notes() == null ? null : cmd.notes().trim();
@@ -158,7 +169,13 @@ public class DailyFinanceService {
         row.setUpdatedAt(Instant.now());
         row.setUpdatedBy(actorEmail);
 
-        return new DailyFinanceUpsertResult(repository.save(row), warnings);
+        DailyFinanceEntry saved = repository.save(row);
+        incomeChannelTemplateService.mergeNames(
+                companyId,
+                incomeChannels.stream().map(DailyFinanceIncomeChannel::name).toList()
+        );
+
+        return new DailyFinanceUpsertResult(saved, warnings);
     }
 
     @Transactional
@@ -231,6 +248,62 @@ public class DailyFinanceService {
         return out;
     }
 
+    private List<DailyFinanceIncomeChannel> validateAndNormalizeIncomeChannels(List<DailyFinanceIncomeChannel> raw) {
+        if (raw == null || raw.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Debes registrar al menos un canal de ingreso");
+        }
+        if (raw.size() > MAX_INCOME_CHANNELS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Máximo " + MAX_INCOME_CHANNELS + " canales de ingreso");
+        }
+        List<DailyFinanceIncomeChannel> out = new ArrayList<>();
+        for (DailyFinanceIncomeChannel line : raw) {
+            if (line == null || line.name() == null || line.name().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cada canal debe tener nombre");
+            }
+            String name = line.name().trim();
+            if (name.length() > MAX_INCOME_CHANNEL_NAME_LEN) {
+                name = name.substring(0, MAX_INCOME_CHANNEL_NAME_LEN);
+            }
+            BigDecimal amount = line.amount() == null
+                    ? BigDecimal.ZERO
+                    : line.amount().setScale(2, RoundingMode.HALF_UP);
+            if (amount.compareTo(BigDecimal.ZERO) < 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Importe de canal no puede ser negativo");
+            }
+            if (amount.compareTo(MAX_DAILY_AMOUNT) > 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Importe de canal fuera de rango");
+            }
+            out.add(new DailyFinanceIncomeChannel(name, amount));
+        }
+        return out;
+    }
+
+    private static BigDecimal sumIncomeChannels(List<DailyFinanceIncomeChannel> lines) {
+        BigDecimal s = BigDecimal.ZERO;
+        for (DailyFinanceIncomeChannel l : lines) {
+            s = s.add(l.amount());
+        }
+        return s.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal sumChannelsByName(List<DailyFinanceIncomeChannel> lines, String... names) {
+        BigDecimal sum = BigDecimal.ZERO;
+        for (DailyFinanceIncomeChannel line : lines) {
+            String normalized = normalize(line.name());
+            for (String name : names) {
+                if (normalized.equals(normalize(name))) {
+                    sum = sum.add(line.amount());
+                    break;
+                }
+            }
+        }
+        return sum.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private static String normalize(String s) {
+        return s == null ? "" : s.trim().toLowerCase();
+    }
+
     private static BigDecimal sumExpenseLines(List<DailyFinanceExpenseLine> lines) {
         BigDecimal s = BigDecimal.ZERO;
         for (DailyFinanceExpenseLine l : lines) {
@@ -249,7 +322,7 @@ public class DailyFinanceService {
         List<DailyFinanceEntry> recent = repository.findByCompanyIdAndDeletedAtIsNullAndEntryDateLessThanOrderByEntryDateDesc(
                 companyId, entryDate, PageRequest.of(0, 60));
         List<BigDecimal> prevChannels = recent.stream()
-                .map(e -> e.getIncomeDataphone().add(e.getIncomeJustEat()).add(e.getIncomeGlovo()).add(e.getIncomeUberEats()))
+                .map(DailyFinanceEntry::getRevenue)
                 .filter(r -> r.compareTo(BigDecimal.ZERO) > 0)
                 .sorted()
                 .toList();

@@ -51,6 +51,10 @@ public class Company {
     @Column(name = "opening_hours_json", columnDefinition = "TEXT")
     private String openingHoursJson;
 
+    /** Nombres de canales de ingreso por defecto para cierres de caja (JSON array de strings). */
+    @Column(name = "income_channel_templates_json", nullable = false, columnDefinition = "TEXT")
+    private String incomeChannelTemplatesJson = "[]";
+
     // NIF o CIF de la empresa (ej: "B12345678")
     @Column(name = "tax_id")
     private String taxId;
