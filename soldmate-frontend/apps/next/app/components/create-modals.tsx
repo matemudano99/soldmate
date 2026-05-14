@@ -9,6 +9,7 @@ import {
   type InventoryCategoryResponse,
   type ProductInput,
   type SupplierResponse,
+  type UserRole,
 } from "app/lib/api";
 
 type ModalShellProps = {
@@ -387,48 +388,131 @@ export function CreateSupplierModal({
   );
 }
 
-export type CreatePersonPayload = { name: string; department: string; role: string; email: string; password: string; phone: string; location: string; online: boolean };
+const RBAC_ROLE_OPTIONS: { value: UserRole; label: string }[] = [
+  { value: "VIEWER", label: "Solo lectura" },
+  { value: "EMPLOYEE", label: "Empleado" },
+  { value: "SUPERVISOR", label: "Supervisor" },
+  { value: "MANAGER", label: "Gerente" },
+  { value: "OWNER", label: "Propietario" },
+];
+
+export type CreatePersonPayload = {
+  name: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  nationalId: string;
+  jobTitle: string;
+  workScheduleNote: string;
+  active: boolean;
+};
+
 export function CreatePersonModal({
   onClose,
   onCreate,
-  departments,
-}: { onClose: () => void; onCreate: (payload: CreatePersonPayload) => void; departments: string[] }) {
-  const [form, setForm] = useState<CreatePersonPayload>({ name: "", department: departments[0] ?? "Design", role: "", email: "", password: "", phone: "", location: "", online: true });
-  const set = (k: keyof CreatePersonPayload, v: string | boolean) => setForm((s) => ({ ...s, [k]: v as never }));
+}: {
+  onClose: () => void;
+  onCreate: (payload: CreatePersonPayload) => void;
+}) {
+  const [form, setForm] = useState<CreatePersonPayload>({
+    name: "",
+    email: "",
+    password: "",
+    role: "EMPLOYEE",
+    nationalId: "",
+    jobTitle: "",
+    workScheduleNote: "",
+    active: true,
+  });
+  const set = <K extends keyof CreatePersonPayload>(k: K, v: CreatePersonPayload[K]) =>
+    setForm((s) => ({ ...s, [k]: v }));
 
   return (
     <ModalShell
       title="Añadir usuario"
-      subtitle="Completa los datos de acceso del nuevo usuario"
+      subtitle="Acceso con email y contraseña (solo el propietario puede crear usuarios)"
       onClose={onClose}
       submitLabel="Crear usuario"
       onSubmit={(e) => {
         e.preventDefault();
         if (!form.name.trim()) return;
-        onCreate({ ...form, name: form.name.trim() });
+        onCreate({
+          ...form,
+          name: form.name.trim(),
+          email: form.email.trim(),
+          nationalId: form.nationalId.trim(),
+          jobTitle: form.jobTitle.trim(),
+          workScheduleNote: form.workScheduleNote.trim(),
+        });
         onClose();
       }}
     >
       <div className="grid grid-cols-2 gap-3">
-        <div><Label>Nombre *</Label><Input value={form.name} onChange={(e) => set("name", e.target.value)} required /></div>
-        <div>
-          <Label>Departamento</Label>
-          <select value={form.department} onChange={(e) => set("department", e.target.value)} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-[#1e2040] outline-none focus:border-[#4f6ef7]">
-            {departments.map((d) => <option key={d}>{d}</option>)}
+        <div className="col-span-2 sm:col-span-1">
+          <Label>Nombre completo *</Label>
+          <Input value={form.name} onChange={(e) => set("name", e.target.value)} required />
+        </div>
+        <div className="col-span-2 sm:col-span-1">
+          <Label>Rol de seguridad *</Label>
+          <select
+            value={form.role}
+            onChange={(e) => set("role", e.target.value as UserRole)}
+            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-[#1e2040] outline-none focus:border-[#4f6ef7]"
+          >
+            {RBAC_ROLE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
           </select>
         </div>
       </div>
-      <div><Label>Cargo / Rol</Label><Input value={form.role} onChange={(e) => set("role", e.target.value)} /></div>
-      <div><Label>Email *</Label><Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} required /></div>
-      <div><Label>Contraseña *</Label><Input type="password" value={form.password} onChange={(e) => set("password", e.target.value)} minLength={8} required placeholder="Mínimo 8 caracteres" /></div>
-      <div className="grid grid-cols-2 gap-3">
-        <div><Label>Teléfono</Label><Input value={form.phone} onChange={(e) => set("phone", e.target.value)} /></div>
-        <div><Label>Ubicación</Label><Input value={form.location} onChange={(e) => set("location", e.target.value)} /></div>
+      <div>
+        <Label>Puesto / área</Label>
+        <Input
+          value={form.jobTitle}
+          onChange={(e) => set("jobTitle", e.target.value)}
+          placeholder="Ej: Sala · Camarero, Cocina · Jefe de partida"
+        />
+      </div>
+      <div>
+        <Label>DNI / NIE (opcional)</Label>
+        <Input value={form.nationalId} onChange={(e) => set("nationalId", e.target.value)} maxLength={32} />
+      </div>
+      <div>
+        <Label>Email *</Label>
+        <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} required />
+      </div>
+      <div>
+        <Label>Contraseña *</Label>
+        <Input
+          type="password"
+          value={form.password}
+          onChange={(e) => set("password", e.target.value)}
+          minLength={8}
+          required
+          placeholder="Mínimo 8 caracteres"
+        />
+      </div>
+      <div>
+        <Label>Nota de horario (opcional)</Label>
+        <Textarea
+          value={form.workScheduleNote}
+          onChange={(e) => set("workScheduleNote", e.target.value)}
+          placeholder="Ej: L–V 10:00–18:00, sábados rotativos"
+          className="min-h-[88px]"
+        />
       </div>
       <div className="flex items-center justify-between py-1">
-        <span className="text-sm font-medium text-gray-600">Estado inicial</span>
-        <button type="button" onClick={() => set("online", !form.online)} className={`relative w-11 h-6 rounded-full transition-colors ${form.online ? "bg-green-400" : "bg-gray-200"}`}>
-          <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${form.online ? "left-6" : "left-1"}`} />
+        <span className="text-sm font-medium text-gray-600">Cuenta activa</span>
+        <button
+          type="button"
+          onClick={() => set("active", !form.active)}
+          className={`relative w-11 h-6 rounded-full transition-colors ${form.active ? "bg-green-400" : "bg-gray-200"}`}
+        >
+          <span
+            className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${form.active ? "left-6" : "left-1"}`}
+          />
         </button>
       </div>
     </ModalShell>

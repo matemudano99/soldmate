@@ -144,6 +144,8 @@ public class ContactService {
         return switch (normalized) {
             case "OWNER" -> User.Role.OWNER;
             case "MANAGER", "ENCARGADO" -> User.Role.MANAGER;
+            case "SUPERVISOR" -> User.Role.SUPERVISOR;
+            case "VIEWER", "LECTOR" -> User.Role.VIEWER;
             case "EMPLOYEE", "STAFF", "EMPLEADO" -> User.Role.EMPLOYEE;
             default -> User.Role.EMPLOYEE;
         };

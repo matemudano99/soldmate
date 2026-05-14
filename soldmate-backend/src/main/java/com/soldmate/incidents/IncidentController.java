@@ -155,6 +155,7 @@ public class IncidentController {
      * Crea una incidencia sin foto (JSON).
      */
     @PostMapping
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR','EMPLOYEE')")
     public ResponseEntity<IncidentResponse> createIncident(
         @RequestHeader("Authorization") String authHeader,
         @RequestBody CreateIncidentRequest req
@@ -184,6 +185,7 @@ public class IncidentController {
      * un formulario con múltiples partes (texto + archivo).
      */
     @PostMapping(value = "/with-photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR','EMPLOYEE')")
     public ResponseEntity<?> createIncidentWithPhoto(
         @RequestHeader("Authorization") String authHeader,
         @RequestParam("title")       String title,
@@ -228,6 +230,7 @@ public class IncidentController {
      * Cambia el estado: OPEN → IN_PROGRESS → CLOSED.
      */
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR','EMPLOYEE')")
     public ResponseEntity<IncidentResponse> updateStatus(
         @RequestHeader("Authorization") String authHeader,
         @PathVariable Long id,
@@ -244,6 +247,7 @@ public class IncidentController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR','EMPLOYEE')")
     public ResponseEntity<IncidentResponse> updateIncident(
         @RequestHeader("Authorization") String authHeader,
         @PathVariable Long id,
@@ -265,7 +269,7 @@ public class IncidentController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('OWNER')")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR')")
     public ResponseEntity<Void> deleteIncident(
         @RequestHeader("Authorization") String authHeader,
         @PathVariable Long id

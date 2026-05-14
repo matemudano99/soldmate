@@ -53,7 +53,9 @@ public class DocumentController {
         String createdAt,
         String uploaderName,
         String uploaderEmail,
-        String uploaderAvatarUrl
+        String uploaderAvatarUrl,
+        Long linkedUserId,
+        String linkedUserName
     ) {
         static DocumentResponse from(Document d) {
             String uploaderName  = "Usuario";
@@ -68,6 +70,14 @@ public class DocumentController {
                 uploaderEmail = u.getEmail();
                 uploaderAvatar = u.getAvatarUrl();
             }
+            Long linkId = null;
+            String linkName = null;
+            if (d.getLinkedUser() != null) {
+                var lu = d.getLinkedUser();
+                linkId = lu.getId();
+                String lf = ((lu.getFirstName() != null ? lu.getFirstName() : "") + " " + (lu.getLastName() != null ? lu.getLastName() : "")).trim();
+                linkName = lf.isBlank() ? lu.getEmail() : lf;
+            }
             return new DocumentResponse(
                 d.getId(),
                 d.getName(),
@@ -79,7 +89,9 @@ public class DocumentController {
                 d.getCreatedAt().format(DATE_FMT),
                 uploaderName,
                 uploaderEmail,
-                uploaderAvatar
+                uploaderAvatar,
+                linkId,
+                linkName
             );
         }
     }
@@ -113,7 +125,7 @@ public class DocumentController {
         }
     }
 
-    public record UpdateDocumentRequest(String name, String category) {}
+    public record UpdateDocumentRequest(String name, String category, Long linkedUserId, Boolean setLinkedUser) {}
 
     public record CreateCategoryRequest(String name, String color) {}
 
@@ -148,11 +160,13 @@ public class DocumentController {
      * Campos multipart: file (obligatorio), name (opcional), category (opcional).
      */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR','EMPLOYEE')")
     public ResponseEntity<?> upload(
         @RequestHeader("Authorization") String authHeader,
         @RequestParam("file")                          MultipartFile file,
         @RequestParam(value = "name",     required = false) String name,
-        @RequestParam(value = "category", required = false) String category
+        @RequestParam(value = "category", required = false) String category,
+        @RequestParam(value = "linkedUserId", required = false) Long linkedUserId
     ) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -167,7 +181,7 @@ public class DocumentController {
         try {
             Long companyId = extractCompanyId(authHeader);
             String uploaderEmail = extractEmail(authHeader);
-            Document doc = documentService.upload(companyId, uploaderEmail, name, category, file);
+            Document doc = documentService.upload(companyId, uploaderEmail, name, category, linkedUserId, file);
             return ResponseEntity.status(HttpStatus.CREATED).body(DocumentResponse.from(doc));
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -182,6 +196,7 @@ public class DocumentController {
     }
 
     @PatchMapping("/{id}")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR','EMPLOYEE')")
     public ResponseEntity<?> updateDocument(
         @RequestHeader("Authorization") String authHeader,
         @PathVariable Long id,
@@ -189,7 +204,7 @@ public class DocumentController {
     ) {
         Long companyId = extractCompanyId(authHeader);
         try {
-            Document doc = documentService.update(companyId, id, req.name(), req.category());
+            Document doc = documentService.update(companyId, id, req.name(), req.category(), req.linkedUserId(), req.setLinkedUser());
             return ResponseEntity.ok(DocumentResponse.from(doc));
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
@@ -197,7 +212,7 @@ public class DocumentController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR')")
     public ResponseEntity<Void> deleteDocument(
         @RequestHeader("Authorization") String authHeader,
         @PathVariable Long id
@@ -224,7 +239,7 @@ public class DocumentController {
     }
 
     @PostMapping("/categories")
-    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR')")
     public ResponseEntity<?> createCategory(
         @RequestHeader("Authorization") String authHeader,
         @RequestBody CreateCategoryRequest req
@@ -242,7 +257,7 @@ public class DocumentController {
     }
 
     @PatchMapping("/categories/{id}")
-    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR')")
     public ResponseEntity<?> updateCategory(
         @RequestHeader("Authorization") String authHeader,
         @PathVariable Long id,
@@ -258,7 +273,7 @@ public class DocumentController {
     }
 
     @DeleteMapping("/categories/{id}")
-    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR')")
     public ResponseEntity<Void> deleteCategory(
         @RequestHeader("Authorization") String authHeader,
         @PathVariable Long id

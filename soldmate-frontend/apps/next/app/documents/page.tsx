@@ -6,8 +6,16 @@ import {
   Search, Download, Eye, MoreVertical, ChevronRight, Trash2, Edit3, X
 } from "lucide-react";
 import { AppTopHeader, UploadDocumentModal, ErpPageShell, notify, useConfirm, PageListSearchField } from "../shared/ui";
-import { documentsApi, type DocumentResponse, type DocumentCategoryResponse, type DocumentStatsResponse } from "../shared/api";
+import {
+  documentsApi,
+  usersApi,
+  type DocumentResponse,
+  type DocumentCategoryResponse,
+  type DocumentStatsResponse,
+  type UserListResponse,
+} from "../shared/api";
 import { useAuthStore } from "app/lib/store";
+import { canDeleteDocuments, canManageDocumentCategories, canUploadDocuments } from "app/lib/rbac";
 
 // Configuración visual por tipo de documento
 const TYPE_META: Record<string, { Icon: React.ElementType; bg: string; text: string; ext: string }> = {
@@ -25,11 +33,14 @@ const TYPE_META: Record<string, { Icon: React.ElementType; bg: string; text: str
 
 export default function DocumentsPage() {
   const { token, role } = useAuthStore();
-  const isOwnerOrManager = role === "OWNER" || role === "MANAGER";
+  const canManageCats = canManageDocumentCategories(role);
+  const canDeleteDocs = canDeleteDocuments(role);
+  const canUpload = canUploadDocuments(role);
 
   const [docs, setDocs] = useState<DocumentResponse[]>([]);
   const [categories, setCategories] = useState<DocumentCategoryResponse[]>([]);
   const [stats, setStats] = useState<DocumentStatsResponse | null>(null);
+  const [companyUsers, setCompanyUsers] = useState<UserListResponse[]>([]);
 
   const [activeCategory, setActiveCategory] = useState<string>("Todos");
   const [search, setSearch] = useState("");
@@ -51,24 +62,41 @@ export default function DocumentsPage() {
   const loadData = async () => {
     if (!token) return;
     try {
-      const [d, c, s] = await Promise.all([
+      const [d, c, s, u] = await Promise.all([
         documentsApi.getAll(token, activeCategory === "Todos" ? undefined : activeCategory),
         documentsApi.getCategories(token),
-        documentsApi.getStats(token)
+        documentsApi.getStats(token),
+        usersApi.getAll(token),
       ]);
       setDocs(d);
       setCategories(c);
       setStats(s);
+      setCompanyUsers(u);
     } catch (err) {
       notify.error((err as Error)?.message ?? "Error al cargar documentos");
     }
   };
 
-  const handleUpload = async (payload: { name: string; category: string; type: string; size: string }, file?: File) => {
+  const handleUpload = async (
+    payload: {
+      name: string;
+      category: string;
+      type: string;
+      size: string;
+      linkedUserId?: number | null;
+    },
+    file?: File
+  ) => {
     if (!token || !file) return;
     const id = notify.loading("Subiendo documento...");
     try {
-      await documentsApi.upload(token, file, payload.name, payload.category);
+      await documentsApi.upload(
+        token,
+        file,
+        payload.name,
+        payload.category,
+        payload.linkedUserId ?? undefined
+      );
       notify.dismiss(id);
       notify.success("Documento subido correctamente");
       await loadData();
@@ -153,7 +181,8 @@ export default function DocumentsPage() {
             </div>
             <button 
               onClick={() => setShowUpload(true)} 
-              className="inline-flex shrink-0 items-center justify-center gap-2 bg-[#4f6ef7] text-white rounded-xl px-4 py-3 sm:py-2.5 text-sm font-semibold shadow-[0_4px_15px_rgba(79,110,247,0.30)] hover:bg-[#3d5ae0] transition-all w-full sm:w-auto min-h-[44px]"
+              disabled={!canUpload}
+              className="inline-flex shrink-0 items-center justify-center gap-2 bg-[#4f6ef7] text-white rounded-xl px-4 py-3 sm:py-2.5 text-sm font-semibold shadow-[0_4px_15px_rgba(79,110,247,0.30)] hover:bg-[#3d5ae0] transition-all w-full sm:w-auto min-h-[44px] disabled:opacity-50 disabled:pointer-events-none"
             >
               <Upload size={15} />
               Subir documento
@@ -194,7 +223,7 @@ export default function DocumentsPage() {
             <div className="w-full lg:w-44 lg:flex-shrink-0 space-y-1">
               <div className="flex items-center justify-between px-1 sm:px-3 mb-2">
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Categorías</p>
-                {isOwnerOrManager && (
+                {canManageCats && (
                   <button 
                     onClick={() => { setEditingCategory(null); setCatForm({ name: "", color: "#4f6ef7" }); setShowCategoryModal(true); }}
                     className="text-xs text-[#4f6ef7] font-semibold hover:underline"
@@ -233,7 +262,7 @@ export default function DocumentsPage() {
                     </div>
                     {activeCategory === cat.name && <ChevronRight size={13} className="opacity-70 flex-shrink-0" />}
                   </button>
-                  {isOwnerOrManager && activeCategory !== cat.name && (
+                  {canManageCats && activeCategory !== cat.name && (
                     <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1 bg-white rounded-md shadow-sm border border-gray-100 p-0.5">
                       <button onClick={() => { setEditingCategory(cat); setCatForm({ name: cat.name, color: cat.color || "#4f6ef7" }); setShowCategoryModal(true); }} className="p-1 hover:bg-gray-100 rounded text-gray-500"><Edit3 size={12} /></button>
                       <button onClick={() => handleDeleteCategory(cat.id)} className="p-1 hover:bg-red-50 rounded text-red-500"><Trash2 size={12} /></button>
@@ -286,6 +315,11 @@ export default function DocumentsPage() {
                           {doc.category ? (
                             <p className="text-[10px] text-gray-400 mt-1">{doc.category}</p>
                           ) : null}
+                          {doc.linkedUserName ? (
+                            <p className="text-[10px] text-[#4f6ef7] mt-0.5 font-medium">
+                              Vinculado: {doc.linkedUserName}
+                            </p>
+                          ) : null}
                           <div className="flex items-center justify-between gap-2 mt-3">
                             <div className="flex items-center gap-1.5 min-w-0">
                               {doc.uploaderAvatarUrl ? (
@@ -307,7 +341,7 @@ export default function DocumentsPage() {
                               >
                                 <Eye size={16} />
                               </a>
-                              {isOwnerOrManager ? (
+                              {canDeleteDocs ? (
                                 <button
                                   type="button"
                                   onClick={() => handleDelete(doc.id)}
@@ -327,10 +361,11 @@ export default function DocumentsPage() {
               </div>
 
               {/* Tabla escritorio */}
-              <div className="hidden lg:block bg-white rounded-2xl shadow-[0_2px_16px_rgba(149,157,165,0.10)] border border-gray-50 overflow-hidden">
-                <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-4 px-5 py-3 border-b border-gray-50 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                <div className="hidden lg:block bg-white rounded-2xl shadow-[0_2px_16px_rgba(149,157,165,0.10)] border border-gray-50 overflow-hidden">
+                <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-4 px-5 py-3 border-b border-gray-50 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
                   <span className="w-9" />
                   <span>Nombre</span>
+                  <span>Vinculado</span>
                   <span>Fecha</span>
                   <span>Tamaño</span>
                   <span className="w-16 text-center">Acciones</span>
@@ -350,7 +385,7 @@ export default function DocumentsPage() {
                           key={doc.id}
                           onMouseEnter={() => setHoveredId(doc.id)}
                           onMouseLeave={() => setHoveredId(null)}
-                          className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-4 px-5 py-3.5 items-center hover:bg-[#fafbff] transition-colors"
+                          className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-4 px-5 py-3.5 items-center hover:bg-[#fafbff] transition-colors"
                         >
                           <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${meta.bg} flex-shrink-0`}>
                             <meta.Icon size={16} className={meta.text} />
@@ -377,6 +412,10 @@ export default function DocumentsPage() {
                             </div>
                           </div>
 
+                          <span className="text-xs text-gray-500 truncate max-w-[120px]" title={doc.linkedUserName ?? ""}>
+                            {doc.linkedUserName ?? "—"}
+                          </span>
+
                           <span className="text-xs text-gray-400 whitespace-nowrap">{parseDate(doc.createdAt)}</span>
 
                           <span className="text-xs text-gray-400 whitespace-nowrap">{formatSize(doc.fileSize)}</span>
@@ -387,7 +426,7 @@ export default function DocumentsPage() {
                             <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-[#4f6ef7] transition-colors" title="Ver / Descargar">
                               <Eye size={13} />
                             </a>
-                            {isOwnerOrManager && (
+                            {canDeleteDocs && (
                               <button onClick={() => handleDelete(doc.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors" title="Eliminar">
                                 <Trash2 size={13} />
                               </button>
@@ -410,6 +449,7 @@ export default function DocumentsPage() {
           onClose={() => setShowUpload(false)}
           onUpload={handleUpload}
           categories={categories}
+          users={companyUsers}
         />
       )}
 
@@ -448,16 +488,38 @@ export default function DocumentsPage() {
 }
 
 // Componente helper para el modal real de subida (con soporte de archivo)
-function UploadDocumentModalReal({ onClose, onUpload, categories }: { onClose: () => void; onUpload: (payload: any, file?: File) => void; categories: DocumentCategoryResponse[] }) {
-  const [form, setForm] = useState({ name: "", category: "" });
+function UploadDocumentModalReal({
+  onClose,
+  onUpload,
+  categories,
+  users,
+}: {
+  onClose: () => void;
+  onUpload: (payload: any, file?: File) => void;
+  categories: DocumentCategoryResponse[];
+  users: UserListResponse[];
+}) {
+  const [form, setForm] = useState({ name: "", category: "", linkedUserId: "" });
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const userLabel = (u: UserListResponse) => {
+    const n = (u.fullName && u.fullName.trim()) || [u.firstName, u.lastName].filter(Boolean).join(" ").trim();
+    return n || u.email;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) { notify.error("Selecciona un archivo"); return; }
     setSubmitting(true);
-    await onUpload({ name: form.name, category: form.category, type: "other", size: "0" }, file);
+    const linked =
+      form.linkedUserId && form.linkedUserId !== ""
+        ? Number(form.linkedUserId)
+        : null;
+    await onUpload(
+      { name: form.name, category: form.category, type: "other", size: "0", linkedUserId: linked },
+      file
+    );
     setSubmitting(false);
     onClose();
   };
@@ -489,6 +551,21 @@ function UploadDocumentModalReal({ onClose, onUpload, categories }: { onClose: (
             <select value={form.category} onChange={e => setForm(s => ({ ...s, category: e.target.value }))} className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#4f6ef7]">
               <option value="">Sin categoría</option>
               {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Usuario vinculado (opcional)</label>
+            <select
+              value={form.linkedUserId}
+              onChange={(e) => setForm((s) => ({ ...s, linkedUserId: e.target.value }))}
+              className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#4f6ef7]"
+            >
+              <option value="">Ninguno</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {userLabel(u)}
+                </option>
+              ))}
             </select>
           </div>
           <div className="flex gap-3 pt-2">

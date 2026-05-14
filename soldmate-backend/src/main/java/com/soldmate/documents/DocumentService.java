@@ -2,6 +2,7 @@ package com.soldmate.documents;
 
 import com.soldmate.auth.User;
 import com.soldmate.auth.UserRepository;
+import com.soldmate.auth.UserCompanyMembershipRepository;
 import com.soldmate.company.Company;
 import com.soldmate.company.CompanyRepository;
 import com.soldmate.notifications.IncidentDocumentNotificationPublisher;
@@ -30,6 +31,7 @@ public class DocumentService {
     private final DocumentRepository         documentRepository;
     private final DocumentCategoryRepository categoryRepository;
     private final UserRepository             userRepository;
+    private final UserCompanyMembershipRepository membershipRepository;
     private final CompanyRepository          companyRepository;
     private final com.soldmate.activity.ActivityLogger activityLogger;
     private final SupabaseStorageService storageService;
@@ -39,6 +41,7 @@ public class DocumentService {
     public DocumentService(DocumentRepository documentRepository,
                            DocumentCategoryRepository categoryRepository,
                            UserRepository userRepository,
+                           UserCompanyMembershipRepository membershipRepository,
                            CompanyRepository companyRepository,
                            com.soldmate.activity.ActivityLogger activityLogger,
                            SupabaseStorageService storageService,
@@ -47,6 +50,7 @@ public class DocumentService {
         this.documentRepository = documentRepository;
         this.categoryRepository  = categoryRepository;
         this.userRepository      = userRepository;
+        this.membershipRepository = membershipRepository;
         this.companyRepository   = companyRepository;
         this.activityLogger      = activityLogger;
         this.storageService      = storageService;
@@ -84,6 +88,7 @@ public class DocumentService {
                            String uploaderEmail,
                            String name,
                            String category,
+                           Long linkedUserId,
                            MultipartFile file) throws IOException {
 
         Company company = companyRepository.findById(companyId)
@@ -91,6 +96,8 @@ public class DocumentService {
 
         User uploader = userRepository.findByEmail(uploaderEmail)
             .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        User linked = resolveLinkedUser(companyId, linkedUserId);
 
         // 1. Detectar tipo de documento
         String mimeType = file.getContentType() != null ? file.getContentType() : "application/octet-stream";
@@ -110,6 +117,7 @@ public class DocumentService {
         doc.setCategory(category != null && !category.isBlank() ? category.trim() : null);
         doc.setUploadedBy(uploader);
         doc.setCompany(company);
+        doc.setLinkedUser(linked);
 
         doc = documentRepository.save(doc);
         activityLogger.log(companyId, uploaderEmail, "DOCUMENT", "CREADO", "Subido: " + doc.getName());
@@ -121,13 +129,16 @@ public class DocumentService {
         return doc;
     }
 
-    /** Renombra o mueve de categoría un documento existente. */
-    public Document update(Long companyId, Long documentId, String name, String category) {
+    /** Renombra, categoría o usuario vinculado. */
+    public Document update(Long companyId, Long documentId, String name, String category, Long linkedUserId, Boolean setLinkedUser) {
         Document doc = documentRepository.findByIdAndCompanyId(documentId, companyId)
             .orElseThrow(() -> new RuntimeException("Documento no encontrado"));
 
         if (name != null && !name.isBlank()) doc.setName(name.trim());
         doc.setCategory(category != null && !category.isBlank() ? category.trim() : null);
+        if (Boolean.TRUE.equals(setLinkedUser)) {
+            doc.setLinkedUser(linkedUserId == null ? null : resolveLinkedUser(companyId, linkedUserId));
+        }
         doc = documentRepository.save(doc);
         // Opcionalmente podemos usar un user genérico o extraer el usuario actual. En este caso enviaremos null para userEmail.
         activityLogger.log(companyId, null, "DOCUMENT", "MODIFICADO", doc.getName());
@@ -193,6 +204,16 @@ public class DocumentService {
             .orElseThrow(() -> new RuntimeException("Categoría no encontrada"));
         categoryRepository.delete(cat);
         activityLogger.log(companyId, null, "DOCUMENT_CATEGORY", "ELIMINADO", cat.getName());
+    }
+
+    private User resolveLinkedUser(Long companyId, Long linkedUserId) {
+        if (linkedUserId == null) {
+            return null;
+        }
+        if (!membershipRepository.existsByUser_IdAndCompany_Id(linkedUserId, companyId)) {
+            throw new RuntimeException("Usuario vinculado no pertenece a esta empresa");
+        }
+        return userRepository.findById(linkedUserId).orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────

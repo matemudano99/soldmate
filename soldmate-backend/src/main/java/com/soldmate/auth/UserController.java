@@ -54,7 +54,11 @@ public class UserController {
         String lastName,
         String fullName,
         String role,
-        String avatarUrl
+        String avatarUrl,
+        String nationalId,
+        String jobTitle,
+        String workScheduleNote,
+        boolean active
     ) {
         static UserResponse from(User u, User.Role roleInCompany) {
             String full = ((u.getFirstName() != null ? u.getFirstName() : "") + " " + (u.getLastName() != null ? u.getLastName() : "")).trim();
@@ -65,7 +69,11 @@ public class UserController {
                 u.getLastName(),
                 full,
                 roleInCompany.name(),
-                u.getAvatarUrl()
+                u.getAvatarUrl(),
+                u.getNationalId(),
+                u.getJobTitle(),
+                u.getWorkScheduleNote(),
+                u.isActive()
             );
         }
     }
@@ -75,14 +83,22 @@ public class UserController {
         @NotBlank @Email String email,
         String role,
         String avatarUrl,
-        @NotBlank @Size(min = 8, message = "Password must be at least 8 characters") String password
+        @NotBlank @Size(min = 8, message = "Password must be at least 8 characters") String password,
+        @Size(max = 32) String nationalId,
+        @Size(max = 160) String jobTitle,
+        @Size(max = 512) String workScheduleNote,
+        Boolean active
     ) {}
 
     public record UpdateUserRequest(
         @NotBlank String fullName,
         @NotBlank @Email String email,
         String role,
-        String avatarUrl
+        String avatarUrl,
+        @Size(max = 32) String nationalId,
+        @Size(max = 160) String jobTitle,
+        @Size(max = 512) String workScheduleNote,
+        Boolean active
     ) {}
 
     @GetMapping
@@ -112,6 +128,8 @@ public class UserController {
             if (membershipRepository.existsByUser_IdAndCompany_Id(user.getId(), companyId)) {
                 return ResponseEntity.status(HttpStatus.CONFLICT).build();
             }
+            applyProfileFields(user, req.nationalId(), req.jobTitle(), req.workScheduleNote(), req.active());
+            userRepository.save(user);
             membershipRepository.save(UserCompanyMembership.of(user, company, role));
             activityLogger.log(companyId, jwtUtil.extractEmail(authHeader.substring(7)), "USER", "VINCULADO", user.getEmail());
             return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.from(user, role));
@@ -126,6 +144,7 @@ public class UserController {
         user.setAvatarUrl(blankToNull(req.avatarUrl()));
         user.setRole(role);
         user.setPassword(passwordEncoder.encode(req.password().trim()));
+        applyProfileFields(user, req.nationalId(), req.jobTitle(), req.workScheduleNote(), req.active());
         userRepository.save(user);
         membershipRepository.save(UserCompanyMembership.of(user, company, role));
 
@@ -160,6 +179,7 @@ public class UserController {
         user.setAvatarUrl(blankToNull(req.avatarUrl()));
         User.Role newRole = resolveRole(req.role());
         user.setRole(newRole);
+        applyProfileFields(user, req.nationalId(), req.jobTitle(), req.workScheduleNote(), req.active());
         userRepository.save(user);
 
         membership.setRole(newRole);
@@ -193,6 +213,15 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
+    private void applyProfileFields(User user, String nationalId, String jobTitle, String workScheduleNote, Boolean active) {
+        user.setNationalId(blankToNull(nationalId));
+        user.setJobTitle(blankToNull(jobTitle));
+        user.setWorkScheduleNote(blankToNull(workScheduleNote));
+        if (active != null) {
+            user.setActive(active);
+        }
+    }
+
     private User.Role resolveRole(String raw) {
         if (raw == null || raw.isBlank()) {
             return User.Role.EMPLOYEE;
@@ -200,6 +229,8 @@ public class UserController {
         return switch (raw.trim().toUpperCase()) {
             case "OWNER" -> User.Role.OWNER;
             case "MANAGER" -> User.Role.MANAGER;
+            case "SUPERVISOR" -> User.Role.SUPERVISOR;
+            case "VIEWER" -> User.Role.VIEWER;
             case "EMPLOYEE", "STAFF" -> User.Role.EMPLOYEE;
             default -> User.Role.EMPLOYEE;
         };

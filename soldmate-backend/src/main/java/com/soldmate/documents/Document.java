@@ -59,4 +59,9 @@ public class Document {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "company_id", nullable = false)
     private Company company;
+
+    /** Usuario del equipo asociado al documento (opcional). */
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "linked_user_id")
+    private User linkedUser;
 }

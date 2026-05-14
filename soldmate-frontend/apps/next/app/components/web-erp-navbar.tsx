@@ -6,11 +6,12 @@ import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   LayoutDashboard, Users, CreditCard, BarChart2,
-  FileText, Calendar, Power, ChevronDown, PanelLeftClose, PanelLeftOpen, X,
-  Wrench, Truck, Package, Activity, ChevronLeft, ChevronRight, Building2
+  FileText, Calendar, Power, PanelLeftOpen, X,
+  Wrench, Truck, Package, Activity, ChevronLeft, Building2, Palmtree
 } from "lucide-react";
 import { useAuthStore } from "app/lib/store";
 import { HelpCenterPopover } from "../shared/ui/alerts-help-popovers";
+import { isNavbarHrefVisible, roleDisplayLabel } from "app/lib/rbac";
 
 const NAV_MAIN = [
   { href: "/dashboard",  label: "Dashboard",    Icon: LayoutDashboard },
@@ -23,6 +24,7 @@ const NAV_MAIN = [
   { href: "/stats",      label: "Estadisticas",   Icon: BarChart2       },
   { href: "/documents",  label: "Documentos",    Icon: FileText        },
   { href: "/calendar",   label: "Calendario",   Icon: Calendar        },
+  { href: "/time-off",   label: "Vacaciones",   Icon: Palmtree        },
 ] as const;
 
 const LS_NAV_COLLAPSED = "sm_navbar_collapsed";
@@ -72,11 +74,7 @@ export function WebErpNavbar() {
 
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
   const displayName = fullName || email || "Usuario";
-  const roleLabel =
-    role === "OWNER" ? "Owner" :
-    role === "MANAGER" ? "Manager" :
-    role === "EMPLOYEE" || role === "STAFF" ? "Employee" :
-    "Usuario";
+  const roleLabel = roleDisplayLabel(role);
 
   const handleLogout = () => {
     logout();
@@ -155,7 +153,7 @@ export function WebErpNavbar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto pt-2">
-        {NAV_MAIN.map(({ href, label, Icon }) => {
+        {NAV_MAIN.filter(({ href }) => isNavbarHrefVisible(href, role)).map(({ href, label, Icon }) => {
           const active = isActive(href);
           return (
             <Link

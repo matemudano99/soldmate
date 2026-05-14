@@ -33,7 +33,6 @@ public class User {
     @Column(nullable = false)
     private String password;
 
-    // firstName y lastName separados para mayor flexibilidad
     @Column(name = "first_name")
     private String firstName;
 
@@ -43,21 +42,39 @@ public class User {
     @Column(name = "avatar_url")
     private String avatarUrl;
 
-    // OWNER: dueño del negocio (acceso total)
-    // MANAGER: encargado/supervisor (gestión operativa)
-    // EMPLOYEE: operario base (acceso limitado)
-    // STAFF: rol legado (compatibilidad con datos antiguos)
+    /** DNI/NIE u otro documento nacional; no es clave ni identificador de login. */
+    @Column(name = "national_id", length = 32)
+    private String nationalId;
+
+    /** Puesto o área operativa (texto libre); la autorización real va en {@link #role}. */
+    @Column(name = "job_title", length = 160)
+    private String jobTitle;
+
+    /** Nota de horario habitual (MVP; sin motor de turnos). */
+    @Column(name = "work_schedule_note", length = 512)
+    private String workScheduleNote;
+
+    /** Si false, no puede iniciar sesión. */
+    @Column(nullable = false)
+    private boolean active = true;
+
+    /**
+     * RBAC por jerarquía (JWT + membresía por negocio):
+     * OWNER, MANAGER, SUPERVISOR, EMPLOYEE, VIEWER.
+     */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role = Role.EMPLOYEE;
 
-    // ManyToOne: muchos usuarios pertenecen a una empresa
-    // FetchType.LAZY: no carga la empresa hasta que se acceda a ella (más eficiente)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "company_id", nullable = false)
     private Company company;
 
     public enum Role {
-        OWNER, MANAGER, EMPLOYEE, STAFF
+        OWNER,
+        MANAGER,
+        SUPERVISOR,
+        EMPLOYEE,
+        VIEWER
     }
 }

@@ -261,6 +261,11 @@ public class AuthController {
                 .body("Credenciales incorrectas");
         }
 
+        if (!user.isActive()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body("Cuenta desactivada. Contacta con el administrador.");
+        }
+
         UserCompanyMembership active = membershipForActiveCompany(user);
         Company company = active.getCompany();
         String token = jwtUtil.generateToken(
@@ -295,6 +300,9 @@ public class AuthController {
         String tokenIn = authHeader.substring(7);
         String email = jwtUtil.extractEmail(tokenIn);
         User user = userRepository.findByEmail(email).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        if (!user.isActive()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Cuenta desactivada");
+        }
 
         UserCompanyMembership mem = membershipRepository.findByUser_IdAndCompany_Id(user.getId(), req.companyId())
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Sin acceso a ese negocio"));
@@ -331,6 +339,9 @@ public class AuthController {
         User user = userRepository.findByEmail(email).orElse(null);
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Usuario no encontrado");
+        }
+        if (!user.isActive()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Cuenta desactivada");
         }
 
         Long companyId = jwtUtil.extractCompanyId(token);

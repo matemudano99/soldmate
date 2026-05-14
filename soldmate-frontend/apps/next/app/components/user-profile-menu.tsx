@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronDown, LogOut, Settings } from "lucide-react";
 import { useAuthStore } from "app/lib/store";
+import { roleDisplayLabel } from "app/lib/rbac";
 
 const MENU_WIDTH = 256;
 const VIEW_PADDING = 8;
@@ -31,11 +32,7 @@ export function UserProfileMenu() {
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
   const displayName = fullName || email || "Usuario";
   const initials = ((firstName?.[0] ?? "") + (lastName?.[0] ?? "")).toUpperCase() || "U";
-  const roleLabel =
-    role === "OWNER" ? "Owner" :
-    role === "MANAGER" ? "Manager" :
-    role === "EMPLOYEE" || role === "STAFF" ? "Employee" :
-    "Usuario";
+  const roleLabel = roleDisplayLabel(role);
 
   const updateMenuPosition = useCallback(() => {
     if (!open || !buttonRef.current) return;

@@ -4,6 +4,7 @@ import com.soldmate.auth.JwtUtil;
 import com.soldmate.company.Company;
 import com.soldmate.company.CompanyRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -74,6 +75,7 @@ public class NotificationController {
     // ─── PUT /api/v1/notifications/{id}/read ──────────────────────────────────
 
     @PutMapping("/{id}/read")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR','EMPLOYEE','VIEWER')")
     public ResponseEntity<NotificationResponse> markRead(
         @RequestHeader("Authorization") String authHeader,
         @PathVariable Long id
@@ -88,6 +90,7 @@ public class NotificationController {
     // ─── PUT /api/v1/notifications/read-all ──────────────────────────────────
 
     @PutMapping("/read-all")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR','EMPLOYEE','VIEWER')")
     public ResponseEntity<Map<String, Integer>> markAllRead(
         @RequestHeader("Authorization") String authHeader
     ) {
@@ -99,6 +102,7 @@ public class NotificationController {
     // ─── POST /api/v1/notifications ───────────────────────────────────────────
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR')")
     public ResponseEntity<NotificationResponse> create(
         @RequestHeader("Authorization") String authHeader,
         @RequestBody CreateNotificationRequest req

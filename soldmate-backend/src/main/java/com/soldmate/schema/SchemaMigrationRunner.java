@@ -57,7 +57,8 @@ public class SchemaMigrationRunner implements ApplicationRunner {
             new MigrationStep("014", "Extend daily_finance_entries and add daily_finance_lines", this::extendDailyFinanceAndCreateLines),
             new MigrationStep("015", "Cash register daily model and fix Europe/Malaga timezone", this::migrateFinanceCashRegisterDailyModel),
             new MigrationStep("016", "Finance dynamic income channels json", this::migrateFinanceIncomeChannelsJson),
-            new MigrationStep("017", "Company income channel name templates for daily finance", this::migrateCompanyIncomeChannelTemplates)
+            new MigrationStep("017", "Company income channel name templates for daily finance", this::migrateCompanyIncomeChannelTemplates),
+            new MigrationStep("018", "RBAC five roles, user profile fields, vacations, document user link", this::rbacFiveRolesUserProfileVacationsDocuments)
         );
 
         for (MigrationStep step : steps) {
@@ -525,6 +526,67 @@ public class SchemaMigrationRunner implements ApplicationRunner {
             """);
         jdbcTemplate.execute("ALTER TABLE companies ALTER COLUMN income_channel_templates_json SET DEFAULT '[]'");
         jdbcTemplate.execute("ALTER TABLE companies ALTER COLUMN income_channel_templates_json SET NOT NULL");
+    }
+
+    /**
+     * Cinco roles (sin STAFF), columnas de perfil en users, vacaciones, vínculo documento→usuario.
+     */
+    private void rbacFiveRolesUserProfileVacationsDocuments() {
+        jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS national_id VARCHAR(32)");
+        jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true");
+        jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS job_title VARCHAR(160)");
+        jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS work_schedule_note VARCHAR(512)");
+
+        jdbcTemplate.execute("UPDATE users SET role = 'EMPLOYEE' WHERE role = 'STAFF'");
+        jdbcTemplate.execute("UPDATE user_company_memberships SET role = 'EMPLOYEE' WHERE role = 'STAFF'");
+
+        jdbcTemplate.execute("""
+            UPDATE users SET role = 'EMPLOYEE'
+            WHERE role IS NULL OR trim(role) = ''
+               OR UPPER(trim(role)) NOT IN ('OWNER','MANAGER','SUPERVISOR','EMPLOYEE','VIEWER')
+            """);
+        jdbcTemplate.execute("""
+            UPDATE user_company_memberships SET role = 'EMPLOYEE'
+            WHERE role IS NULL OR trim(role) = ''
+               OR UPPER(trim(role)) NOT IN ('OWNER','MANAGER','SUPERVISOR','EMPLOYEE','VIEWER')
+            """);
+
+        String roles = "'OWNER','MANAGER','SUPERVISOR','EMPLOYEE','VIEWER'";
+        jdbcTemplate.execute("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check");
+        jdbcTemplate.execute("ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN (" + roles + "))");
+
+        jdbcTemplate.execute("ALTER TABLE user_company_memberships DROP CONSTRAINT IF EXISTS user_company_memberships_role_check");
+        jdbcTemplate.execute(
+            "ALTER TABLE user_company_memberships ADD CONSTRAINT user_company_memberships_role_check CHECK (role IN (" + roles + "))"
+        );
+
+        jdbcTemplate.execute("""
+            CREATE TABLE IF NOT EXISTS vacation_requests (
+                id BIGSERIAL PRIMARY KEY,
+                company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+                user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                start_date DATE NOT NULL,
+                end_date DATE NOT NULL,
+                notes VARCHAR(500),
+                created_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+            """);
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_vacation_requests_company ON vacation_requests(company_id)");
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_vacation_requests_user ON vacation_requests(user_id)");
+
+        jdbcTemplate.execute("ALTER TABLE documents ADD COLUMN IF NOT EXISTS linked_user_id BIGINT");
+        jdbcTemplate.execute("""
+            DO $$
+            BEGIN
+              IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint WHERE conname = 'documents_linked_user_id_fkey'
+              ) THEN
+                ALTER TABLE documents
+                  ADD CONSTRAINT documents_linked_user_id_fkey
+                  FOREIGN KEY (linked_user_id) REFERENCES users(id) ON DELETE SET NULL;
+              END IF;
+            END $$
+            """);
     }
 
     private boolean columnExists(String table, String column) {

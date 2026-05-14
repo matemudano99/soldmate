@@ -156,6 +156,7 @@ public class ContactController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR')")
     public ResponseEntity<ContactResponse> create(
         @RequestHeader("Authorization") String authHeader,
         @RequestBody CreateRequest req
@@ -169,6 +170,7 @@ public class ContactController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR')")
     public ResponseEntity<ContactResponse> update(
         @RequestHeader("Authorization") String authHeader,
         @PathVariable Long id,
@@ -184,6 +186,7 @@ public class ContactController {
     }
 
     @PatchMapping("/{id}/active")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR')")
     public ResponseEntity<ContactResponse> toggleActive(
         @RequestHeader("Authorization") String authHeader,
         @PathVariable Long id

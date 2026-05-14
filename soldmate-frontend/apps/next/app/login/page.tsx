@@ -196,24 +196,9 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <div className="my-6 flex items-center gap-3">
-            <div className="flex-1 h-px bg-gray-100" />
-            <span className="text-xs text-gray-400">o continúa con</span>
-            <div className="flex-1 h-px bg-gray-100" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            {["Google", "Microsoft"].map((p) => (
-              <button
-                key={p}
-                type="button"
-                className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white py-2.5 text-xs font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
-              >
-                <span className="text-base">{p === "Google" ? "G" : "M"}</span>
-                {p}
-              </button>
-            ))}
-          </div>
+          <p className="mt-6 rounded-xl border border-gray-100 bg-white px-3 py-2 text-center text-[11px] text-gray-500">
+            Acceso con email y contraseña de tu organización.
+          </p>
 
           <p className="mt-5 text-center text-xs text-gray-400">
             ¿No tienes cuenta?{" "}

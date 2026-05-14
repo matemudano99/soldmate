@@ -6,6 +6,7 @@ import { SectionCard } from "../components/web-ui";
 import { ErpPageShell, AppTopHeader, notify } from "../shared/ui";
 import { authApi, describeNetworkError } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
+import { roleDisplayLabel } from "app/lib/rbac";
 import { Building2, Camera, Eye, EyeOff, KeyRound, Lock, Shield, UserRound } from "lucide-react";
 
 const TIMEZONE_OPTIONS = [
@@ -63,14 +64,7 @@ export default function CompanySettingsPage() {
   });
   const [prefsSaved, setPrefsSaved] = useState(false);
 
-  const roleLabel =
-    role === "OWNER"
-      ? "Owner"
-      : role === "MANAGER"
-        ? "Manager"
-        : role === "EMPLOYEE" || role === "STAFF"
-          ? "Employee"
-          : "Usuario";
+  const roleLabel = roleDisplayLabel(role);
 
   const tierLabel = tier === "PREMIUM" ? "Premium" : tier === "FREE" ? "Gratuito" : "—";
 

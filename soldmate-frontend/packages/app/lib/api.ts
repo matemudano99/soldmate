@@ -33,6 +33,18 @@ export function describeNetworkError(err: unknown): string {
 
 // ─── Tipos que coinciden con los DTOs del backend ───────────────────────────
 
+export type UserRole = "OWNER" | "MANAGER" | "SUPERVISOR" | "EMPLOYEE" | "VIEWER";
+
+export function normalizeUserRole(role: string | null | undefined): UserRole | null {
+  if (role == null || role === "") return null;
+  const u = role.trim().toUpperCase();
+  if (u === "STAFF") return "EMPLOYEE";
+  if (u === "OWNER" || u === "MANAGER" || u === "SUPERVISOR" || u === "EMPLOYEE" || u === "VIEWER") {
+    return u;
+  }
+  return "EMPLOYEE";
+}
+
 export interface LinkedCompany {
   companyId: number;
   companyName: string;
@@ -42,7 +54,7 @@ export interface LinkedCompany {
 export interface AuthResponse {
   token: string;
   email: string;
-  role: "OWNER" | "MANAGER" | "EMPLOYEE" | "STAFF";
+  role: UserRole;
   tier: "FREE" | "PREMIUM";
   companyId: number;
   firstName: string | null;
@@ -173,16 +185,24 @@ export interface UserListResponse {
   firstName: string | null;
   lastName: string | null;
   fullName: string | null;
-  role: "OWNER" | "MANAGER" | "EMPLOYEE" | "STAFF";
+  role: UserRole;
   avatarUrl: string | null;
+  nationalId: string | null;
+  jobTitle: string | null;
+  workScheduleNote: string | null;
+  active: boolean;
 }
 
 export interface UserUpsertInput {
   fullName: string;
   email: string;
-  role: "OWNER" | "MANAGER" | "EMPLOYEE" | "STAFF";
+  role: UserRole;
   avatarUrl?: string | null;
   password?: string;
+  nationalId?: string | null;
+  jobTitle?: string | null;
+  workScheduleNote?: string | null;
+  active?: boolean;
 }
 
 export interface DashboardWeeklyPoint {
@@ -277,8 +297,9 @@ export interface ActivityItemResponse {
   id: number;
   type: string;
   title: string;
-  status: "OPEN" | "IN_PROGRESS" | "CLOSED";
-  priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  /** Acción del log (p. ej. CREADO, MODIFICADO, ELIMINADO). */
+  status: string;
+  priority: string;
   createdAt: string;
   actorName: string;
   actorAvatarUrl: string | null;
@@ -321,8 +342,10 @@ async function handleResponse<T>(res: Response): Promise<T> {
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 function normalizeAuthResponse(data: AuthResponse): AuthResponse {
+  const nr = normalizeUserRole(data.role);
   return {
     ...data,
+    role: nr ?? "EMPLOYEE",
     linkedCompanies: Array.isArray(data.linkedCompanies) ? data.linkedCompanies : [],
   };
 }
@@ -595,6 +618,37 @@ export const usersApi = {
       const text = await res.text();
       throw new Error(text || `Error ${res.status}`);
     }
+  },
+};
+
+export interface VacationResponse {
+  id: number;
+  userId: number;
+  userEmail: string;
+  userFullName: string;
+  startDate: string;
+  endDate: string;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface VacationCreateInput {
+  startDate: string;
+  endDate: string;
+  notes?: string | null;
+}
+
+export const vacationsApi = {
+  list: async (token: string): Promise<VacationResponse[]> => {
+    const res = await authFetch("/api/v1/vacations", token);
+    return handleResponse<VacationResponse[]>(res);
+  },
+  create: async (token: string, body: VacationCreateInput): Promise<VacationResponse> => {
+    const res = await authFetch("/api/v1/vacations", token, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return handleResponse<VacationResponse>(res);
   },
 };
 
@@ -897,6 +951,8 @@ export interface DocumentResponse {
   uploaderName: string;
   uploaderEmail: string | null;
   uploaderAvatarUrl: string | null;
+  linkedUserId: number | null;
+  linkedUserName: string | null;
 }
 
 export interface DocumentStatsResponse {
@@ -935,12 +991,16 @@ export const documentsApi = {
     token: string,
     file: File,
     name?: string,
-    category?: string
+    category?: string,
+    linkedUserId?: number | null
   ): Promise<DocumentResponse> => {
     const formData = new FormData();
     formData.append("file", file);
-    if (name)     formData.append("name",     name);
+    if (name) formData.append("name", name);
     if (category) formData.append("category", category);
+    if (linkedUserId != null && linkedUserId > 0) {
+      formData.append("linkedUserId", String(linkedUserId));
+    }
 
     const res = await fetch(`${BASE_URL}/api/v1/documents/upload`, {
       method: "POST",
@@ -953,7 +1013,12 @@ export const documentsApi = {
   update: async (
     token: string,
     id: number,
-    data: { name?: string; category?: string }
+    data: {
+      name?: string;
+      category?: string;
+      linkedUserId?: number | null;
+      setLinkedUser?: boolean;
+    }
   ): Promise<DocumentResponse> => {
     const res = await authFetch(`/api/v1/documents/${id}`, token, {
       method: "PATCH",

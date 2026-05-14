@@ -48,7 +48,7 @@ public class InventoryCategoryController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('OWNER')")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR')")
     public ResponseEntity<InventoryCategoryResponse> create(
         @RequestHeader("Authorization") String authHeader,
         @Valid @RequestBody CreateInventoryCategoryRequest req
@@ -59,7 +59,7 @@ public class InventoryCategoryController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('OWNER')")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR')")
     public ResponseEntity<InventoryCategoryResponse> update(
         @RequestHeader("Authorization") String authHeader,
         @PathVariable Long id,
@@ -71,7 +71,7 @@ public class InventoryCategoryController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('OWNER')")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR')")
     public ResponseEntity<Void> delete(
         @RequestHeader("Authorization") String authHeader,
         @PathVariable Long id

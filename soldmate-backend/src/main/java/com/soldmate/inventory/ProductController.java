@@ -90,7 +90,7 @@ public class ProductController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('OWNER')")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR')")
     public ResponseEntity<ProductResponse> createProduct(
         @RequestHeader("Authorization") String authHeader,
         @Valid @RequestBody CreateProductRequest req
@@ -116,6 +116,7 @@ public class ProductController {
     }
 
     @PatchMapping("/{id}/stock")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR','EMPLOYEE')")
     public ResponseEntity<ProductResponse> updateStock(
         @RequestHeader("Authorization") String authHeader,
         @PathVariable Long id,
@@ -132,7 +133,7 @@ public class ProductController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('OWNER')")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR')")
     public ResponseEntity<ProductResponse> updateProduct(
         @RequestHeader("Authorization") String authHeader,
         @PathVariable Long id,
@@ -159,7 +160,7 @@ public class ProductController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('OWNER')")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR')")
     public ResponseEntity<Void> deleteProduct(
         @RequestHeader("Authorization") String authHeader,
         @PathVariable Long id

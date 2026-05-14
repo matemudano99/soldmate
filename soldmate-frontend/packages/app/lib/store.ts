@@ -9,7 +9,8 @@
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import type { AuthResponse, LinkedCompany } from "./api";
+import type { AuthResponse, LinkedCompany, UserRole } from "./api";
+import { normalizeUserRole } from "./api";
 import type { StateStorage } from "zustand/middleware";
 
 // ─── Tipos del estado ────────────────────────────────────────────────────────
@@ -18,7 +19,7 @@ interface AuthState {
   // Datos del usuario autenticado (null si no ha iniciado sesión)
   token: string | null;
   email: string | null;
-  role: "OWNER" | "MANAGER" | "EMPLOYEE" | "STAFF" | null;
+  role: UserRole | null;
   tier: "FREE" | "PREMIUM" | null;
   companyId: number | null;
   firstName: string | null;
@@ -142,7 +143,7 @@ export const useAuthStore = create<AuthState>()(
     set({
       token: data.token,
       email: data.email,
-      role: data.role,
+      role: normalizeUserRole(data.role),
       tier: data.tier,
       companyId: data.companyId ?? null,
       firstName: data.firstName ?? null,
@@ -159,7 +160,7 @@ export const useAuthStore = create<AuthState>()(
     set({
       token: data.token,
       email: data.email,
-      role: data.role,
+      role: normalizeUserRole(data.role),
       tier: data.tier,
       companyId: data.companyId ?? null,
       firstName: data.firstName ?? null,
@@ -174,7 +175,7 @@ export const useAuthStore = create<AuthState>()(
     setCookie("sm_token", data.token, isRememberLocalStorage() ? 86400 : undefined);
     set({
       token: data.token,
-      role: data.role,
+      role: normalizeUserRole(data.role),
       tier: data.tier,
       companyId: data.companyId ?? null,
       linkedCompanies: data.linkedCompanies ?? [],
@@ -224,6 +225,9 @@ export const useAuthStore = create<AuthState>()(
       onRehydrateStorage: () => (state) => {
         if (state && !Array.isArray(state.linkedCompanies)) {
           state.linkedCompanies = [];
+        }
+        if (state?.role) {
+          state.role = normalizeUserRole(state.role as string) ?? state.role;
         }
       },
     }

@@ -5,7 +5,7 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
-import { Users, ShoppingCart, Star, Activity, Download } from "lucide-react";
+import { Users, ShoppingCart, Activity, Download, Percent } from "lucide-react";
 import { AppTopHeader, ErpPageShell, notify } from "../shared/ui";
 import { dashboardApi, inventoryApi } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
@@ -38,18 +38,18 @@ const HOURLY_TRAFFIC = [
 ];
 
 const TOP_PRODUCTS = [
-  { name: "Paella Valenciana",   sales: 284, rating: 4.9, revenue: 5680 },
-  { name: "Sangría jarra",       sales: 412, rating: 4.7, revenue: 4120 },
-  { name: "Croquetas caseras",   sales: 356, rating: 4.8, revenue: 2848 },
-  { name: "Tortilla española",   sales: 198, rating: 4.6, revenue: 1584 },
-  { name: "Tarta de queso",      sales: 167, rating: 4.9, revenue: 1336 },
+  { name: "Paella Valenciana", sales: 284, revenue: 5680, marginPct: 22 },
+  { name: "Sangría jarra", sales: 412, revenue: 4120, marginPct: 19 },
+  { name: "Croquetas caseras", sales: 356, revenue: 2848, marginPct: 24 },
+  { name: "Tortilla española", sales: 198, revenue: 1584, marginPct: 18 },
+  { name: "Tarta de queso", sales: 167, revenue: 1336, marginPct: 26 },
 ];
 
 const SUMMARY_KPIS = [
-  { label: "Clientes esta semana", value: "961",    Icon: Users,        color: "text-[#4f6ef7]", bg: "bg-blue-50 border-blue-100" },
-  { label: "Pedidos totales",      value: "295",    Icon: ShoppingCart, color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-100" },
-  { label: "Valoración media",     value: "4.8 ★", Icon: Star,         color: "text-amber-500", bg: "bg-amber-50 border-amber-100" },
-  { label: "Incidencias abiertas", value: "3",      Icon: Activity,     color: "text-red-500",  bg: "bg-red-50 border-red-100" },
+  { label: "Clientes esta semana", value: "961", Icon: Users, color: "text-[#4f6ef7]", bg: "bg-blue-50 border-blue-100" },
+  { label: "Pedidos totales", value: "295", Icon: ShoppingCart, color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-100" },
+  { label: "Margen bruto (ejemplo)", value: "21%", Icon: Percent, color: "text-amber-500", bg: "bg-amber-50 border-amber-100" },
+  { label: "Incidencias abiertas", value: "3", Icon: Activity, color: "text-red-500", bg: "bg-red-50 border-red-100" },
 ];
 
 const PERIODS = ["Esta semana", "Este mes", "Este año"] as const;
@@ -283,9 +283,9 @@ export default function StatsPage() {
                       />
                     </div>
                   </div>
-                  <div className="flex items-center gap-0.5 flex-shrink-0">
-                    <Star size={10} className="text-amber-400 fill-amber-400" />
-                    <span className="text-xs font-semibold text-gray-500">{p.rating}</span>
+                  <div className="flex flex-col items-end gap-0.5 flex-shrink-0 text-right">
+                    <span className="text-[10px] font-semibold text-gray-500">{p.revenue.toLocaleString("es-ES")} €</span>
+                    <span className="text-[10px] text-emerald-600 font-medium">Margen ~{p.marginPct}%</span>
                   </div>
                 </div>
               ))}

@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -81,6 +82,7 @@ public class CalendarController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR','EMPLOYEE')")
     public ResponseEntity<CalendarEventResponse> createEvent(
         @RequestHeader("Authorization") String authHeader,
         @Valid @RequestBody CreateCalendarEventRequest req
@@ -105,6 +107,7 @@ public class CalendarController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR','EMPLOYEE')")
     public ResponseEntity<CalendarEventResponse> updateEvent(
         @RequestHeader("Authorization") String authHeader,
         @PathVariable Long id,
@@ -128,6 +131,7 @@ public class CalendarController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','SUPERVISOR','EMPLOYEE')")
     public ResponseEntity<Void> deleteEvent(
         @RequestHeader("Authorization") String authHeader,
         @PathVariable Long id
