@@ -47,7 +47,7 @@ const CITY = { label: "negocio" };
 const RAIN_ALERT_MM = 1.0;
 const STRONG_WIND_KMH = 35;
 const TASK_PREVIEW_COUNT = 4;
-/** Semanas extra tras la semana actual (cada una suma 7 días). Máx. 3 → hasta 28 días. */
+/** Semanas extra tras la primera semana (cada una suma 7 días). Máx. 3 → hasta 28 días desde hoy. */
 const MAX_EXTRA_WEEKS = 3;
 
 function localIso(d: Date): string {
@@ -149,15 +149,14 @@ export default function CalendarPage() {
 
   const todayStr = localIso(new Date());
 
+  /** Desde hoy (inclusive), en bloques de 7 días — sin fechas pasadas; sigue siendo “por semanas”. */
   const visibleDates = useMemo(() => {
-    const now = new Date();
-    const monday = new Date(now);
-    const diff = (now.getDay() + 6) % 7;
-    monday.setDate(now.getDate() - diff);
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
     const totalDays = Math.min(7 + extraWeeks * 7, 7 + MAX_EXTRA_WEEKS * 7);
     return Array.from({ length: totalDays }, (_, i) => {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + i);
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
       const iso = localIso(d);
       const shortRaw = d.toLocaleDateString("es-ES", { weekday: "short" });
       const short = shortRaw.replace(/\./g, "").trim();
@@ -315,7 +314,7 @@ export default function CalendarPage() {
 
           <SectionCard
             title={extraWeeks > 0 ? `Próximos ${visibleDates.length} días` : "Vista semanal"}
-            subtitle={`Desde el lunes de esta semana: pronóstico, festivos públicos de referencia para Málaga (capital: laboral estatal, andaluz y dos locales típicas; sin traslados por domingo) y tareas. «Ver más» amplía hasta ${7 + MAX_EXTRA_WEEKS * 7} días.`}
+            subtitle={`Desde hoy (sin días pasados): pronóstico, festivos públicos de referencia para Málaga (capital: laboral estatal, andaluz y dos locales típicas; sin traslados por domingo) y tareas. Cada bloque son 7 días; «Ver más» añade otra semana, hasta ${7 + MAX_EXTRA_WEEKS * 7} días.`}
           >
             {forecastError && !loadingForecast && (
               <div className="mb-4 rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-600">
@@ -527,7 +526,7 @@ export default function CalendarPage() {
                   onClick={() => setExtraWeeks(0)}
                   className="text-xs font-semibold text-gray-500 underline-offset-2 hover:text-[#4f6ef7] hover:underline"
                 >
-                  Volver a mostrar solo esta semana
+                  Volver a mostrar solo los próximos 7 días
                 </button>
               ) : null}
             </div>

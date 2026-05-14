@@ -630,14 +630,24 @@ export default function FinancesPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 border-b border-gray-50 px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400 sm:grid-cols-[1.2fr_auto_auto_auto_auto_auto_auto] sm:gap-4 sm:px-5">
-                      <span>Fecha / notas</span>
-                      <span className="hidden text-right sm:block">Apertura</span>
-                      <span className="text-right">Canales</span>
-                      <span className="text-right">Gastos</span>
-                      <span className="hidden text-right sm:block">Cierre</span>
-                      <span className="hidden text-right sm:block">Saldo final</span>
-                      <span className="text-right"> </span>
+                    {/* Cabecera: flex + anchos fijos evita solaparse con la columna de acciones (grid + hidden rompía el flujo). */}
+                    <div className="hidden border-b border-gray-50 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400 sm:flex sm:items-center sm:gap-3 sm:px-5">
+                      <span className="min-w-0 flex-1">Fecha / notas</span>
+                      <span className="hidden w-[5.75rem] shrink-0 text-right lg:block">Apertura</span>
+                      <span className="w-[5.75rem] shrink-0 text-right">Canales</span>
+                      <span className="w-[5.75rem] shrink-0 text-right">Gastos</span>
+                      <span className="hidden w-[5.75rem] shrink-0 text-right xl:block">Cierre</span>
+                      <span className="hidden w-[5.75rem] shrink-0 text-right lg:block">Saldo</span>
+                      <span className="w-[5.25rem] shrink-0 sm:text-right" aria-hidden>
+                        {" "}
+                      </span>
+                    </div>
+                    <div className="flex border-b border-gray-50 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 sm:hidden">
+                      <span className="min-w-0 flex-1">Día / notas</span>
+                      <span className="w-[5.25rem] shrink-0 text-right">Canales</span>
+                      <span className="w-[5.25rem] shrink-0 text-right">Gastos</span>
+                      <span className="w-[5.25rem] shrink-0 text-right">Saldo</span>
+                      <span className="w-[5.25rem] shrink-0" aria-hidden />
                     </div>
                     <div className="divide-y divide-gray-50">
                       {filteredRows.map((row) => {
@@ -654,9 +664,9 @@ export default function FinancesPage() {
                         return (
                           <div
                             key={row.id}
-                            className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-2 px-3 py-3.5 transition-colors hover:bg-[#fafbff] sm:grid-cols-[1.2fr_auto_auto_auto_auto_auto_auto] sm:gap-4 sm:px-5"
+                            className="flex flex-col gap-2 px-4 py-3 transition-colors hover:bg-[#fafbff] sm:flex-row sm:items-center sm:gap-3 sm:px-5 sm:py-3.5"
                           >
-                            <div className="min-w-0">
+                            <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium capitalize text-[#1e2040]">
                                 {fecha}
                                 {nExp > 0 && (
@@ -672,30 +682,37 @@ export default function FinancesPage() {
                                 <p className="mt-0.5 text-xs text-gray-300">—</p>
                               )}
                             </div>
-                            <span className="hidden whitespace-nowrap text-right text-xs font-medium text-gray-500 sm:block">
-                              {formatEuro(num(row.cashOpening))}
-                            </span>
-                            <span className="whitespace-nowrap text-right text-sm font-semibold text-emerald-600">
-                              {formatEuro(rev)}
-                            </span>
-                            <span className="whitespace-nowrap text-right text-sm font-semibold text-red-500">
-                              {formatEuro(exp)}
-                            </span>
-                            <span className="hidden whitespace-nowrap text-right text-xs font-medium text-gray-500 sm:block">
-                              {formatEuro(num(row.cashClosing))}
-                            </span>
-                            <span
-                              className={`hidden whitespace-nowrap text-right text-sm font-bold sm:block ${saldo >= 0 ? "text-emerald-600" : "text-red-500"}`}
-                            >
-                              {formatEuro(saldo)}
-                            </span>
-                            <div className="flex justify-end gap-1">
-                              {canWrite && (
-                                <>
+                            <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-gray-100 pt-2 sm:flex-nowrap sm:justify-end sm:border-t-0 sm:pt-0">
+                              <div className="flex flex-1 flex-wrap items-center justify-end gap-x-3 gap-y-1 sm:flex-nowrap sm:gap-3">
+                                <span className="hidden w-[5.75rem] shrink-0 whitespace-nowrap text-right text-xs font-medium text-gray-500 lg:block">
+                                  {formatEuro(num(row.cashOpening))}
+                                </span>
+                                <span className="w-[5.75rem] shrink-0 whitespace-nowrap text-right text-sm font-semibold text-emerald-600">
+                                  {formatEuro(rev)}
+                                </span>
+                                <span className="w-[5.75rem] shrink-0 whitespace-nowrap text-right text-sm font-semibold text-red-500">
+                                  {formatEuro(exp)}
+                                </span>
+                                <span
+                                  className={`block w-[5.75rem] shrink-0 whitespace-nowrap text-right text-sm font-bold sm:hidden ${saldo >= 0 ? "text-emerald-600" : "text-red-500"}`}
+                                >
+                                  {formatEuro(saldo)}
+                                </span>
+                                <span className="hidden w-[5.75rem] shrink-0 whitespace-nowrap text-right text-xs font-medium text-gray-500 xl:block">
+                                  {formatEuro(num(row.cashClosing))}
+                                </span>
+                                <span
+                                  className={`hidden w-[5.75rem] shrink-0 whitespace-nowrap text-right text-sm font-bold lg:block ${saldo >= 0 ? "text-emerald-600" : "text-red-500"}`}
+                                >
+                                  {formatEuro(saldo)}
+                                </span>
+                              </div>
+                              {canWrite ? (
+                                <div className="flex shrink-0 items-center justify-end gap-0.5 sm:w-[5.25rem]">
                                   <button
                                     type="button"
                                     onClick={() => setModal({ mode: "edit", initial: row })}
-                                    className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-[#4f6ef7]"
+                                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-[#4f6ef7]"
                                     aria-label="Editar"
                                   >
                                     <Pencil size={16} />
@@ -704,12 +721,14 @@ export default function FinancesPage() {
                                     type="button"
                                     onClick={() => onDeleteRow(row)}
                                     disabled={deleteMut.isPending}
-                                    className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
                                     aria-label="Archivar"
                                   >
                                     <Trash2 size={16} />
                                   </button>
-                                </>
+                                </div>
+                              ) : (
+                                <div className="hidden w-[5.25rem] shrink-0 sm:block" aria-hidden />
                               )}
                             </div>
                           </div>
