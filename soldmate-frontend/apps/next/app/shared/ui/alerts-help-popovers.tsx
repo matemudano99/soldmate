@@ -1,9 +1,13 @@
 "use client";
 
 import React from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, Bell, CheckCircle, Clock, HelpCircle, LifeBuoy, Mail, Phone } from "lucide-react";
 import { alertsApi, notificationsApi, describeNetworkError, type AlertResponse, type NotificationResponse } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
+
+const PANEL_WIDTH = 340;
+const VIEW_PADDING = 8;
 
 function useOutsideClose(ref: React.RefObject<HTMLDivElement | null>, onClose: () => void) {
   React.useEffect(() => {
@@ -23,11 +27,48 @@ export function AlertsBellPopover() {
   const [notifications, setNotifications] = React.useState<NotificationResponse[]>([]);
   const [unreadCount, setUnreadCount] = React.useState(0);
   const [error, setError] = React.useState<string | null>(null);
-  const rootRef = React.useRef<HTMLDivElement>(null);
+  const [panelPos, setPanelPos] = React.useState<{ top: number; left: number } | null>(null);
+  const buttonRef = React.useRef<HTMLButtonElement>(null);
+  const panelRef = React.useRef<HTMLDivElement>(null);
 
-  useOutsideClose(rootRef, () => setOpen(false));
+  // Close on outside click
+  React.useEffect(() => {
+    if (!open) return;
+    function handleOutside(e: MouseEvent) {
+      const t = e.target as Node;
+      if (buttonRef.current?.contains(t) || panelRef.current?.contains(t)) return;
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [open]);
 
-  // Fetch unread count on mount (to show badge)
+  // Compute position
+  const updatePos = React.useCallback(() => {
+    if (!buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const panelW = Math.min(PANEL_WIDTH, vw - VIEW_PADDING * 2);
+    // Prefer aligning right edge to button right edge; clamp to viewport
+    let left = rect.right - panelW;
+    left = Math.max(VIEW_PADDING, Math.min(left, vw - panelW - VIEW_PADDING));
+    let top = rect.bottom + 6;
+    const estHeight = 360;
+    if (top + estHeight > vh - VIEW_PADDING && rect.top > estHeight) {
+      top = rect.top - estHeight - 6;
+    }
+    setPanelPos({ top, left });
+  }, []);
+
+  React.useLayoutEffect(() => {
+    if (!open) { setPanelPos(null); return; }
+    updatePos();
+    window.addEventListener("resize", updatePos);
+    return () => window.removeEventListener("resize", updatePos);
+  }, [open, updatePos]);
+
+  // Fetch unread count on mount
   React.useEffect(() => {
     if (!token) return;
     notificationsApi.getUnreadCount(token).then(setUnreadCount).catch(() => {});
@@ -71,9 +112,72 @@ export function AlertsBellPopover() {
     } catch { /* silent */ }
   };
 
+  const panel = open && panelPos && typeof document !== "undefined" && createPortal(
+    <div
+      ref={panelRef}
+      className="fixed z-[100] rounded-2xl border border-gray-100 bg-white shadow-[0_8px_28px_rgba(149,157,165,0.24)] overflow-hidden"
+      style={{
+        top: panelPos.top,
+        left: panelPos.left,
+        width: Math.min(PANEL_WIDTH, window.innerWidth - VIEW_PADDING * 2),
+      }}
+    >
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
+        <p className="text-sm font-semibold text-[#1e2040]">Notificaciones</p>
+        {unreadCount > 0 && (
+          <button type="button" onClick={handleMarkAllRead} className="text-xs text-[#4f6ef7] hover:underline">
+            Marcar todas leídas
+          </button>
+        )}
+      </div>
+      <div className="max-h-80 overflow-y-auto">
+        {notifications.map((n) => {
+          const Icon = n.type === "ALERT" ? AlertTriangle : n.type === "WARNING" ? Clock : CheckCircle;
+          const styles = n.type === "ALERT" ? "text-red-500" : n.type === "WARNING" ? "text-amber-500" : "text-[#4f6ef7]";
+          return (
+            <button
+              key={n.id}
+              type="button"
+              onClick={() => handleMarkRead(n.id)}
+              className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-50 ${n.read ? "opacity-60" : ""}`}
+            >
+              <Icon size={14} className={`mt-0.5 flex-shrink-0 ${styles}`} />
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-medium text-[#1e2040] truncate ${n.read ? "" : "font-semibold"}`}>{n.title}</p>
+                {n.body && <p className="text-xs text-gray-400 truncate mt-0.5">{n.body}</p>}
+              </div>
+              {!n.read && <span className="w-2 h-2 bg-[#4f6ef7] rounded-full mt-1 flex-shrink-0" />}
+            </button>
+          );
+        })}
+        {alerts.length > 0 && (
+          <div className="px-4 pt-3 pb-1">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Alertas de inventario</p>
+          </div>
+        )}
+        {alerts.map((a, idx) => {
+          const Icon = a.type === "critical" ? AlertTriangle : a.type === "warning" ? Clock : CheckCircle;
+          const styles = a.type === "critical" ? "text-red-600" : a.type === "warning" ? "text-amber-600" : "text-green-600";
+          return (
+            <div key={`alert-${idx}`} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50">
+              <Icon size={14} className={`flex-shrink-0 ${styles}`} />
+              <span className="text-sm text-gray-700 truncate">{a.text}</span>
+            </div>
+          );
+        })}
+        {!notifications.length && !alerts.length ? (
+          <p className="text-xs text-gray-400 px-4 py-8 text-center">Sin notificaciones</p>
+        ) : null}
+      </div>
+      {error ? <p className="text-xs text-amber-600 px-4 pb-3">{error}</p> : null}
+    </div>,
+    document.body,
+  );
+
   return (
-    <div className="relative" ref={rootRef}>
+    <div className="relative flex-shrink-0">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="relative p-2.5 rounded-xl bg-white border border-gray-100 shadow-sm hover:bg-gray-50"
@@ -86,60 +190,7 @@ export function AlertsBellPopover() {
           </span>
         )}
       </button>
-      {open ? (
-        <div className="absolute right-0 top-12 z-50 w-[min(360px,calc(100vw-1rem))] rounded-2xl border border-gray-100 bg-white shadow-[0_8px_28px_rgba(149,157,165,0.24)] overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
-            <p className="text-sm font-semibold text-[#1e2040]">Notificaciones</p>
-            {unreadCount > 0 && (
-              <button type="button" onClick={handleMarkAllRead} className="text-xs text-[#4f6ef7] hover:underline">
-                Marcar todas leídas
-              </button>
-            )}
-          </div>
-          <div className="max-h-80 overflow-y-auto">
-            {/* Persistent notifications */}
-            {notifications.map((n) => {
-              const Icon = n.type === "ALERT" ? AlertTriangle : n.type === "WARNING" ? Clock : CheckCircle;
-              const styles = n.type === "ALERT" ? "text-red-500" : n.type === "WARNING" ? "text-amber-500" : "text-[#4f6ef7]";
-              return (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => handleMarkRead(n.id)}
-                  className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-50 ${n.read ? "opacity-60" : ""}`}
-                >
-                  <Icon size={14} className={`mt-0.5 flex-shrink-0 ${styles}`} />
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium text-[#1e2040] ${n.read ? "" : "font-semibold"}`}>{n.title}</p>
-                    {n.body && <p className="text-xs text-gray-400 truncate mt-0.5">{n.body}</p>}
-                  </div>
-                  {!n.read && <span className="w-2 h-2 bg-[#4f6ef7] rounded-full mt-1 flex-shrink-0" />}
-                </button>
-              );
-            })}
-            {/* Legacy inventory alerts */}
-            {alerts.length > 0 && (
-              <div className="px-4 pt-3 pb-1">
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Alertas de inventario</p>
-              </div>
-            )}
-            {alerts.map((a, idx) => {
-              const Icon = a.type === "critical" ? AlertTriangle : a.type === "warning" ? Clock : CheckCircle;
-              const styles = a.type === "critical" ? "text-red-600" : a.type === "warning" ? "text-amber-600" : "text-green-600";
-              return (
-                <div key={`alert-${idx}`} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50">
-                  <Icon size={14} className={`flex-shrink-0 ${styles}`} />
-                  <span className="text-sm text-gray-700">{a.text}</span>
-                </div>
-              );
-            })}
-            {!notifications.length && !alerts.length ? (
-              <p className="text-xs text-gray-400 px-4 py-8 text-center">Sin notificaciones</p>
-            ) : null}
-          </div>
-          {error ? <p className="text-xs text-amber-600 px-4 pb-3">{error}</p> : null}
-        </div>
-      ) : null}
+      {panel}
     </div>
   );
 }
@@ -205,4 +256,3 @@ export function HelpCenterPopover({ compact = false }: HelpCenterPopoverProps) {
     </div>
   );
 }
-

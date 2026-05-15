@@ -129,10 +129,10 @@ export function AppTopHeader() {
 
   return (
     <header className="flex flex-shrink-0 items-center justify-between gap-2 py-3 pl-14 pr-4 md:px-7 md:py-4">
-      <div className="min-w-0 flex-1 overflow-hidden">
+      <div className="min-w-0 flex-1">
         <p className="text-[10px] text-gray-400 md:text-xs">{todayCap}</p>
         <div className="mt-0.5 flex min-w-0 items-center gap-1">
-          <h1 className="min-w-0 truncate text-sm font-bold text-[#1e2040] md:text-xl">{displayName}</h1>
+          <h1 className="min-w-0 truncate text-sm font-bold text-[#1e2040] max-w-[38vw] md:max-w-none md:text-xl">{displayName}</h1>
           {showCompanyPicker ? (
             <div className="relative shrink-0" ref={companyMenuRef}>
               <button
