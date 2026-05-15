@@ -128,7 +128,7 @@ export function AppTopHeader() {
   };
 
   return (
-    <header className="flex flex-shrink-0 items-center justify-between gap-4 py-4 pl-16 pr-7 md:px-7">
+    <header className="flex flex-shrink-0 items-center justify-between gap-4 py-4 px-4 md:px-7">
       <div>
         <p className="text-xs text-gray-400">{todayCap}</p>
         <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1">

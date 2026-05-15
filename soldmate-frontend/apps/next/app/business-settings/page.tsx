@@ -83,9 +83,10 @@ export default function BusinessSettingsPage() {
 
   useEffect(() => {
     if (!token) return;
+    const authToken = token; // narrowed: string (not null)
     async function loadBusiness() {
       try {
-        const data = await businessProfileApi.get(token);
+        const data = await businessProfileApi.get(authToken);
         setBusiness({
           businessName: data.businessName ?? "",
           phone: data.phone ?? "",

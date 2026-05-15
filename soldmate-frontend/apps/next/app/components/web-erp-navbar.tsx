@@ -100,7 +100,7 @@ export function WebErpNavbar() {
       <button
         type="button"
         onClick={() => setMobileOpen((v) => !v)}
-        className="md:hidden fixed top-4 left-4 z-50 inline-flex items-center justify-center w-11 h-11 rounded-xl border border-gray-200 bg-white text-[#1e2040] shadow-[0_8px_24px_rgba(15,23,42,0.14)]"
+        className="md:hidden fixed bottom-6 left-4 z-50 inline-flex items-center justify-center w-12 h-12 rounded-2xl border border-gray-200 bg-white text-[#1e2040] shadow-[0_8px_24px_rgba(15,23,42,0.18)]"
         title={mobileOpen ? "Cerrar menu" : "Abrir menu"}
       >
         {mobileOpen ? <X size={18} /> : <PanelLeftOpen size={18} />}

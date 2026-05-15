@@ -689,6 +689,7 @@ export default function PeoplePage() {
           workScheduleNote: payload.workScheduleNote,
           active: payload.active,
           avatar: null,
+          lastSeenAt: null,
         },
         payload.password
       )
