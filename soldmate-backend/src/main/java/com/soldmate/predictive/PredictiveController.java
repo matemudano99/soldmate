@@ -68,7 +68,9 @@ public class PredictiveController {
         double lat = company.getLatitude() != null ? company.getLatitude() : 40.4168;
         double lon = company.getLongitude() != null ? company.getLongitude() : -3.7038;
         List<ForecastController.ImpactDay> forecast = forecastController.getImpactForCoordinates(lat, lon);
-        List<PredictiveDay> output = forecast.stream().map(f -> {
+        List<PredictiveDay> output = forecast.stream()
+            .filter(f -> LocalDate.parse(f.date()).isAfter(now))
+            .map(f -> {
             LocalDate date = LocalDate.parse(f.date());
             double baseline = baselineByDay.getOrDefault(date.getDayOfWeek(), 250.0);
             double weatherFactor = Math.max(0.55, 1 - (f.impactScore() / 100.0));

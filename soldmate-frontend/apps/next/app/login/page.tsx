@@ -106,7 +106,27 @@ export default function LoginPage() {
           </div>
 
           <h2 className="text-2xl font-bold text-[#1e2040] mb-1">Bienvenido de nuevo</h2>
-          <p className="text-gray-400 text-sm mb-7">Accede a tu panel operativo</p>
+          <p className="text-gray-400 text-sm mb-4">Accede a tu panel operativo</p>
+
+          <div className="mb-6 flex flex-wrap gap-2">
+            {[
+              { role: "Owner", email: "owner@test.com" },
+              { role: "Manager", email: "manager@test.com" },
+              { role: "Supervisor", email: "supervisor@test.com" },
+              { role: "Employee", email: "employee@test.com" },
+              { role: "Viewer", email: "viewer@test.com" }
+            ].map(t => (
+              <button
+                key={t.role}
+                type="button"
+                onClick={() => { setEmail(t.email); setPassword("Password123!"); }}
+                className="rounded border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+                title={`Usar credenciales de ${t.role}`}
+              >
+                {t.role}
+              </button>
+            ))}
+          </div>
 
           {error && (
             <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">
