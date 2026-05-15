@@ -1,12 +1,10 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
-  DollarSign, Wrench, Package, Users, TrendingUp,
-  ChevronRight, Circle,
-  CheckCircle2, Clock, Activity, CloudRain,
-  FileText, Palmtree
+  DollarSign, Wrench, Package, Users,
+  Circle, CheckCircle2, Clock, CloudRain,
+  FileText, Palmtree, Sun, Landmark, CalendarDays,
 } from "lucide-react";
 import { ErpPageShell, AppTopHeader, PageListSearchField, KpiCard, SectionCard } from "../shared/ui";
 import Link from "next/link";
@@ -18,32 +16,31 @@ import {
   describeNetworkError,
   forecastApi,
   inventoryApi,
-  predictionsApi,
   financeApi,
   type ActivityItemResponse,
   type BusinessProfileResponse,
   type DashboardSummaryResponse,
-  type PredictiveDay,
   type ProductResponse,
   type ForecastImpactDay,
-  type DailyFinanceEntryResponse
+  type DailyFinanceEntryResponse,
 } from "app/lib/api";
 import { compareProductsByCategoryThenName } from "app/lib/inventorySort";
-import { isBusinessOpenNow } from "app/lib/weather";
+import { calendarYmdLocal, isBusinessOpenNow } from "app/lib/weather";
+import {
+  buildUpcomingOperationalAlerts,
+  formatOperationalDayTitle,
+  type OperationalAlertDay,
+} from "../../lib/operationalAlerts";
+import type { OperationalAlertKind } from "app/lib/weather";
 
-const RAIN_DASHBOARD_MIN_MM = 5.0;
-
-function calendarYmdLocal(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function isForecastDateAfterToday(dateIso: string): boolean {
-  const ymd = dateIso.slice(0, 10);
-  return ymd > calendarYmdLocal(new Date());
-}
+const ALERT_BADGE: Record<
+  OperationalAlertKind,
+  { label: string; className: string; Icon: typeof CloudRain }
+> = {
+  rain: { label: "Lluvia", className: "bg-sky-100 text-sky-800", Icon: CloudRain },
+  heat: { label: "Calor", className: "bg-orange-100 text-orange-800", Icon: Sun },
+  holiday: { label: "Festivo", className: "bg-violet-100 text-violet-800", Icon: Landmark },
+};
 
 const QUICK_ACTIONS = [
   { label: "Cierre de caja",    href: "/finances",      color: "bg-emerald-50 text-emerald-600 hover:bg-emerald-100", Icon: DollarSign },
@@ -67,10 +64,47 @@ const PRIORITY_CFG = {
   LOW:      "text-blue-400",
 };
 
+function OperationalAlertRow({ alert }: { alert: OperationalAlertDay }) {
+  const isToday = alert.date === calendarYmdLocal(new Date());
+  return (
+    <li
+      className={`flex flex-col gap-2 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
+        isToday ? "border-indigo-200 bg-indigo-50/40" : "border-gray-100 bg-gray-50/60"
+      }`}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-[#1e2040]">
+          {formatOperationalDayTitle(alert.date)}
+          {isToday ? (
+            <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-indigo-600">Hoy</span>
+          ) : null}
+        </p>
+        <p className="mt-0.5 text-xs text-gray-600">{alert.summary}</p>
+        {alert.forecast?.recommendation ? (
+          <p className="mt-1 text-[11px] text-gray-500">{alert.forecast.recommendation}</p>
+        ) : null}
+      </div>
+      <div className="flex flex-wrap gap-1.5 sm:justify-end">
+        {alert.kinds.map((kind) => {
+          const b = ALERT_BADGE[kind];
+          return (
+            <span
+              key={kind}
+              className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold ${b.className}`}
+            >
+              <b.Icon size={12} />
+              {b.label}
+            </span>
+          );
+        })}
+      </div>
+    </li>
+  );
+}
+
 export default function DashboardPage() {
   const token = useAuthStore((s) => s.token);
   const [summary, setSummary] = useState<DashboardSummaryResponse | null>(null);
-  const [predictions, setPredictions] = useState<PredictiveDay[]>([]);
   const [allLowStockProducts, setAllLowStockProducts] = useState<ProductResponse[]>([]);
   const [activityFeedFull, setActivityFeedFull] = useState<ActivityItemResponse[]>([]);
   const [businessProfile, setBusinessProfile] = useState<BusinessProfileResponse | null>(null);
@@ -86,19 +120,17 @@ export default function DashboardPage() {
         setError(null);
         const todayStr = calendarYmdLocal(new Date());
         
-        const [summaryRes, weatherRes, predictionRes, productsRes, activityRes, businessRes, financeRes] = await Promise.all([
+        const [summaryRes, weatherRes, productsRes, activityRes, businessRes, financeRes] = await Promise.all([
           dashboardApi.getSummary(token!),
           forecastApi.getImpact(token!),
-          predictionsApi.getOperations(token!),
           inventoryApi.getAll(token!),
           activityApi.getAll(token!),
           businessProfileApi.get(token!),
-          financeApi.listDaily(token!, todayStr, todayStr).catch(() => [])
+          financeApi.listDaily(token!, todayStr, todayStr).catch(() => []),
         ]);
-        
+
         setSummary(summaryRes);
         setWeatherImpactRaw(weatherRes);
-        setPredictions(predictionRes.slice(0, 3));
         setAllLowStockProducts([...productsRes].sort(compareProductsByCategoryThenName).filter((p) => p.lowStock));
         setActivityFeedFull(activityRes);
         setBusinessProfile(businessRes);
@@ -144,11 +176,10 @@ export default function DashboardPage() {
       .slice(0, 6);
   }, [activityFeedFull, dq]);
 
-  const rainForecastDays = useMemo(() => {
-    return [...weatherImpactRaw]
-      .filter((d) => isForecastDateAfterToday(d.date) && d.rain >= RAIN_DASHBOARD_MIN_MM)
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }, [weatherImpactRaw]);
+  const operationalAlerts = useMemo(
+    () => buildUpcomingOperationalAlerts(weatherImpactRaw),
+    [weatherImpactRaw]
+  );
 
   return (
     <ErpPageShell>
@@ -200,57 +231,46 @@ export default function DashboardPage() {
           />
         </div>
 
-        <div className="grid lg:grid-cols-[1fr_2fr] gap-4">
-          {/* Quick actions */}
-          <SectionCard title="Acciones rápidas">
-            <div className="grid grid-cols-2 gap-3">
-              {QUICK_ACTIONS.map((a) => (
-                <Link
-                  key={a.label}
-                  href={a.href}
-                  className={`flex flex-col items-start gap-2.5 rounded-xl p-4 transition-all ${a.color} group`}
-                >
-                  <a.Icon size={20} />
-                  <span className="text-xs font-semibold leading-tight">{a.label}</span>
-                </Link>
-              ))}
-            </div>
-          </SectionCard>
+        <SectionCard title="Acciones rápidas">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {QUICK_ACTIONS.map((a) => (
+              <Link
+                key={a.label}
+                href={a.href}
+                className={`flex flex-col items-start gap-2.5 rounded-xl p-4 transition-all ${a.color} group`}
+              >
+                <a.Icon size={20} />
+                <span className="text-xs font-semibold leading-tight">{a.label}</span>
+              </Link>
+            ))}
+          </div>
+        </SectionCard>
 
-          {/* Predictive operations */}
-          <SectionCard title="Predicción operativa (próximos días)">
-            <div className="grid sm:grid-cols-3 gap-3">
-              {predictions.map((p) => {
-                const isRainy = p.weatherImpact < 100;
-                return (
-                  <div key={p.date} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                    <p className="text-sm font-semibold text-[#1e2040] mb-2">{p.date}</p>
-                    <div className="space-y-1.5">
-                      <p className="text-xs text-gray-600 flex justify-between">
-                        <span>Demanda esp.</span>
-                        <span className="font-semibold text-[#1e2040]">€{Math.round(p.predictedDemand)}</span>
-                      </p>
-                      <p className="text-xs text-gray-600 flex justify-between">
-                        <span>Staff req.</span>
-                        <span className="font-semibold text-[#1e2040]">{p.suggestedStaff}</span>
-                      </p>
-                    </div>
-                    {isRainy && (
-                      <div className="mt-3 inline-flex items-center gap-1 bg-sky-50 text-sky-700 px-2 py-1 rounded-md text-[10px] font-medium w-full justify-center">
-                        <CloudRain size={12} /> Impacto por clima
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-              {predictions.length === 0 && (
-                <p className="col-span-3 text-center text-sm text-gray-500 py-6">
-                  No hay datos predictivos suficientes (se requiere histórico de ventas).
-                </p>
-              )}
-            </div>
-          </SectionCard>
-        </div>
+        <SectionCard
+          title="Alertas operativas"
+          subtitle="Próximos 14 días: lluvia, festivo (ref. Málaga) o calor ≥31 °C"
+        >
+          {operationalAlerts.length > 0 ? (
+            <ul className="space-y-2">
+              {operationalAlerts.map((alert) => (
+                <OperationalAlertRow key={alert.date} alert={alert} />
+              ))}
+            </ul>
+          ) : (
+            <p className="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-8 text-center text-sm text-gray-500">
+              Sin alertas relevantes en los próximos días. Revisa el calendario para el detalle del clima.
+            </p>
+          )}
+          <div className="mt-4 border-t border-gray-100 pt-3 text-center">
+            <Link
+              href="/calendar"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#4f6ef7] hover:underline"
+            >
+              <CalendarDays size={14} />
+              Ver calendario y tareas
+            </Link>
+          </div>
+        </SectionCard>
 
         {/* Bottom row */}
         <div className="grid lg:grid-cols-[1.2fr_1fr_1fr] gap-4">

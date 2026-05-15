@@ -6,7 +6,7 @@ import { SectionCard } from "../components/web-ui";
 import { ErpPageShell, AppTopHeader, notify } from "../shared/ui";
 import { authApi, describeNetworkError } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
-import { roleDisplayLabel } from "app/lib/rbac";
+import { canAccessBusinessSettings, roleDisplayLabel } from "app/lib/rbac";
 import { Building2, Camera, Eye, EyeOff, KeyRound, Lock, Shield, UserRound } from "lucide-react";
 
 const TIMEZONE_OPTIONS = [
@@ -348,11 +348,19 @@ export default function CompanySettingsPage() {
 
             <SectionCard title="Preferencias" subtitle="Idioma, moneda y zona horaria (solo este navegador)">
               <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mb-3">
-                Estas opciones se guardan en tu dispositivo para recordar cómo prefieres ver importes y fechas. El calendario operativo del negocio sigue usando la zona horaria configurada en{" "}
-                <Link href="/business-settings" className="font-semibold text-[#4f6ef7] underline">
-                  Configuración del negocio
-                </Link>{" "}
-                (OWNER).
+                Estas opciones se guardan en tu dispositivo para recordar cómo prefieres ver importes y fechas.
+                {canAccessBusinessSettings(role) ? (
+                  <>
+                    {" "}
+                    El calendario operativo del negocio sigue usando la zona horaria configurada en{" "}
+                    <Link href="/business-settings" className="font-semibold text-[#4f6ef7] underline">
+                      Configuración del negocio
+                    </Link>
+                    .
+                  </>
+                ) : (
+                  " La zona horaria del negocio la define el propietario del tenant."
+                )}
               </p>
               <div className="grid sm:grid-cols-2 gap-3">
                 <div className="rounded-xl border border-gray-100 bg-[#f8f9fc] p-4">
@@ -404,7 +412,7 @@ export default function CompanySettingsPage() {
               {prefsSaved && <p className="text-xs text-emerald-600 mt-2">Guardado.</p>}
             </SectionCard>
 
-            {role === "OWNER" && (
+            {canAccessBusinessSettings(role) && (
               <SectionCard
                 title="Configuración del negocio"
                 subtitle="Datos fiscales, horario y ubicación del tenant actual"

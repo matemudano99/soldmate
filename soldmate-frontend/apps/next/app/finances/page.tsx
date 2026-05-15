@@ -217,8 +217,8 @@ function CustomTooltip({
 export default function FinancesPage() {
   const token = useAuthStore((s) => s.token);
   const role = useAuthStore((s) => s.role);
-  const canWrite = role === "OWNER" || role === "MANAGER";
-  const isOwner = role === "OWNER";
+  const canWrite = role === "OWNER" || role === "MANAGER" || role === "DEV";
+  const isOwner = role === "OWNER" || role === "DEV";
   const qc = useQueryClient();
   const [authReady, setAuthReady] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("Todos");

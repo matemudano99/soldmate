@@ -110,11 +110,12 @@ export default function LoginPage() {
 
           <div className="mb-6 flex flex-wrap gap-2">
             {[
+              { role: "DEV", email: "dev@soldmate.local" },
               { role: "Owner", email: "owner@test.com" },
               { role: "Manager", email: "manager@test.com" },
               { role: "Supervisor", email: "supervisor@test.com" },
               { role: "Employee", email: "employee@test.com" },
-              { role: "Viewer", email: "viewer@test.com" }
+              { role: "Viewer", email: "viewer@test.com" },
             ].map(t => (
               <button
                 key={t.role}

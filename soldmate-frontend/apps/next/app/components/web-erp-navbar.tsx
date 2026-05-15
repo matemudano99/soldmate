@@ -7,11 +7,11 @@ import Image from "next/image";
 import {
   LayoutDashboard, Users, CreditCard, BarChart2,
   FileText, Calendar, Power, PanelLeftOpen, X,
-  Wrench, Truck, Package, Activity, ChevronLeft, Building2, Palmtree
+  Wrench, Truck, Package, Activity, ChevronLeft, Building2, Database
 } from "lucide-react";
 import { useAuthStore } from "app/lib/store";
 import { HelpCenterPopover } from "../shared/ui/alerts-help-popovers";
-import { isNavbarHrefVisible, roleDisplayLabel } from "app/lib/rbac";
+import { canAccessBusinessSettings, canAccessDevConsole, isNavbarHrefVisible, roleDisplayLabel } from "app/lib/rbac";
 
 const NAV_MAIN = [
   { href: "/dashboard",  label: "Dashboard",    Icon: LayoutDashboard },
@@ -176,7 +176,25 @@ export function WebErpNavbar() {
 
       {/* Bottom */}
       <div className="px-3 pb-5 pt-3 border-t border-gray-50 space-y-0.5">
-        {role === "OWNER" ? (
+        {canAccessDevConsole(role) ? (
+          <Link
+            href="/dev-console"
+            onClick={() => setMobileOpen(false)}
+            className={`relative flex items-center ${collapsed ? "justify-center" : "gap-3"} px-3 py-2.5 rounded-xl transition-colors ${
+              pathname.startsWith("/dev-console")
+                ? "bg-violet-50 text-violet-700"
+                : "text-[#9095a0] hover:bg-gray-50 hover:text-gray-600"
+            }`}
+            title="Consola DEV"
+          >
+            {pathname.startsWith("/dev-console") && (
+              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-violet-600 rounded-r-full" />
+            )}
+            <Database size={16} strokeWidth={pathname.startsWith("/dev-console") ? 2.2 : 1.8} />
+            {!collapsed ? <span className="text-sm font-medium">Consola DEV</span> : null}
+          </Link>
+        ) : null}
+        {canAccessBusinessSettings(role) ? (
           <Link
             href="/business-settings"
             onClick={() => setMobileOpen(false)}

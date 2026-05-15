@@ -6,6 +6,8 @@ import { SectionCard } from "../components/web-ui";
 import { ErpPageShell, AppTopHeader, notify } from "../shared/ui";
 import { businessProfileApi, type BusinessProfileResponse, describeNetworkError } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
+import { canAccessBusinessSettings } from "app/lib/rbac";
+import { useRouter } from "next/navigation";
 import { Building2 } from "lucide-react";
 
 const COUNTRY_OPTIONS = [
@@ -55,6 +57,7 @@ const DEFAULT_OPENING_HOURS = JSON.stringify(
 );
 
 export default function BusinessSettingsPage() {
+  const router = useRouter();
   const token = useAuthStore((s) => s.token);
   const role = useAuthStore((s) => s.role);
 
@@ -82,7 +85,13 @@ export default function BusinessSettingsPage() {
   });
 
   useEffect(() => {
-    if (!token) return;
+    if (role && !canAccessBusinessSettings(role)) {
+      router.replace("/dashboard");
+    }
+  }, [role, router]);
+
+  useEffect(() => {
+    if (!token || !canAccessBusinessSettings(role)) return;
     const authToken = token; // narrowed: string (not null)
     async function loadBusiness() {
       try {
@@ -112,7 +121,7 @@ export default function BusinessSettingsPage() {
       }
     }
     void loadBusiness();
-  }, [token]);
+  }, [token, role]);
 
   const onSaveBusiness = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,23 +145,8 @@ export default function BusinessSettingsPage() {
     }
   };
 
-  if (role !== "OWNER") {
-    return (
-      <ErpPageShell>
-        <AppTopHeader />
-        <main className="flex-1 min-h-0 overflow-y-auto pb-6">
-          <div className="px-4 sm:px-6 max-w-xl">
-            <h1 className="text-2xl font-bold text-[#1e2040] mb-3">Configuración del negocio</h1>
-            <p className="text-sm text-gray-600 mb-4">
-              Solo el propietario (OWNER) puede editar los datos fiscales y operativos del negocio activo.
-            </p>
-            <Link href="/company-settings" className="text-sm font-semibold text-[#4f6ef7] hover:underline">
-              Volver a Ajustes de cuenta
-            </Link>
-          </div>
-        </main>
-      </ErpPageShell>
-    );
+  if (!canAccessBusinessSettings(role)) {
+    return null;
   }
 
   return (

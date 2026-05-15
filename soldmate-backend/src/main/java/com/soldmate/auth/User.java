@@ -62,8 +62,9 @@ public class User {
     private java.time.LocalDateTime lastSeenAt;
 
     /**
-     * RBAC por jerarquía (JWT + membresía por negocio):
-     * OWNER, MANAGER, SUPERVISOR, EMPLOYEE, VIEWER.
+     * Rol global del usuario (columna users.role).
+     * DEV: operador de plataforma (consola multi-tenant); el JWT usa DEV si está aquí.
+     * Resto: rol por defecto; en sesión normal manda la membresía del negocio activo.
      */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -74,10 +75,16 @@ public class User {
     private Company company;
 
     public enum Role {
+        DEV,
         OWNER,
         MANAGER,
         SUPERVISOR,
         EMPLOYEE,
         VIEWER
+    }
+
+    /** Roles asignables en {@code user_company_memberships} (sin DEV). */
+    public static boolean isTenantMembershipRole(Role r) {
+        return r != null && r != Role.DEV;
     }
 }

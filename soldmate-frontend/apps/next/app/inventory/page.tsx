@@ -33,7 +33,7 @@ function productCategoryLabel(p: ProductResponse): string {
 export default function InventoryPage() {
   const token = useAuthStore((s) => s.token);
   const role = useAuthStore((s) => s.role);
-  const isOwner = role === "OWNER";
+  const isOwner = role === "OWNER" || role === "DEV";
   const qc = useQueryClient();
   const [authReady, setAuthReady] = useState(false);
   const [search, setSearch] = useState("");

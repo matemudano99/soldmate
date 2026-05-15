@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -229,6 +230,9 @@ public class UserController {
             return User.Role.EMPLOYEE;
         }
         return switch (raw.trim().toUpperCase()) {
+            case "DEV" -> throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "El rol DEV solo puede asignarse desde la consola de plataforma");
             case "OWNER" -> User.Role.OWNER;
             case "MANAGER" -> User.Role.MANAGER;
             case "SUPERVISOR" -> User.Role.SUPERVISOR;

@@ -10,6 +10,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -55,13 +56,15 @@ public class JwtFilter extends OncePerRequestFilter {
             String email = jwtUtil.extractEmail(token);
             String role  = jwtUtil.extractRole(token);
 
-            // Spring Security espera el prefijo "ROLE_" internamente
-            SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + role);
+            List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
+            // DEV: operador de plataforma con permisos de OWNER en el tenant activo (soporte).
+            if ("DEV".equalsIgnoreCase(role)) {
+                authorities.add(new SimpleGrantedAuthority("ROLE_OWNER"));
+            }
 
-            // Registramos al usuario como autenticado en el contexto de seguridad
-            // null como credenciales: no necesitamos la contraseña, ya tenemos el JWT
             UsernamePasswordAuthenticationToken authToken =
-                    new UsernamePasswordAuthenticationToken(email, null, List.of(authority));
+                    new UsernamePasswordAuthenticationToken(email, null, authorities);
 
             SecurityContextHolder.getContext().setAuthentication(authToken);
         }

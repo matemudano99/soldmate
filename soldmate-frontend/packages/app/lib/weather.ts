@@ -1,5 +1,26 @@
 import type { ForecastImpactDay } from "./api";
 
+/** Umbrales alineados con calendario y backend (ForecastController). */
+export const RAIN_ALERT_MM = 1;
+export const HEAT_ALERT_C = 31;
+export const STRONG_WIND_KMH = 35;
+
+export type OperationalAlertKind = "rain" | "heat" | "holiday";
+
+export function calendarYmdLocal(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function classifyForecastAlerts(day: ForecastImpactDay): OperationalAlertKind[] {
+  const kinds: OperationalAlertKind[] = [];
+  if (day.rain >= RAIN_ALERT_MM) kinds.push("rain");
+  if (day.tempMax >= HEAT_ALERT_C) kinds.push("heat");
+  return kinds;
+}
+
 export function getWorkloadScoreFromForecast(day: ForecastImpactDay): number {
   return day.impactScore;
 }

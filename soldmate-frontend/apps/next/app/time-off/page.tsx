@@ -66,7 +66,7 @@ export default function TimeOffPage() {
             <div>
               <h1 className="text-2xl font-bold text-[#1e2040]">Vacaciones</h1>
               <p className="text-sm text-gray-500 mt-1">
-                Registro interno (MVP). {role === "OWNER" || role === "MANAGER"
+                Registro interno (MVP). {role === "OWNER" || role === "MANAGER" || role === "DEV"
                   ? "Ves todas las solicitudes de la empresa."
                   : "Ves tus propias solicitudes."}{" "}
                 Tu rol: {roleDisplayLabel(role)}.

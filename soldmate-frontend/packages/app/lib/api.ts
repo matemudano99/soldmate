@@ -35,10 +35,14 @@ export function describeNetworkError(err: unknown): string {
 
 export type UserRole = "OWNER" | "MANAGER" | "SUPERVISOR" | "EMPLOYEE" | "VIEWER";
 
-export function normalizeUserRole(role: string | null | undefined): UserRole | null {
+/** Rol de sesión JWT (incluye operador de plataforma). */
+export type AppRole = UserRole | "DEV";
+
+export function normalizeUserRole(role: string | null | undefined): AppRole | null {
   if (role == null || role === "") return null;
   const u = role.trim().toUpperCase();
   if (u === "STAFF") return "EMPLOYEE";
+  if (u === "DEV") return "DEV";
   if (u === "OWNER" || u === "MANAGER" || u === "SUPERVISOR" || u === "EMPLOYEE" || u === "VIEWER") {
     return u;
   }
@@ -54,7 +58,7 @@ export interface LinkedCompany {
 export interface AuthResponse {
   token: string;
   email: string;
-  role: UserRole;
+  role: AppRole;
   tier: "FREE" | "PREMIUM";
   companyId: number;
   firstName: string | null;
@@ -657,6 +661,163 @@ export const vacationsApi = {
       body: JSON.stringify(body),
     });
     return handleResponse<VacationResponse>(res);
+  },
+};
+
+// ─── Consola DEV (multi-tenant) ──────────────────────────────────────────────
+
+export interface DevMembershipLink {
+  membershipId: number;
+  companyId: number;
+  companyName: string;
+  membershipRole: UserRole;
+}
+
+export interface DevUserAggregate {
+  userId: number;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  nationalId: string | null;
+  jobTitle: string | null;
+  workScheduleNote: string | null;
+  active: boolean;
+  avatarUrl: string | null;
+  globalRole: AppRole;
+  lastSeenAt: string | null;
+  primaryCompanyId: number | null;
+  memberships: DevMembershipLink[];
+}
+
+export interface DevCompanySummary {
+  companyId: number;
+  companyName: string;
+  taxId: string | null;
+  city: string | null;
+  country: string | null;
+  subscriptionTier: string | null;
+  businessEmail: string | null;
+  businessPhone: string | null;
+  addressLine: string | null;
+  membershipCount: number;
+}
+
+export interface DevConsoleResponse {
+  companyCount: number;
+  membershipCount: number;
+  distinctUserCount: number;
+  companies: DevCompanySummary[];
+  users: DevUserAggregate[];
+}
+
+export interface DevUserUpdateInput {
+  email: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  nationalId?: string | null;
+  jobTitle?: string | null;
+  workScheduleNote?: string | null;
+  active?: boolean;
+  avatarUrl?: string | null;
+  globalRole?: AppRole;
+  membershipRole?: UserRole;
+  primaryCompanyId?: number;
+  membershipCompanyId?: number;
+  newPassword?: string;
+}
+
+export interface DevCompanyUpsertInput {
+  name: string;
+  taxId?: string | null;
+  city?: string | null;
+  country?: string | null;
+  businessEmail?: string | null;
+  businessPhone?: string | null;
+  addressLine?: string | null;
+  subscriptionTier?: string | null;
+}
+
+export interface DevCreateUserInput {
+  email: string;
+  password: string;
+  companyId: number;
+  firstName?: string | null;
+  lastName?: string | null;
+  membershipRole?: UserRole;
+  globalRole?: AppRole;
+}
+
+export const devApi = {
+  getConsole: async (token: string): Promise<DevConsoleResponse> => {
+    const res = await authFetch("/api/v1/dev/console", token);
+    return handleResponse<DevConsoleResponse>(res);
+  },
+  updateUser: async (
+    token: string,
+    userId: number,
+    membershipId: number,
+    body: DevUserUpdateInput
+  ): Promise<DevUserAggregate> => {
+    const q = `?membershipId=${membershipId}`;
+    const res = await authFetch(`/api/v1/dev/users/${userId}${q}`, token, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+    return handleResponse<DevUserAggregate>(res);
+  },
+  createCompany: async (token: string, body: DevCompanyUpsertInput): Promise<DevCompanySummary> => {
+    const res = await authFetch("/api/v1/dev/companies", token, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return handleResponse<DevCompanySummary>(res);
+  },
+  updateCompany: async (
+    token: string,
+    companyId: number,
+    body: DevCompanyUpsertInput
+  ): Promise<DevCompanySummary> => {
+    const res = await authFetch(`/api/v1/dev/companies/${companyId}`, token, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+    return handleResponse<DevCompanySummary>(res);
+  },
+  deleteCompany: async (token: string, companyId: number, confirmName: string): Promise<void> => {
+    const q = `?confirmName=${encodeURIComponent(confirmName)}`;
+    const res = await authFetch(`/api/v1/dev/companies/${companyId}${q}`, token, { method: "DELETE" });
+    if (!res.ok) await handleResponse(res);
+  },
+  deleteUser: async (token: string, userId: number): Promise<void> => {
+    const res = await authFetch(`/api/v1/dev/users/${userId}`, token, { method: "DELETE" });
+    if (!res.ok) await handleResponse(res);
+  },
+  deleteMembership: async (token: string, membershipId: number): Promise<void> => {
+    const res = await authFetch(`/api/v1/dev/memberships/${membershipId}`, token, { method: "DELETE" });
+    if (!res.ok) await handleResponse(res);
+  },
+  createUser: async (token: string, body: DevCreateUserInput): Promise<DevUserAggregate> => {
+    const res = await authFetch("/api/v1/dev/users", token, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return handleResponse<DevUserAggregate>(res);
+  },
+  addMembership: async (
+    token: string,
+    userId: number,
+    companyId: number,
+    membershipRole?: UserRole
+  ): Promise<DevUserAggregate> => {
+    const res = await authFetch(`/api/v1/dev/users/${userId}/memberships`, token, {
+      method: "POST",
+      body: JSON.stringify({ companyId, membershipRole }),
+    });
+    return handleResponse<DevUserAggregate>(res);
+  },
+  unlockUser: async (token: string, userId: number): Promise<DevUserAggregate> => {
+    const res = await authFetch(`/api/v1/dev/users/${userId}/unlock`, token, { method: "POST" });
+    return handleResponse<DevUserAggregate>(res);
   },
 };
 

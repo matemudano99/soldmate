@@ -42,7 +42,7 @@ const STATUS_FILTERS: { value: "ALL" | IncidentStatus; label: string }[] = [
 export default function IncidentsPage() {
   const token = useAuthStore((s) => s.token);
   const role = useAuthStore((s) => s.role);
-  const isOwner = role === "OWNER";
+  const isOwner = role === "OWNER" || role === "DEV";
   const qc = useQueryClient();
   const [authReady, setAuthReady] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"ALL" | IncidentStatus>("ALL");

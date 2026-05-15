@@ -58,7 +58,8 @@ public class SchemaMigrationRunner implements ApplicationRunner {
             new MigrationStep("015", "Cash register daily model and fix Europe/Malaga timezone", this::migrateFinanceCashRegisterDailyModel),
             new MigrationStep("016", "Finance dynamic income channels json", this::migrateFinanceIncomeChannelsJson),
             new MigrationStep("017", "Company income channel name templates for daily finance", this::migrateCompanyIncomeChannelTemplates),
-            new MigrationStep("018", "RBAC five roles, user profile fields, vacations, document user link", this::rbacFiveRolesUserProfileVacationsDocuments)
+            new MigrationStep("018", "RBAC five roles, user profile fields, vacations, document user link", this::rbacFiveRolesUserProfileVacationsDocuments),
+            new MigrationStep("019", "DEV platform role and dev console support", this::devPlatformRole)
         );
 
         for (MigrationStep step : steps) {
@@ -587,6 +588,22 @@ public class SchemaMigrationRunner implements ApplicationRunner {
               END IF;
             END $$
             """);
+    }
+
+    /**
+     * Rol DEV en users (no en membresías). Usuario dev de plataforma para consola multi-tenant.
+     */
+    private void devPlatformRole() {
+        String userRoles = "'DEV','OWNER','MANAGER','SUPERVISOR','EMPLOYEE','VIEWER'";
+        String membershipRoles = "'OWNER','MANAGER','SUPERVISOR','EMPLOYEE','VIEWER'";
+
+        jdbcTemplate.execute("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check");
+        jdbcTemplate.execute("ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN (" + userRoles + "))");
+
+        jdbcTemplate.execute("ALTER TABLE user_company_memberships DROP CONSTRAINT IF EXISTS user_company_memberships_role_check");
+        jdbcTemplate.execute(
+            "ALTER TABLE user_company_memberships ADD CONSTRAINT user_company_memberships_role_check CHECK (role IN (" + membershipRoles + "))"
+        );
     }
 
     private boolean columnExists(String table, String column) {

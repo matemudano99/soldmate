@@ -9,7 +9,7 @@
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import type { AuthResponse, LinkedCompany, UserRole } from "./api";
+import type { AppRole, AuthResponse, LinkedCompany } from "./api";
 import { normalizeUserRole } from "./api";
 import type { StateStorage } from "zustand/middleware";
 
@@ -19,7 +19,7 @@ interface AuthState {
   // Datos del usuario autenticado (null si no ha iniciado sesión)
   token: string | null;
   email: string | null;
-  role: UserRole | null;
+  role: AppRole | null;
   tier: "FREE" | "PREMIUM" | null;
   companyId: number | null;
   firstName: string | null;
@@ -236,8 +236,8 @@ export const useAuthStore = create<AuthState>()(
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Comprueba si el usuario tiene rol OWNER (dueño del negocio) */
-export const isOwner = (role: string | null) => role === "OWNER";
+/** Dueño del negocio o operador DEV (mismos permisos ERP en el tenant activo). */
+export const isOwner = (role: string | null) => role === "OWNER" || role === "DEV";
 
 /** Comprueba si el usuario tiene plan PREMIUM */
 export const isPremium = (tier: string | null) => tier === "PREMIUM";

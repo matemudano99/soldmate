@@ -10,7 +10,7 @@ import { useAuthStore } from "app/lib/store";
 export default function SuppliersPage() {
   const token = useAuthStore((s) => s.token);
   const role = useAuthStore((s) => s.role);
-  const isOwner = role === "OWNER";
+  const isOwner = role === "OWNER" || role === "DEV";
   const qc = useQueryClient();
   const [authReady, setAuthReady] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);

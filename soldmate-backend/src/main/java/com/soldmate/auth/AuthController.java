@@ -113,6 +113,14 @@ public class AuthController {
             .orElseThrow(() -> new IllegalStateException("Usuario sin membresía en el negocio principal"));
     }
 
+    /** Rol en JWT: DEV es global en {@link User#getRole()}; si no, el de la membresía activa. */
+    private String sessionRole(User user, UserCompanyMembership membership) {
+        if (user.getRole() == User.Role.DEV) {
+            return User.Role.DEV.name();
+        }
+        return membership.getRole().name();
+    }
+
     private boolean userAlreadyHasCompanyNameIgnoreCase(User user, String companyName) {
         String n = companyName == null ? "" : companyName.trim();
         if (n.isEmpty()) {
@@ -268,10 +276,11 @@ public class AuthController {
 
         UserCompanyMembership active = membershipForActiveCompany(user);
         Company company = active.getCompany();
+        String role = sessionRole(user, active);
         String token = jwtUtil.generateToken(
             user.getEmail(),
             company.getId(),
-            active.getRole().name(),
+            role,
             company.getSubscriptionTier().name()
         );
 
@@ -279,7 +288,7 @@ public class AuthController {
             new AuthResponse(
                 token,
                 user.getEmail(),
-                active.getRole().name(),
+                role,
                 company.getSubscriptionTier().name(),
                 company.getId(),
                 user.getFirstName(),
@@ -308,10 +317,11 @@ public class AuthController {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Sin acceso a ese negocio"));
 
         Company company = mem.getCompany();
+        String role = sessionRole(user, mem);
         String newToken = jwtUtil.generateToken(
             user.getEmail(),
             company.getId(),
-            mem.getRole().name(),
+            role,
             company.getSubscriptionTier().name()
         );
 
@@ -319,7 +329,7 @@ public class AuthController {
             new AuthResponse(
                 newToken,
                 user.getEmail(),
-                mem.getRole().name(),
+                role,
                 company.getSubscriptionTier().name(),
                 company.getId(),
                 user.getFirstName(),
@@ -352,7 +362,7 @@ public class AuthController {
             new AuthResponse(
                 token,
                 user.getEmail(),
-                mem.getRole().name(),
+                sessionRole(user, mem),
                 mem.getCompany().getSubscriptionTier().name(),
                 companyId,
                 user.getFirstName(),
@@ -389,7 +399,7 @@ public class AuthController {
             new AuthResponse(
                 token,
                 user.getEmail(),
-                mem.getRole().name(),
+                sessionRole(user, mem),
                 mem.getCompany().getSubscriptionTier().name(),
                 companyId,
                 user.getFirstName(),
