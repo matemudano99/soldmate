@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "app/lib/store";
 import { authApi, businessProfileApi, describeNetworkError } from "app/lib/api";
@@ -9,16 +10,8 @@ import { AlertsBellPopover } from "./alerts-help-popovers";
 import { UserProfileMenu } from "./user-profile-menu";
 import { GlobalSearchModal } from "./global-search";
 
-function useOutsideClose(ref: React.RefObject<HTMLDivElement | null>, onClose: () => void) {
-  React.useEffect(() => {
-    function onPointerDown(event: MouseEvent) {
-      if (!ref.current) return;
-      if (!ref.current.contains(event.target as Node)) onClose();
-    }
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
-  }, [ref, onClose]);
-}
+const COMPANY_MENU_WIDTH = 240;
+const VIEW_PADDING = 8;
 
 function formatTodayEs(): string {
   const dateStr = new Intl.DateTimeFormat("es-ES", {
@@ -48,15 +41,47 @@ export function AppTopHeader() {
   const [switching, setSwitching] = React.useState(false);
   const [switchError, setSwitchError] = React.useState<string | null>(null);
   const [companyMenuOpen, setCompanyMenuOpen] = React.useState(false);
-  const companyMenuRef = React.useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = React.useState<{ top: number; left: number } | null>(null);
 
-  useOutsideClose(companyMenuRef, () => setCompanyMenuOpen(false));
+  const chevronRef = React.useRef<HTMLButtonElement>(null);
+  const dropdownRef = React.useRef<HTMLUListElement>(null);
 
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
   const fromLinks = linkedCompanies.find((c) => c.companyId === companyId)?.companyName?.trim();
   const displayName = fromLinks || businessName || firstName || fullName || email?.split("@")[0] || "Usuario";
   const todayCap = formatTodayEs();
   const showCompanyPicker = linkedCompanies.length > 1;
+
+  // Compute portal position for company menu
+  const updateMenuPos = React.useCallback(() => {
+    if (!chevronRef.current) return;
+    const rect = chevronRef.current.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const menuW = Math.min(COMPANY_MENU_WIDTH, vw - VIEW_PADDING * 2);
+    let left = rect.left;
+    left = Math.max(VIEW_PADDING, Math.min(left, vw - menuW - VIEW_PADDING));
+    const top = rect.bottom + 4;
+    setMenuPos({ top, left });
+  }, []);
+
+  React.useLayoutEffect(() => {
+    if (!companyMenuOpen) { setMenuPos(null); return; }
+    updateMenuPos();
+    window.addEventListener("resize", updateMenuPos);
+    return () => window.removeEventListener("resize", updateMenuPos);
+  }, [companyMenuOpen, updateMenuPos]);
+
+  // Close on outside click
+  React.useEffect(() => {
+    if (!companyMenuOpen) return;
+    function handleOutside(e: MouseEvent) {
+      const t = e.target as Node;
+      if (chevronRef.current?.contains(t) || dropdownRef.current?.contains(t)) return;
+      setCompanyMenuOpen(false);
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [companyMenuOpen]);
 
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -75,35 +100,20 @@ export function AppTopHeader() {
     let alive = true;
     void authApi
       .me(token)
-      .then((data) => {
-        if (!alive) return;
-        syncSession(data);
-      })
+      .then((data) => { if (!alive) return; syncSession(data); })
       .catch(() => {});
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [token, linkedCompanies.length, syncSession]);
 
   React.useEffect(() => {
     if (!token) return;
-    if (fromLinks) {
-      setBusinessName(fromLinks);
-      return;
-    }
+    if (fromLinks) { setBusinessName(fromLinks); return; }
     let alive = true;
     void businessProfileApi
       .get(token)
-      .then((b) => {
-        if (!alive) return;
-        setBusinessName(b.businessName?.trim() || null);
-      })
-      .catch(() => {
-        if (alive) setBusinessName(null);
-      });
-    return () => {
-      alive = false;
-    };
+      .then((b) => { if (!alive) return; setBusinessName(b.businessName?.trim() || null); })
+      .catch(() => { if (alive) setBusinessName(null); });
+    return () => { alive = false; };
   }, [token, companyId, fromLinks]);
 
   const openSearch = () => setSearchOpen(true);
@@ -127,6 +137,41 @@ export function AppTopHeader() {
     }
   };
 
+  const companyDropdown =
+    companyMenuOpen &&
+    menuPos &&
+    typeof document !== "undefined" &&
+    createPortal(
+      <ul
+        ref={dropdownRef}
+        role="listbox"
+        aria-label="Negocios vinculados"
+        className="fixed z-[100] rounded-xl border border-gray-100 bg-white py-1 shadow-lg"
+        style={{
+          top: menuPos.top,
+          left: menuPos.left,
+          width: Math.min(COMPANY_MENU_WIDTH, window.innerWidth - VIEW_PADDING * 2),
+        }}
+      >
+        {linkedCompanies.map((c) => (
+          <li key={c.companyId} role="presentation">
+            <button
+              type="button"
+              role="option"
+              aria-selected={c.companyId === companyId}
+              onClick={() => void selectCompany(c.companyId)}
+              className={`flex w-full items-center px-3 py-2.5 text-left text-sm font-medium outline-none transition hover:bg-gray-50 ${
+                c.companyId === companyId ? "bg-[#eef1f8] text-[#4f6ef7]" : "text-[#1e2040]"
+              }`}
+            >
+              <span className="truncate">{c.companyName}</span>
+            </button>
+          </li>
+        ))}
+      </ul>,
+      document.body,
+    );
+
   return (
     <header className="flex flex-shrink-0 items-center justify-between gap-2 py-3 pl-14 pr-4 md:px-7 md:py-4">
       <div className="min-w-0 flex-1">
@@ -134,50 +179,26 @@ export function AppTopHeader() {
         <div className="mt-0.5 flex min-w-0 items-center gap-1">
           <h1 className="min-w-0 truncate text-sm font-bold text-[#1e2040] max-w-[38vw] md:max-w-none md:text-xl">{displayName}</h1>
           {showCompanyPicker ? (
-            <div className="relative shrink-0" ref={companyMenuRef}>
-              <button
-                type="button"
-                onClick={() => setCompanyMenuOpen((v) => !v)}
-                disabled={switching}
-                className="inline-flex items-center justify-center rounded-lg p-1 text-[#1e2040] outline-none transition hover:bg-white/80 focus-visible:ring-2 focus-visible:ring-[#4f6ef7]/40 disabled:opacity-50"
-                aria-haspopup="listbox"
-                aria-expanded={companyMenuOpen}
-                aria-label="Cambiar de negocio"
-                title="Cambiar de negocio"
-              >
-                {switching ? (
-                  <Loader2 className="size-5 animate-spin text-gray-500" aria-hidden />
-                ) : (
-                  <ChevronDown
-                    className={`size-5 text-gray-500 transition-transform ${companyMenuOpen ? "rotate-180" : ""}`}
-                    aria-hidden
-                  />
-                )}
-              </button>
-              {companyMenuOpen && !switching ? (
-                <ul
-                  role="listbox"
-                  aria-label="Negocios vinculados"
-                  className="absolute left-0 top-full z-50 mt-1 min-w-[12rem] max-w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-gray-100 bg-white py-1 shadow-lg"
-                >
-                  {linkedCompanies.map((c) => (
-                    <li key={c.companyId} role="presentation">
-                      <button
-                        type="button"
-                        role="option"
-                        aria-selected={c.companyId === companyId}
-                        onClick={() => void selectCompany(c.companyId)}
-                        className={`flex w-full items-center px-3 py-2 text-left text-sm font-medium outline-none transition hover:bg-gray-50 ${
-                          c.companyId === companyId ? "bg-[#eef1f8] text-[#4f6ef7]" : "text-[#1e2040]"
-                        }`}
-                      >
-                        <span className="truncate">{c.companyName}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
+            <button
+              ref={chevronRef}
+              type="button"
+              onClick={() => setCompanyMenuOpen((v) => !v)}
+              disabled={switching}
+              className="inline-flex shrink-0 items-center justify-center rounded-lg p-1 text-[#1e2040] outline-none transition hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-[#4f6ef7]/40 disabled:opacity-50"
+              aria-haspopup="listbox"
+              aria-expanded={companyMenuOpen}
+              aria-label="Cambiar de negocio"
+              title="Cambiar de negocio"
+            >
+              {switching ? (
+                <Loader2 className="size-4 animate-spin text-gray-500" aria-hidden />
+              ) : (
+                <ChevronDown
+                  className={`size-4 text-gray-500 transition-transform ${companyMenuOpen ? "rotate-180" : ""}`}
+                  aria-hidden
+                />
+              )}
+            </button>
           ) : null}
         </div>
         {switchError ? <p className="mt-1 text-xs text-red-500">{switchError}</p> : null}
@@ -201,6 +222,7 @@ export function AppTopHeader() {
         <AlertsBellPopover />
         <UserProfileMenu />
       </div>
+      {companyDropdown}
       {searchOpen && <GlobalSearchModal onClose={() => setSearchOpen(false)} />}
     </header>
   );
