@@ -43,6 +43,7 @@ export default function DocumentsPage() {
   const [companyUsers, setCompanyUsers] = useState<UserListResponse[]>([]);
 
   const [activeCategory, setActiveCategory] = useState<string>("Todos");
+  const [activeUserFilter, setActiveUserFilter] = useState<string>("Todos");
   const [search, setSearch] = useState("");
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [showUpload, setShowUpload] = useState(false);
@@ -154,7 +155,11 @@ export default function DocumentsPage() {
     }
   };
 
-  const filtered = docs.filter(d => d.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = docs.filter(d => {
+    const matchSearch = d.name.toLowerCase().includes(search.toLowerCase()) || (d.linkedUserName?.toLowerCase() || "").includes(search.toLowerCase());
+    const matchUser = activeUserFilter === "Todos" || d.linkedUserId === Number(activeUserFilter);
+    return matchSearch && matchUser;
+  });
 
   const formatSize = (bytes: number | null) => {
     if (bytes == null) return "-";
@@ -189,8 +194,21 @@ export default function DocumentsPage() {
             </button>
           </div>
 
-          <div className="mb-5">
-            <PageListSearchField value={search} onChange={setSearch} placeholder="Buscar documentos por nombre…" />
+          <div className="flex flex-col sm:flex-row gap-3 mb-5">
+            <div className="flex-1">
+              <PageListSearchField value={search} onChange={setSearch} placeholder="Buscar documentos por nombre o usuario vinculado…" />
+            </div>
+            <select
+              value={activeUserFilter}
+              onChange={(e) => setActiveUserFilter(e.target.value)}
+              className="bg-white border border-gray-100 rounded-xl px-4 py-2.5 text-sm text-gray-600 outline-none focus:border-[#4f6ef7] shadow-sm min-w-[200px]"
+            >
+              <option value="Todos">Todos los usuarios</option>
+              {companyUsers.map((u) => {
+                const n = (u.fullName && u.fullName.trim()) || [u.firstName, u.lastName].filter(Boolean).join(" ").trim() || u.email;
+                return <option key={u.id} value={u.id}>{n}</option>;
+              })}
+            </select>
           </div>
 
           {/* Stats bar */}
