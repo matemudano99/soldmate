@@ -24,7 +24,6 @@ const NAV_MAIN = [
   { href: "/stats",      label: "Estadisticas",   Icon: BarChart2       },
   { href: "/documents",  label: "Documentos",    Icon: FileText        },
   { href: "/calendar",   label: "Calendario",   Icon: Calendar        },
-  { href: "/time-off",   label: "Vacaciones",   Icon: Palmtree        },
 ] as const;
 
 const LS_NAV_COLLAPSED = "sm_navbar_collapsed";

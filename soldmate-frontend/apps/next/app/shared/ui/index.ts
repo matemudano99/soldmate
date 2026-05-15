@@ -19,4 +19,6 @@ export { Skeleton, SkeletonCard, SkeletonTable, SkeletonList } from "./skeleton"
 export { EmptyState } from "./empty-state";
 export { PageTransition, FadeIn, SlideIn, StaggerList, StaggerItem } from "./page-transition";
 export { GlobalSearchModal } from "./global-search";
-
+export { KpiCard } from "./kpi-card";
+export { FilterPillBar } from "./filter-pill-bar";
+export { SectionCard } from "./section-card";
