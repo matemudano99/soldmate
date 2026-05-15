@@ -128,11 +128,11 @@ export function AppTopHeader() {
   };
 
   return (
-    <header className="flex flex-shrink-0 items-center justify-between gap-4 py-4 px-4 md:px-7">
-      <div>
-        <p className="text-xs text-gray-400">{todayCap}</p>
-        <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1">
-          <h1 className="min-w-0 truncate text-xl font-bold text-[#1e2040]">{displayName}</h1>
+    <header className="flex flex-shrink-0 items-center justify-between gap-2 py-3 pl-14 pr-4 md:px-7 md:py-4">
+      <div className="min-w-0 flex-1 overflow-hidden">
+        <p className="text-[10px] text-gray-400 md:text-xs">{todayCap}</p>
+        <div className="mt-0.5 flex min-w-0 items-center gap-1">
+          <h1 className="min-w-0 truncate text-sm font-bold text-[#1e2040] md:text-xl">{displayName}</h1>
           {showCompanyPicker ? (
             <div className="relative shrink-0" ref={companyMenuRef}>
               <button
@@ -182,7 +182,7 @@ export function AppTopHeader() {
         </div>
         {switchError ? <p className="mt-1 text-xs text-red-500">{switchError}</p> : null}
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-shrink-0 items-center gap-2 md:gap-3">
         <div className="relative hidden w-full max-w-56 cursor-text items-center md:flex">
           <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
