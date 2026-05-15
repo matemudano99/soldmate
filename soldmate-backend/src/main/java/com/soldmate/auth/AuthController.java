@@ -462,6 +462,17 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                 .body("Almacenamiento: " + e.getMessage());
         }
+    @PostMapping("/heartbeat")
+    public ResponseEntity<?> heartbeat(@RequestHeader("Authorization") String authHeader) {
+        String token = authHeader.substring(7);
+        String email = jwtUtil.extractEmail(token);
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Usuario no encontrado");
+        }
+        user.setLastSeenAt(java.time.LocalDateTime.now());
+        userRepository.save(user);
+        return ResponseEntity.ok().build();
     }
 
     private static boolean isPasswordStrong(String password) {

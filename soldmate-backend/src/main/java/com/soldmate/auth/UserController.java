@@ -58,7 +58,8 @@ public class UserController {
         String nationalId,
         String jobTitle,
         String workScheduleNote,
-        boolean active
+        boolean active,
+        String lastSeenAt
     ) {
         static UserResponse from(User u, User.Role roleInCompany) {
             String full = ((u.getFirstName() != null ? u.getFirstName() : "") + " " + (u.getLastName() != null ? u.getLastName() : "")).trim();
@@ -73,7 +74,8 @@ public class UserController {
                 u.getNationalId(),
                 u.getJobTitle(),
                 u.getWorkScheduleNote(),
-                u.isActive()
+                u.isActive(),
+                u.getLastSeenAt() != null ? u.getLastSeenAt().toString() : null
             );
         }
     }

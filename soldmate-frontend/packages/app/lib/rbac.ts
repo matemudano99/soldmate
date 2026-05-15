@@ -13,22 +13,24 @@ export function canEditFinance(role: string | null): boolean {
   return role === "OWNER" || role === "MANAGER";
 }
 
+export function canManageInventory(role: string | null): boolean {
+  return role === "OWNER" || role === "MANAGER" || role === "SUPERVISOR";
+}
+
+export function canCreateIncident(role: string | null): boolean {
+  return role === "OWNER" || role === "MANAGER" || role === "SUPERVISOR" || role === "EMPLOYEE";
+}
+
+export function canViewAllVacations(role: string | null): boolean {
+  return role === "OWNER" || role === "MANAGER";
+}
+
 export function canPostVacationRequest(role: string | null): boolean {
-  return (
-    role === "OWNER" ||
-    role === "MANAGER" ||
-    role === "SUPERVISOR" ||
-    role === "EMPLOYEE"
-  );
+  return role === "OWNER" || role === "MANAGER" || role === "SUPERVISOR" || role === "EMPLOYEE";
 }
 
 export function canUploadDocuments(role: string | null): boolean {
-  return (
-    role === "OWNER" ||
-    role === "MANAGER" ||
-    role === "SUPERVISOR" ||
-    role === "EMPLOYEE"
-  );
+  return role === "OWNER" || role === "MANAGER" || role === "SUPERVISOR" || role === "EMPLOYEE";
 }
 
 export function canPatchDocuments(role: string | null): boolean {

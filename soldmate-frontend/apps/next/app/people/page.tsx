@@ -16,6 +16,8 @@ import {
   Trash2,
   Loader2,
   AlertCircle,
+  FileText,
+  Palmtree,
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -30,10 +32,14 @@ import type { CreatePersonPayload } from "../components/create-modals";
 import {
   activityApi,
   usersApi,
+  vacationsApi,
+  documentsApi,
   type ActivityItemResponse,
   type UserListResponse,
   type UserUpsertInput,
   type UserRole,
+  type VacationResponse,
+  type DocumentResponse,
 } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 import { canManageUsers, roleDisplayLabel } from "app/lib/rbac";
@@ -48,6 +54,17 @@ interface Person {
   workScheduleNote: string;
   active: boolean;
   avatar: string | null;
+  lastSeenAt: string | null;
+}
+
+export function getPresenceStatus(lastSeenAt: string | null, active: boolean) {
+  if (!active) return { color: "bg-gray-300", label: "Cuenta desactivada" };
+  if (!lastSeenAt) return { color: "bg-gray-300", label: "Offline" };
+  
+  const diffMinutes = (Date.now() - new Date(lastSeenAt).getTime()) / 60000;
+  if (diffMinutes < 2) return { color: "bg-emerald-400", label: "Online" };
+  if (diffMinutes < 15) return { color: "bg-amber-400", label: "Ausente" };
+  return { color: "bg-gray-300", label: "Offline" };
 }
 
 const ROLE_FILTERS: Array<"Todos" | UserRole> = [
@@ -74,6 +91,7 @@ function mapUser(u: UserListResponse): Person {
     workScheduleNote: u.workScheduleNote ?? "",
     active: u.active,
     avatar: u.avatarUrl ?? null,
+    lastSeenAt: u.lastSeenAt ?? null,
   };
 }
 
@@ -159,10 +177,8 @@ function PersonCard({
         <div className="relative">
           <Avatar person={emp} size={52} />
           <span
-            className={`absolute bottom-0.5 right-0.5 w-2.5 h-2.5 rounded-full border border-white ${
-              emp.active ? "bg-emerald-400" : "bg-gray-300"
-            }`}
-            title={emp.active ? "Cuenta activa" : "Cuenta desactivada"}
+            className={`absolute bottom-0.5 right-0.5 w-2.5 h-2.5 rounded-full border border-white ${getPresenceStatus(emp.lastSeenAt, emp.active).color}`}
+            title={getPresenceStatus(emp.lastSeenAt, emp.active).label}
           />
         </div>
 
@@ -249,9 +265,8 @@ function PersonRow({
       <div className="relative flex-shrink-0">
         <Avatar person={emp} size={38} />
         <span
-          className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${
-            emp.active ? "bg-emerald-400" : "bg-gray-300"
-          }`}
+          className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${getPresenceStatus(emp.lastSeenAt, emp.active).color}`}
+          title={getPresenceStatus(emp.lastSeenAt, emp.active).label}
         />
       </div>
       <div className="min-w-0">
@@ -296,6 +311,25 @@ function DetailPanel({
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Person>(emp);
+  const token = useAuthStore((s) => s.token);
+
+  const { data: vacations = [] } = useQuery({
+    queryKey: ["vacations", emp.id],
+    queryFn: async () => {
+      const all = await vacationsApi.list(token!);
+      return all.filter((v) => v.userId === emp.id);
+    },
+    enabled: !!token && !!emp.id,
+  });
+
+  const { data: documents = [] } = useQuery({
+    queryKey: ["documents", "linked", emp.id],
+    queryFn: async () => {
+      const all = await documentsApi.getAll(token!);
+      return all.filter((d) => d.linkedUserId === emp.id);
+    },
+    enabled: !!token && !!emp.id,
+  });
 
   React.useEffect(() => {
     setDraft(emp);
@@ -371,9 +405,8 @@ function DetailPanel({
         <div className="relative mb-3">
           <Avatar person={editing ? draft : emp} size={72} />
           <span
-            className={`absolute bottom-1 right-1 w-3 h-3 rounded-full border-2 border-white ${
-              (editing ? draft.active : emp.active) ? "bg-emerald-400" : "bg-gray-300"
-            }`}
+            className={`absolute bottom-1 right-1 w-3 h-3 rounded-full border-2 border-white ${getPresenceStatus(emp.lastSeenAt, editing ? draft.active : emp.active).color}`}
+            title={getPresenceStatus(emp.lastSeenAt, editing ? draft.active : emp.active).label}
           />
         </div>
 
@@ -472,6 +505,56 @@ function DetailPanel({
             />
           ) : (
             <p className="text-xs text-gray-600 whitespace-pre-wrap">{emp.workScheduleNote || "—"}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="px-5 py-4 border-b border-gray-50 space-y-3">
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Vacaciones</p>
+        </div>
+        <div className="space-y-2">
+          {vacations.length ? (
+            vacations.map((v) => (
+              <div key={v.id} className="flex items-start gap-2.5">
+                <Palmtree size={13} className="text-[#4f6ef7] flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-semibold text-[#1e2040]">
+                    {new Date(v.startDate).toLocaleDateString("es-ES")} - {new Date(v.endDate).toLocaleDateString("es-ES")}
+                  </p>
+                  {v.notes && <p className="text-[10px] text-gray-500 mt-0.5">{v.notes}</p>}
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-xs text-gray-400">No hay vacaciones registradas.</p>
+          )}
+        </div>
+      </div>
+
+      <div className="px-5 py-4 border-b border-gray-50 space-y-3">
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Documentos vinculados</p>
+        </div>
+        <div className="space-y-2">
+          {documents.length ? (
+            documents.map((d) => (
+              <a
+                key={d.id}
+                href={d.fileUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-start gap-2.5 group"
+              >
+                <FileText size={13} className="text-emerald-500 flex-shrink-0 mt-0.5 group-hover:text-emerald-600" />
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-[#1e2040] truncate group-hover:underline">{d.name}</p>
+                  <p className="text-[10px] text-gray-400">{new Date(d.createdAt).toLocaleDateString("es-ES")}</p>
+                </div>
+              </a>
+            ))
+          ) : (
+            <p className="text-xs text-gray-400">No hay documentos.</p>
           )}
         </div>
       </div>

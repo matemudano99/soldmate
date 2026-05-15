@@ -58,6 +58,9 @@ public class User {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Column(name = "last_seen_at")
+    private java.time.LocalDateTime lastSeenAt;
+
     /**
      * RBAC por jerarquía (JWT + membresía por negocio):
      * OWNER, MANAGER, SUPERVISOR, EMPLOYEE, VIEWER.

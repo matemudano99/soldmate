@@ -191,6 +191,7 @@ export interface UserListResponse {
   jobTitle: string | null;
   workScheduleNote: string | null;
   active: boolean;
+  lastSeenAt?: string | null;
 }
 
 export interface UserUpsertInput {
@@ -416,6 +417,13 @@ export const authApi = {
       body: formData,
     });
     return handleResponse<{ avatarUrl: string }>(res);
+  },
+  heartbeat: async (token: string): Promise<void> => {
+    const res = await authFetch("/api/v1/auth/heartbeat", token, { method: "POST" });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || `Error ${res.status}`);
+    }
   },
 };
 
