@@ -462,6 +462,8 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                 .body("Almacenamiento: " + e.getMessage());
         }
+    }
+
     @PostMapping("/heartbeat")
     public ResponseEntity<?> heartbeat(@RequestHeader("Authorization") String authHeader) {
         String token = authHeader.substring(7);
