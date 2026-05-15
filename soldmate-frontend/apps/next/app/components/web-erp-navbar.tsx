@@ -21,7 +21,6 @@ const NAV_MAIN = [
   { href: "/incidents",  label: "Incidencias",  Icon: Wrench          },
   { href: "/suppliers",  label: "Proveedores",  Icon: Truck           },
   { href: "/finances",   label: "Finanzas",     Icon: CreditCard      },
-  { href: "/stats",      label: "Estadisticas",   Icon: BarChart2       },
   { href: "/documents",  label: "Documentos",    Icon: FileText        },
   { href: "/calendar",   label: "Calendario",   Icon: Calendar        },
 ] as const;

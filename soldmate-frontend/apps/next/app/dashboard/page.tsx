@@ -6,7 +6,7 @@ import {
   DollarSign, Wrench, Package, Users, TrendingUp,
   ChevronRight, Circle,
   CheckCircle2, Clock, Activity, CloudRain,
-  FileText
+  FileText, Palmtree
 } from "lucide-react";
 import { ErpPageShell, AppTopHeader, PageListSearchField, KpiCard, SectionCard } from "../shared/ui";
 import Link from "next/link";
@@ -49,6 +49,7 @@ const QUICK_ACTIONS = [
   { label: "Cierre de caja",    href: "/finances",      color: "bg-emerald-50 text-emerald-600 hover:bg-emerald-100", Icon: DollarSign },
   { label: "Ver inventario",    href: "/inventory",     color: "bg-blue-50 text-[#4f6ef7] hover:bg-blue-100",         Icon: Package    },
   { label: "Subir documento",   href: "/documents",     color: "bg-violet-50 text-violet-500 hover:bg-violet-100",    Icon: FileText   },
+  { label: "Pedir vacaciones",  href: "/time-off",      color: "bg-pink-50 text-pink-500 hover:bg-pink-100",          Icon: Palmtree   },
   { label: "Reportar avería",   href: "/incidents/new", color: "bg-red-50 text-red-500 hover:bg-red-100",             Icon: Wrench     },
   { label: "Ver equipo",        href: "/people",        color: "bg-amber-50 text-amber-600 hover:bg-amber-100",       Icon: Users      },
 ];

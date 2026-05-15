@@ -12,7 +12,9 @@ import {
   CalendarDays,
   ChevronDown,
   Landmark,
+  Palmtree,
 } from "lucide-react";
+import Link from "next/link";
 import { SectionCard } from "../components/web-ui";
 import { AppTopHeader, CreateCalendarTaskModal, ErpPageShell, notify, useConfirm } from "../shared/ui";
 import { businessProfileApi, calendarApi, forecastApi, type CalendarEventResponse, type ForecastImpactDay } from "app/lib/api";
@@ -302,14 +304,23 @@ export default function CalendarPage() {
                 Clima, festivos de referencia (Málaga capital + ES/AN) y tareas por día · {businessCity}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowCreate(true)}
-              className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-[#4f6ef7] px-4 py-3 text-sm font-semibold text-white hover:bg-[#3d5ae0] sm:w-auto sm:py-2.5"
-            >
-              <Plus size={14} />
-              Crear tarea
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Link
+                href="/time-off"
+                className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-pink-50 px-4 py-3 text-sm font-semibold text-pink-600 hover:bg-pink-100 sm:w-auto sm:py-2.5"
+              >
+                <Palmtree size={14} />
+                Pedir vacaciones
+              </Link>
+              <button
+                type="button"
+                onClick={() => setShowCreate(true)}
+                className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-[#4f6ef7] px-4 py-3 text-sm font-semibold text-white hover:bg-[#3d5ae0] sm:w-auto sm:py-2.5"
+              >
+                <Plus size={14} />
+                Crear tarea
+              </button>
+            </div>
           </div>
 
           <SectionCard
