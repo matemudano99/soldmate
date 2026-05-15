@@ -327,58 +327,86 @@ export default function BusinessSettingsPage() {
                 </div>
                 <div>
                   <label className="block text-xs text-gray-500 font-semibold mb-2">Horario por día</label>
-                  <div className="space-y-2">
+                  <p className="text-[10px] text-gray-400 mb-3">Puedes configurar horario partido (p. ej. 08:00–14:00 y 17:00–22:00) usando el botón «+ Turno».</p>
+                  <div className="space-y-3">
                     {(["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const).map((day) => {
                       const label = { mon: "Lun", tue: "Mar", wed: "Mié", thu: "Jue", fri: "Vie", sat: "Sáb", sun: "Dom" }[day];
                       let parsed: Record<string, string> = {};
-                      try {
-                        parsed = JSON.parse(business.openingHours ?? "{}");
-                      } catch {
-                        /* ignore */
-                      }
+                      try { parsed = JSON.parse(business.openingHours ?? "{}"); } catch { /* ignore */ }
                       const val = parsed[day] ?? "CLOSED";
                       const isClosed = val === "CLOSED";
+
+                      // Parse into slots: "08:00-14:00,17:00-22:00" → [["08:00","14:00"],["17:00","22:00"]]
+                      const slots: [string, string][] = isClosed ? [] : val.split(",").map((s) => {
+                        const [open, close] = s.trim().split("-");
+                        return [open ?? "08:00", close ?? "18:00"];
+                      });
+
+                      const setSlots = (nextSlots: [string, string][]) => {
+                        let p: Record<string, string> = {};
+                        try { p = JSON.parse(business.openingHours ?? "{}"); } catch { /* ignore */ }
+                        p[day] = nextSlots.length === 0 ? "CLOSED" : nextSlots.map(([o, c]) => `${o}-${c}`).join(",");
+                        setBusiness((b) => ({ ...b, openingHours: JSON.stringify(p, null, 2) }));
+                      };
+
                       return (
-                        <div key={day} className="flex items-center gap-3">
-                          <span className="w-10 text-xs font-semibold text-gray-600" id={`oh-day-${day}`}>
-                            {label}
-                          </span>
-                          <input
-                            type="checkbox"
-                            checked={!isClosed}
-                            aria-label={`Abierto el ${label}`}
-                            onChange={(e) => {
-                              let p: Record<string, string> = {};
-                              try {
-                                p = JSON.parse(business.openingHours ?? "{}");
-                              } catch {
-                                /* ignore */
-                              }
-                              p[day] = e.target.checked ? "08:00-18:00" : "CLOSED";
-                              setBusiness((b) => ({ ...b, openingHours: JSON.stringify(p, null, 2) }));
-                            }}
-                            className="accent-[#4f6ef7]"
-                          />
-                          {!isClosed ? (
+                        <div key={day} className="flex flex-col sm:flex-row sm:items-start gap-2">
+                          <div className="flex items-center gap-2 min-w-[5rem]">
                             <input
-                              value={val}
-                              aria-labelledby={`oh-day-${day}`}
-                              aria-label={`Franja horaria (${label})`}
-                              onChange={(e) => {
-                                let p: Record<string, string> = {};
-                                try {
-                                  p = JSON.parse(business.openingHours ?? "{}");
-                                } catch {
-                                  /* ignore */
-                                }
-                                p[day] = e.target.value;
-                                setBusiness((b) => ({ ...b, openingHours: JSON.stringify(p, null, 2) }));
-                              }}
-                              placeholder="08:00-18:00"
-                              className="flex-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs"
+                              type="checkbox"
+                              checked={!isClosed}
+                              aria-label={`Abierto el ${label}`}
+                              onChange={(e) => setSlots(e.target.checked ? [["08:00", "18:00"]] : [])}
+                              className="accent-[#4f6ef7]"
                             />
+                            <span className="text-xs font-semibold text-gray-600 w-8">{label}</span>
+                          </div>
+
+                          {isClosed ? (
+                            <span className="text-xs text-gray-400 italic py-1.5">Cerrado</span>
                           ) : (
-                            <span className="text-xs text-gray-400 italic">Cerrado</span>
+                            <div className="flex flex-col gap-1.5 flex-1">
+                              {slots.map(([open, close], idx) => (
+                                <div key={idx} className="flex items-center gap-1.5 flex-wrap">
+                                  <input
+                                    type="time"
+                                    value={open}
+                                    onChange={(e) => {
+                                      const next = [...slots] as [string, string][];
+                                      next[idx] = [e.target.value, close];
+                                      setSlots(next);
+                                    }}
+                                    className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs min-w-[90px]"
+                                  />
+                                  <span className="text-xs text-gray-400">–</span>
+                                  <input
+                                    type="time"
+                                    value={close}
+                                    onChange={(e) => {
+                                      const next = [...slots] as [string, string][];
+                                      next[idx] = [open, e.target.value];
+                                      setSlots(next);
+                                    }}
+                                    className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs min-w-[90px]"
+                                  />
+                                  {slots.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setSlots(slots.filter((_, i) => i !== idx))}
+                                      className="text-[10px] text-red-400 hover:text-red-600 px-1"
+                                      title="Eliminar turno"
+                                    >✕</button>
+                                  )}
+                                </div>
+                              ))}
+                              {slots.length < 2 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setSlots([...slots, ["17:00", "22:00"]])}
+                                  className="text-[10px] font-semibold text-[#4f6ef7] hover:underline text-left"
+                                >+ Turno (partido)</button>
+                              )}
+                            </div>
                           )}
                         </div>
                       );

@@ -87,7 +87,7 @@ export function AlertsBellPopover() {
         )}
       </button>
       {open ? (
-        <div className="absolute right-0 top-12 z-50 w-[360px] rounded-2xl border border-gray-100 bg-white shadow-[0_8px_28px_rgba(149,157,165,0.24)] overflow-hidden">
+        <div className="absolute right-0 top-12 z-50 w-[min(360px,calc(100vw-1rem))] rounded-2xl border border-gray-100 bg-white shadow-[0_8px_28px_rgba(149,157,165,0.24)] overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
             <p className="text-sm font-semibold text-[#1e2040]">Notificaciones</p>
             {unreadCount > 0 && (

@@ -128,14 +128,14 @@ export function UserProfileMenu() {
     );
 
   return (
-    <div className="relative">
+    <div className="relative flex-shrink-0">
       <button
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-xl bg-white border border-gray-100 px-2 py-1.5 shadow-sm hover:bg-gray-50 transition-colors"
+        className="flex items-center gap-1.5 rounded-xl bg-white border border-gray-100 px-1.5 py-1.5 shadow-sm hover:bg-gray-50 transition-colors min-w-0"
       >
-        <div className="relative">
+        <div className="relative flex-shrink-0">
           {avatarUrl ? (
             <img
               src={avatarUrl}
@@ -143,13 +143,14 @@ export function UserProfileMenu() {
               className="w-8 h-8 rounded-full ring-2 ring-white shadow-sm object-cover"
             />
           ) : (
-            <div className="w-8 h-8 rounded-full ring-2 ring-white shadow-sm bg-[#4f6ef7] text-white text-[11px] font-semibold flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full ring-2 ring-white shadow-sm bg-[#4f6ef7] text-white text-[11px] font-semibold flex items-center justify-center select-none">
               {initials}
             </div>
           )}
           <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-white" />
         </div>
-        <ChevronDown size={14} className={`text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />
+        <span className="hidden sm:block text-xs font-medium text-gray-700 max-w-[80px] truncate">{firstName || displayName.split(" ")[0]}</span>
+        <ChevronDown size={13} className={`text-gray-400 transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`} />
       </button>
 
       {dropdown}
