@@ -7,7 +7,7 @@ import { ErpPageShell, AppTopHeader, notify } from "../shared/ui";
 import { authApi, describeNetworkError } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 import { canAccessBusinessSettings, roleDisplayLabel } from "app/lib/rbac";
-import { Building2, Camera, Eye, EyeOff, KeyRound, Lock, Shield, UserRound } from "lucide-react";
+import { Camera, Eye, EyeOff, KeyRound, Lock, Shield, UserRound } from "lucide-react";
 
 const TIMEZONE_OPTIONS = [
   "Europe/Madrid",
@@ -411,23 +411,6 @@ export default function CompanySettingsPage() {
               </button>
               {prefsSaved && <p className="text-xs text-emerald-600 mt-2">Guardado.</p>}
             </SectionCard>
-
-            {canAccessBusinessSettings(role) && (
-              <SectionCard
-                title="Configuración del negocio"
-                subtitle="Datos fiscales, horario y ubicación del tenant actual"
-                right={
-                  <Link href="/business-settings" className="text-xs font-semibold text-[#4f6ef7] hover:underline inline-flex items-center gap-1">
-                    <Building2 size={14} />
-                    Abrir configurador
-                  </Link>
-                }
-              >
-                <p className="text-sm text-gray-600">
-                  Nombre fiscal, NIF/CIF, moneda del negocio, coordenadas y horarios. Si operas en varios negocios, elige el activo en la cabecera.
-                </p>
-              </SectionCard>
-            )}
           </div>
         </div>
       </main>
