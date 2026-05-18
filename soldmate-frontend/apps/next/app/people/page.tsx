@@ -43,6 +43,7 @@ import {
 } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 import { canManageUsers, roleDisplayLabel } from "app/lib/rbac";
+import { getPresenceStatus, isSameUserEmail } from "app/lib/presence";
 
 interface Person {
   id: number;
@@ -57,14 +58,11 @@ interface Person {
   lastSeenAt: string | null;
 }
 
-export function getPresenceStatus(lastSeenAt: string | null, active: boolean) {
-  if (!active) return { color: "bg-gray-300", label: "Cuenta desactivada" };
-  if (!lastSeenAt) return { color: "bg-gray-300", label: "Offline" };
-  
-  const diffMinutes = (Date.now() - new Date(lastSeenAt).getTime()) / 60000;
-  if (diffMinutes < 2) return { color: "bg-emerald-400", label: "Online" };
-  if (diffMinutes < 15) return { color: "bg-amber-400", label: "Ausente" };
-  return { color: "bg-gray-300", label: "Offline" };
+function usePersonPresence(person: Person, active = person.active) {
+  const currentEmail = useAuthStore((s) => s.email);
+  return getPresenceStatus(person.lastSeenAt, active, {
+    isSelf: isSameUserEmail(person.email, currentEmail),
+  });
 }
 
 const ROLE_FILTERS: Array<"Todos" | UserRole> = [
@@ -160,6 +158,7 @@ function PersonCard({
   canWrite: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const presence = usePersonPresence(emp);
 
   return (
     <div
@@ -177,8 +176,8 @@ function PersonCard({
         <div className="relative">
           <Avatar person={emp} size={52} />
           <span
-            className={`absolute bottom-0.5 right-0.5 w-2.5 h-2.5 rounded-full border border-white ${getPresenceStatus(emp.lastSeenAt, emp.active).color}`}
-            title={getPresenceStatus(emp.lastSeenAt, emp.active).label}
+            className={`absolute bottom-0.5 right-0.5 w-2.5 h-2.5 rounded-full border border-white ${presence.color}`}
+            title={presence.label}
           />
         </div>
 
@@ -255,6 +254,8 @@ function PersonRow({
   onDelete: () => void;
   canWrite: boolean;
 }) {
+  const presence = usePersonPresence(emp);
+
   return (
     <div
       onClick={onSelect}
@@ -265,8 +266,8 @@ function PersonRow({
       <div className="relative flex-shrink-0">
         <Avatar person={emp} size={38} />
         <span
-          className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${getPresenceStatus(emp.lastSeenAt, emp.active).color}`}
-          title={getPresenceStatus(emp.lastSeenAt, emp.active).label}
+          className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${presence.color}`}
+          title={presence.label}
         />
       </div>
       <div className="min-w-0">
@@ -312,6 +313,7 @@ function DetailPanel({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Person>(emp);
   const token = useAuthStore((s) => s.token);
+  const presence = usePersonPresence(emp, editing ? draft.active : emp.active);
 
   const { data: vacations = [] } = useQuery({
     queryKey: ["vacations", emp.id],
@@ -405,8 +407,8 @@ function DetailPanel({
         <div className="relative mb-3">
           <Avatar person={editing ? draft : emp} size={72} />
           <span
-            className={`absolute bottom-1 right-1 w-3 h-3 rounded-full border-2 border-white ${getPresenceStatus(emp.lastSeenAt, editing ? draft.active : emp.active).color}`}
-            title={getPresenceStatus(emp.lastSeenAt, editing ? draft.active : emp.active).label}
+            className={`absolute bottom-1 right-1 w-3 h-3 rounded-full border-2 border-white ${presence.color}`}
+            title={presence.label}
           />
         </div>
 

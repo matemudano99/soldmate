@@ -12,6 +12,7 @@ import { useAuthStore } from "app/lib/store";
 import {
   activityApi,
   businessProfileApi,
+  calendarApi,
   dashboardApi,
   describeNetworkError,
   forecastApi,
@@ -19,6 +20,7 @@ import {
   financeApi,
   type ActivityItemResponse,
   type BusinessProfileResponse,
+  type CalendarEventResponse,
   type DashboardSummaryResponse,
   type ProductResponse,
   type ForecastImpactDay,
@@ -63,6 +65,50 @@ const PRIORITY_CFG = {
   MEDIUM:   "text-amber-500",
   LOW:      "text-blue-400",
 };
+
+function addDaysYmd(base: Date, days: number): string {
+  const d = new Date(base);
+  d.setDate(d.getDate() + days);
+  return calendarYmdLocal(d);
+}
+
+function pickNextCalendarTask(events: CalendarEventResponse[]): CalendarEventResponse | null {
+  const now = new Date();
+  const today = calendarYmdLocal(now);
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  const sorted = [...events].sort((a, b) => {
+    const byDate = a.eventDate.localeCompare(b.eventDate);
+    if (byDate !== 0) return byDate;
+    return (a.eventTime ?? "99:99").localeCompare(b.eventTime ?? "99:99");
+  });
+
+  for (const ev of sorted) {
+    if (ev.eventDate < today) continue;
+    if (ev.eventDate > today) return ev;
+    if (!ev.eventTime) return ev;
+    const [h, m] = ev.eventTime.split(":").map((x) => Number(x));
+    if (!Number.isFinite(h)) return ev;
+    const mins = h * 60 + (Number.isFinite(m) ? m : 0);
+    if (mins >= nowMinutes) return ev;
+  }
+  return null;
+}
+
+function formatNextTaskKpi(task: CalendarEventResponse | null): string {
+  if (!task) return "Sin tareas";
+  const title = task.title.trim() || "Sin título";
+  const shortTitle = title.length > 26 ? `${title.slice(0, 25)}…` : title;
+  const today = calendarYmdLocal(new Date());
+  if (task.eventDate === today) {
+    return task.eventTime ? `${shortTitle} · hoy ${task.eventTime.slice(0, 5)}` : `${shortTitle} · hoy`;
+  }
+  const d = new Date(`${task.eventDate}T12:00:00`);
+  const when = d.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+  return task.eventTime
+    ? `${shortTitle} · ${when} ${task.eventTime.slice(0, 5)}`
+    : `${shortTitle} · ${when}`;
+}
 
 function OperationalAlertRow({ alert }: { alert: OperationalAlertDay }) {
   const isToday = alert.date === calendarYmdLocal(new Date());
@@ -109,7 +155,8 @@ export default function DashboardPage() {
   const [activityFeedFull, setActivityFeedFull] = useState<ActivityItemResponse[]>([]);
   const [businessProfile, setBusinessProfile] = useState<BusinessProfileResponse | null>(null);
   const [weatherImpactRaw, setWeatherImpactRaw] = useState<ForecastImpactDay[]>([]);
-  const [todayFinance, setTodayFinance] = useState<DailyFinanceEntryResponse | null>(null);
+  const [yesterdayFinance, setYesterdayFinance] = useState<DailyFinanceEntryResponse | null>(null);
+  const [nextTask, setNextTask] = useState<CalendarEventResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dashSearch, setDashSearch] = useState("");
 
@@ -118,23 +165,28 @@ export default function DashboardPage() {
     async function load() {
       try {
         setError(null);
-        const todayStr = calendarYmdLocal(new Date());
-        
-        const [summaryRes, weatherRes, productsRes, activityRes, businessRes, financeRes] = await Promise.all([
-          dashboardApi.getSummary(token!),
-          forecastApi.getImpact(token!),
-          inventoryApi.getAll(token!),
-          activityApi.getAll(token!),
-          businessProfileApi.get(token!),
-          financeApi.listDaily(token!, todayStr, todayStr).catch(() => []),
-        ]);
+        const now = new Date();
+        const yesterdayStr = addDaysYmd(now, -1);
+        const calendarToStr = addDaysYmd(now, 60);
+
+        const [summaryRes, weatherRes, productsRes, activityRes, businessRes, financeRes, calendarRes] =
+          await Promise.all([
+            dashboardApi.getSummary(token!),
+            forecastApi.getImpact(token!),
+            inventoryApi.getAll(token!),
+            activityApi.getAll(token!),
+            businessProfileApi.get(token!),
+            financeApi.listDaily(token!, yesterdayStr, yesterdayStr).catch(() => []),
+            calendarApi.getAll(token!, calendarYmdLocal(now), calendarToStr).catch(() => []),
+          ]);
 
         setSummary(summaryRes);
         setWeatherImpactRaw(weatherRes);
         setAllLowStockProducts([...productsRes].sort(compareProductsByCategoryThenName).filter((p) => p.lowStock));
         setActivityFeedFull(activityRes);
         setBusinessProfile(businessRes);
-        setTodayFinance(financeRes[0] || null);
+        setYesterdayFinance(financeRes[0] || null);
+        setNextTask(pickNextCalendarTask(calendarRes));
       } catch (err) {
         setError(describeNetworkError(err));
       }
@@ -202,8 +254,12 @@ export default function DashboardPage() {
 
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
           <KpiCard
-            label="Caja de hoy"
-            value={todayFinance ? `€${todayFinance.revenue.toLocaleString("es-ES")}` : "Sin cierre"}
+            label="Caja de ayer"
+            value={
+              yesterdayFinance
+                ? `€${yesterdayFinance.revenue.toLocaleString("es-ES")}`
+                : "Sin cierre"
+            }
             Icon={DollarSign}
             colorClass="text-emerald-600"
             bgClass="bg-emerald-50 border-emerald-100"
@@ -223,9 +279,9 @@ export default function DashboardPage() {
             bgClass="bg-red-50 border-red-100"
           />
           <KpiCard
-            label="Equipo activo"
-            value={`${summary?.activeContacts ?? 0} / ${summary?.totalContacts ?? 0}`}
-            Icon={Users}
+            label="Próxima tarea"
+            value={formatNextTaskKpi(nextTask)}
+            Icon={CalendarDays}
             colorClass="text-blue-500"
             bgClass="bg-blue-50 border-blue-100"
           />

@@ -284,6 +284,8 @@ public class AuthController {
             company.getSubscriptionTier().name()
         );
 
+        touchLastSeen(user);
+
         return ResponseEntity.ok(
             new AuthResponse(
                 token,
@@ -324,6 +326,8 @@ public class AuthController {
             role,
             company.getSubscriptionTier().name()
         );
+
+        touchLastSeen(user);
 
         return ResponseEntity.ok(
             new AuthResponse(
@@ -482,9 +486,13 @@ public class AuthController {
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Usuario no encontrado");
         }
+        touchLastSeen(user);
+        return ResponseEntity.ok().build();
+    }
+
+    private void touchLastSeen(User user) {
         user.setLastSeenAt(java.time.LocalDateTime.now());
         userRepository.save(user);
-        return ResponseEntity.ok().build();
     }
 
     private static boolean isPasswordStrong(String password) {

@@ -41,6 +41,7 @@ import {
 } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 import { DailyFinanceModal } from "./daily-finance-modal";
+import { downloadDailyFinanceCsv } from "./export-daily-finance-csv";
 
 const MONTH_SHORT = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"] as const;
 
@@ -146,50 +147,6 @@ function pctDelta(cur: number, prev: number): string {
   if (prev === 0) return "sin mes anterior";
   const p = Math.round(((cur - prev) / prev) * 100);
   return `${p >= 0 ? "+" : ""}${p}% vs mes anterior`;
-}
-
-function exportDailyCSV(rows: DailyFinanceEntryResponse[]) {
-  const headers = [
-    "Fecha",
-    "Efectivo_apertura",
-    "Canales",
-    "Ingresos_canales_total",
-    "Gastos_total",
-    "Efectivo_cierre",
-    "Saldo_final",
-    "Lineas_gasto",
-    "Creado_por",
-    "Actualizado_por",
-    "Notas",
-  ];
-  const lines = [
-    headers.join(","),
-    ...rows.map((r) => {
-      const note = (r.notes ?? "").replace(/"/g, '""');
-      const lc = r.expenseLines?.length ?? 0;
-      return [
-        r.entryDate,
-        num(r.cashOpening),
-        `"${(r.incomeChannels ?? []).map((c) => `${c.name}: ${num(c.amount)}`).join(" | ").replace(/"/g, '""')}"`,
-        num(r.revenue),
-        num(r.expenses),
-        num(r.cashClosing),
-        num(r.finalBalance),
-        lc,
-        r.createdBy ?? "",
-        r.updatedBy ?? "",
-        `"${note}"`,
-      ].join(",");
-    }),
-  ];
-  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `finanzas-cierres-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-  notify.success("CSV exportado");
 }
 
 function CustomTooltip({
@@ -432,7 +389,10 @@ export default function FinancesPage() {
               )}
               <button
                 type="button"
-                onClick={() => exportDailyCSV(filteredRows)}
+                onClick={() => {
+                  downloadDailyFinanceCsv(filteredRows);
+                  notify.success("CSV exportado");
+                }}
                 disabled={filteredRows.length === 0}
                 className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 shadow-sm transition-all hover:bg-gray-50 disabled:opacity-50"
               >

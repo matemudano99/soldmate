@@ -229,6 +229,9 @@ export const useAuthStore = create<AuthState>()(
         if (state?.role) {
           state.role = normalizeUserRole(state.role as string) ?? state.role;
         }
+        if (state?.token) {
+          state.isAuthenticated = true;
+        }
       },
     }
   )
