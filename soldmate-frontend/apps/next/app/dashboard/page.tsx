@@ -237,7 +237,7 @@ export default function DashboardPage() {
   return (
     <ErpPageShell>
       <AppTopHeader />
-      <main className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-7 pb-6 space-y-5">
+      <main className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-7 pb-6 space-y-4">
         {error && <p className="text-xs text-amber-600">{error}</p>}
         <p className="text-xs text-gray-500">
           Estado del negocio:{" "}
@@ -253,8 +253,9 @@ export default function DashboardPage() {
           className="max-w-xl"
         />
 
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5 sm:gap-3">
           <KpiCard
+            compact
             label="Caja de ayer"
             value={
               yesterdayFinance
@@ -266,6 +267,7 @@ export default function DashboardPage() {
             bgClass="bg-emerald-50 border-emerald-100"
           />
           <KpiCard
+            compact
             label="Stock bajo"
             value={`${summary?.lowStockProducts ?? 0} items`}
             Icon={Package}
@@ -273,6 +275,7 @@ export default function DashboardPage() {
             bgClass="bg-amber-50 border-amber-100"
           />
           <KpiCard
+            compact
             label="Incidencias activas"
             value={String((summary?.openIncidents ?? 0) + (summary?.inProgressIncidents ?? 0))}
             Icon={Wrench}
@@ -280,6 +283,7 @@ export default function DashboardPage() {
             bgClass="bg-red-50 border-red-100"
           />
           <KpiCard
+            compact
             label="Próxima tarea"
             value={formatNextTaskKpi(nextTask)}
             Icon={CalendarDays}
@@ -288,27 +292,28 @@ export default function DashboardPage() {
           />
         </div>
 
-        <SectionCard title="Acciones rápidas">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <SectionCard title="Acciones rápidas" compact>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
             {QUICK_ACTIONS.map((a) => (
               <Link
                 key={a.label}
                 href={a.href}
-                className={`flex flex-col items-start gap-2.5 rounded-xl p-4 transition-all ${a.color} group`}
+                className={`flex flex-col items-start gap-1.5 rounded-lg p-2.5 transition-all ${a.color} group`}
               >
-                <a.Icon size={20} />
-                <span className="text-xs font-semibold leading-tight">{a.label}</span>
+                <a.Icon size={16} />
+                <span className="text-[11px] font-semibold leading-tight">{a.label}</span>
               </Link>
             ))}
           </div>
         </SectionCard>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
           <RecentlyActiveUsers />
           <SectionCard
-          title="Alertas operativas"
-          subtitle="Próximos 14 días: lluvia, festivo (ref. Málaga) o calor ≥31 °C"
-        >
+            compact
+            title="Alertas operativas"
+            subtitle="Próximos 14 días: lluvia, festivo (ref. Málaga) o calor ≥31 °C"
+          >
           {operationalAlerts.length > 0 ? (
             <ul className="space-y-2">
               {operationalAlerts.map((alert) => (

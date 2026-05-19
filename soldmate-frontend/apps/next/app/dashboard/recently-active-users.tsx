@@ -51,7 +51,8 @@ export function RecentlyActiveUsers() {
     <SectionCard
       title="Usuarios recientemente activos"
       subtitle="Conectados en los últimos 5 minutos"
-      className="min-h-[200px] flex flex-col"
+      compact
+      className="min-h-0 flex flex-col"
     >
       {isLoading ? (
         <p className="text-sm text-gray-400 py-6 text-center">Cargando…</p>
@@ -64,7 +65,7 @@ export function RecentlyActiveUsers() {
               <li key={u.id}>
                 <Link
                   href="/people"
-                  className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/60 px-3 py-2.5 transition-colors hover:bg-indigo-50/50 hover:border-indigo-100"
+                  className="flex items-center gap-2.5 rounded-lg border border-gray-100 bg-gray-50/60 px-2.5 py-2 transition-colors hover:bg-indigo-50/50 hover:border-indigo-100"
                 >
                   <UserAvatarPresence
                     name={name}
@@ -75,7 +76,7 @@ export function RecentlyActiveUsers() {
                       isSelf: self,
                       locallyOnline: isLocallyOnline(u.id),
                     }}
-                    size={40}
+                    size={36}
                   />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-[#1e2040] truncate">{name}</p>

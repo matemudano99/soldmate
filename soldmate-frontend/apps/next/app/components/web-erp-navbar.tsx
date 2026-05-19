@@ -7,7 +7,7 @@ import Image from "next/image";
 import {
   LayoutDashboard, Users, CreditCard, BarChart2,
   FileText, Calendar, Power, PanelLeftOpen, X,
-  Wrench, Truck, Package, Activity, ChevronLeft, Building2, Database
+  Wrench, Truck, Package, Activity, ChevronLeft, Building2, Database, Monitor
 } from "lucide-react";
 import { useAuthStore } from "app/lib/store";
 import { HelpCenterPopover } from "../shared/ui/alerts-help-popovers";
@@ -21,6 +21,7 @@ const NAV_MAIN = [
   { href: "/incidents",  label: "Incidencias",  Icon: Wrench          },
   { href: "/suppliers",  label: "Proveedores",  Icon: Truck           },
   { href: "/finances",   label: "Finanzas",     Icon: CreditCard      },
+  { href: "/tpv",        label: "TPV",          Icon: Monitor         },
   { href: "/documents",  label: "Documentos",    Icon: FileText        },
   { href: "/calendar",   label: "Calendario",   Icon: Calendar        },
 ] as const;
