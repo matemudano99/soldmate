@@ -43,10 +43,7 @@ import { useAuthStore } from "app/lib/store";
 import { DailyFinanceModal } from "./daily-finance-modal";
 import { downloadDailyFinanceCsv } from "./export-daily-finance-csv";
 
-const MONTH_SHORT = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"] as const;
-
-const TABS = ["Todos", "Ingresos", "Gastos"] as const;
-type Tab = (typeof TABS)[number];
+const CHART_DAYS = 31;
 
 function toIsoDate(d: Date): string {
   const y = d.getFullYear();
@@ -71,10 +68,6 @@ function formatEuro(n: number): string {
   return n.toLocaleString("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 2 });
 }
 
-function monthKeyFromEntryDate(entryDate: string): string {
-  return entryDate.slice(0, 7);
-}
-
 function normalizeEntry(r: DailyFinanceEntryResponse): DailyFinanceEntryResponse {
   return {
     ...r,
@@ -90,28 +83,27 @@ function normalizeEntry(r: DailyFinanceEntryResponse): DailyFinanceEntryResponse
   };
 }
 
-function buildLast12MonthsChart(entries: DailyFinanceEntryResponse[]) {
+function buildDailyChart(entries: DailyFinanceEntryResponse[]) {
   const now = new Date();
-  const buckets: { month: string; key: string; ingresos: number; gastos: number; saldoFinal: number }[] = [];
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const y = d.getFullYear();
-    const m = d.getMonth();
-    const key = `${y}-${String(m + 1).padStart(2, "0")}`;
-    buckets.push({ key, month: MONTH_SHORT[m], ingresos: 0, gastos: 0, saldoFinal: 0 });
+  const buckets: { day: string; key: string; ingresos: number; gastos: number; saldoFinal: number }[] = [];
+  for (let i = CHART_DAYS - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const key = toIsoDate(d);
+    const day = d.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+    buckets.push({ key, day, ingresos: 0, gastos: 0, saldoFinal: 0 });
   }
   const byKey = new Map(buckets.map((b) => [b.key, b]));
   for (const e of entries) {
-    const k = monthKeyFromEntryDate(e.entryDate);
-    const b = byKey.get(k);
+    const b = byKey.get(e.entryDate);
     if (b) {
-      b.ingresos += num(e.revenue);
-      b.gastos += num(e.expenses);
-      b.saldoFinal += num(e.finalBalance);
+      b.ingresos = num(e.revenue);
+      b.gastos = num(e.expenses);
+      b.saldoFinal = num(e.finalBalance);
     }
   }
-  return buckets.map(({ month, ingresos, gastos, saldoFinal }) => ({
-    month,
+  return buckets.map(({ day, ingresos, gastos, saldoFinal }) => ({
+    day,
     ingresos,
     gastos,
     saldoFinal,
@@ -178,7 +170,6 @@ export default function FinancesPage() {
   const isOwner = role === "OWNER" || role === "DEV";
   const qc = useQueryClient();
   const [authReady, setAuthReady] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>("Todos");
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState<{ mode: "create" | "edit"; initial?: DailyFinanceEntryResponse | null } | null>(
     null,
@@ -271,7 +262,7 @@ export default function FinancesPage() {
     [entries],
   );
 
-  const monthlyChart = useMemo(() => buildLast12MonthsChart(entries), [entries]);
+  const dailyChart = useMemo(() => buildDailyChart(entries), [entries]);
   const { current: curMonth, previous: prevMonth } = useMemo(() => currentAndPrevMonthKeys(), []);
   const curTotals = useMemo(() => sumForMonthPrefix(entries, curMonth), [entries, curMonth]);
   const prevTotals = useMemo(() => sumForMonthPrefix(entries, prevMonth), [entries, prevMonth]);
@@ -334,25 +325,21 @@ export default function FinancesPage() {
   }, [curTotals, prevTotals, daysInCurMonth, daysRegisteredCurMonth]);
 
   const chartRangeLabel = useMemo(() => {
-    const now = new Date();
-    const from = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-    const to = new Date(now.getFullYear(), now.getMonth(), 1);
-    return `${from.toLocaleDateString("es-ES", { month: "short", year: "numeric" })} – ${to.toLocaleDateString("es-ES", { month: "short", year: "numeric" })}`;
+    const to = new Date();
+    const from = new Date();
+    from.setDate(from.getDate() - (CHART_DAYS - 1));
+    return `${from.toLocaleDateString("es-ES", { day: "numeric", month: "short" })} – ${to.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}`;
   }, []);
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
+    if (!q) return sortedEntries;
     return sortedEntries.filter((row) => {
-      if (activeTab === "Ingresos" && num(row.revenue) <= 0) return false;
-      if (activeTab === "Gastos" && num(row.expenses) <= 0) return false;
-      if (q) {
-        const expHay = (row.expenseLines ?? []).map((l) => `${l.detail}`).join(" ");
-        const hay = `${row.entryDate} ${row.notes ?? ""} ${expHay}`.toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      return true;
+      const expHay = (row.expenseLines ?? []).map((l) => `${l.detail}`).join(" ");
+      const hay = `${row.entryDate} ${row.notes ?? ""} ${expHay}`.toLowerCase();
+      return hay.includes(q);
     });
-  }, [sortedEntries, activeTab, search]);
+  }, [sortedEntries, search]);
 
   const headerMonthLabel = new Date().toLocaleDateString("es-ES", { month: "long", year: "numeric" });
   const lockedMonths = lockedMonthsQuery.data ?? [];
@@ -488,7 +475,7 @@ export default function FinancesPage() {
                   <div className="mb-5 flex items-center justify-between">
                     <div>
                       <h2 className="text-base font-semibold text-[#1e2040]">Ingresos (canales) vs gastos</h2>
-                      <p className="mt-0.5 text-xs text-gray-400">Últimos 12 meses · {chartRangeLabel}</p>
+                      <p className="mt-0.5 text-xs text-gray-400">Vista diaria · {chartRangeLabel}</p>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-gray-400">
                       <span className="flex items-center gap-1.5">
@@ -501,27 +488,45 @@ export default function FinancesPage() {
                       </span>
                     </div>
                   </div>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={monthlyChart} barGap={4}>
+                  <ResponsiveContainer width="100%" height={240}>
+                    <BarChart data={dailyChart} barGap={2} margin={{ bottom: 4 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f2f7" vertical={false} />
-                      <XAxis dataKey="month" tick={{ fill: "#9095a0", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <XAxis
+                        dataKey="day"
+                        tick={{ fill: "#9095a0", fontSize: 9 }}
+                        axisLine={false}
+                        tickLine={false}
+                        interval="preserveStartEnd"
+                        angle={-40}
+                        textAnchor="end"
+                        height={52}
+                      />
                       <YAxis hide />
                       <Tooltip content={<CustomTooltip />} />
-                      <Bar dataKey="ingresos" name="Canales" fill="#4f6ef7" radius={[5, 5, 0, 0]} maxBarSize={28} />
-                      <Bar dataKey="gastos" name="Gastos" fill="#f87171" radius={[5, 5, 0, 0]} maxBarSize={28} />
+                      <Bar dataKey="ingresos" name="Canales" fill="#4f6ef7" radius={[4, 4, 0, 0]} maxBarSize={14} />
+                      <Bar dataKey="gastos" name="Gastos" fill="#f87171" radius={[4, 4, 0, 0]} maxBarSize={14} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
 
                 <div className="rounded-2xl border border-gray-50 bg-white p-5 shadow-[0_2px_16px_rgba(149,157,165,0.10)]">
                   <div className="mb-5">
-                    <h2 className="text-base font-semibold text-[#1e2040]">Saldo final mensual</h2>
-                    <p className="mt-0.5 text-xs text-gray-400">Suma diaria de saldo final (caja)</p>
+                    <h2 className="text-base font-semibold text-[#1e2040]">Saldo final diario</h2>
+                    <p className="mt-0.5 text-xs text-gray-400">Saldo de caja por día de cierre</p>
                   </div>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <LineChart data={monthlyChart}>
+                  <ResponsiveContainer width="100%" height={240}>
+                    <LineChart data={dailyChart} margin={{ bottom: 4 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f2f7" vertical={false} />
-                      <XAxis dataKey="month" tick={{ fill: "#9095a0", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <XAxis
+                        dataKey="day"
+                        tick={{ fill: "#9095a0", fontSize: 9 }}
+                        axisLine={false}
+                        tickLine={false}
+                        interval="preserveStartEnd"
+                        angle={-40}
+                        textAnchor="end"
+                        height={52}
+                      />
                       <YAxis hide />
                       <Tooltip content={<CustomTooltip />} />
                       <Line
@@ -541,28 +546,12 @@ export default function FinancesPage() {
               <div className="overflow-hidden rounded-2xl border border-gray-50 bg-white shadow-[0_2px_16px_rgba(149,157,165,0.10)]">
                 <div className="flex flex-col gap-3 border-b border-gray-50 p-5 sm:flex-row sm:items-center sm:justify-between">
                   <h2 className="text-base font-semibold text-[#1e2040]">Cierres por día</h2>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <input
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Buscar por fecha, notas o gastos…"
-                      className="hidden rounded-xl border border-gray-100 px-3 py-1.5 text-xs outline-none focus:border-[#4f6ef7] sm:block"
-                    />
-                    <div className="flex gap-1 rounded-xl bg-[#f8f9fc] p-1">
-                      {TABS.map((t) => (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() => setActiveTab(t)}
-                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                            activeTab === t ? "bg-white text-[#4f6ef7] shadow-sm" : "text-gray-400 hover:text-gray-600"
-                          }`}
-                        >
-                          {t}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Buscar por fecha, notas o gastos…"
+                    className="w-full rounded-xl border border-gray-100 px-3 py-1.5 text-xs outline-none focus:border-[#4f6ef7] sm:max-w-xs"
+                  />
                 </div>
 
                 {sortedEntries.length === 0 ? (

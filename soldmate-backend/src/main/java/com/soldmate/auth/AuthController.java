@@ -39,6 +39,7 @@ public class AuthController {
     private final NifCifValidator nifCifValidator;
     private final CompanySettingsService settingsService;
     private final SupabaseStorageService storageService;
+    private final UserPresenceService userPresenceService;
 
     public AuthController(UserRepository userRepository,
                           CompanyRepository companyRepository,
@@ -48,7 +49,8 @@ public class AuthController {
                           AuthRateLimiter authRateLimiter,
                           NifCifValidator nifCifValidator,
                           CompanySettingsService settingsService,
-                          SupabaseStorageService storageService) {
+                          SupabaseStorageService storageService,
+                          UserPresenceService userPresenceService) {
         this.userRepository = userRepository;
         this.companyRepository = companyRepository;
         this.membershipRepository = membershipRepository;
@@ -58,6 +60,7 @@ public class AuthController {
         this.nifCifValidator = nifCifValidator;
         this.settingsService = settingsService;
         this.storageService = storageService;
+        this.userPresenceService = userPresenceService;
     }
 
     public record RegisterRequest(
@@ -89,6 +92,7 @@ public class AuthController {
 
     public record AuthResponse(
         String token,
+        Long userId,
         String email,
         String role,
         String tier,
@@ -98,6 +102,21 @@ public class AuthController {
         String avatarUrl,
         List<LinkedCompany> linkedCompanies
     ) {}
+
+    private AuthResponse authResponseFor(User user, String token, String role, String tier, Long companyId) {
+        return new AuthResponse(
+            token,
+            user.getId(),
+            user.getEmail(),
+            role,
+            tier,
+            companyId,
+            user.getFirstName(),
+            user.getLastName(),
+            user.getAvatarUrl(),
+            linkedCompaniesFor(user)
+        );
+    }
 
     public record SwitchCompanyRequest(@NotNull Long companyId) {}
 
@@ -196,18 +215,9 @@ public class AuthController {
                 company.getSubscriptionTier().name()
             );
 
+            touchLastSeen(user);
             return ResponseEntity.status(HttpStatus.CREATED).body(
-                new AuthResponse(
-                    token,
-                    user.getEmail(),
-                    active.getRole().name(),
-                    company.getSubscriptionTier().name(),
-                    company.getId(),
-                    user.getFirstName(),
-                    user.getLastName(),
-                    user.getAvatarUrl(),
-                    linkedCompaniesFor(user)
-                )
+                authResponseFor(user, token, active.getRole().name(), company.getSubscriptionTier().name(), company.getId())
             );
         }
 
@@ -239,18 +249,9 @@ public class AuthController {
             company.getSubscriptionTier().name()
         );
 
+        touchLastSeen(user);
         return ResponseEntity.status(HttpStatus.CREATED).body(
-            new AuthResponse(
-                token,
-                user.getEmail(),
-                active.getRole().name(),
-                company.getSubscriptionTier().name(),
-                company.getId(),
-                user.getFirstName(),
-                user.getLastName(),
-                user.getAvatarUrl(),
-                linkedCompaniesFor(user)
-            )
+            authResponseFor(user, token, active.getRole().name(), company.getSubscriptionTier().name(), company.getId())
         );
     }
 
@@ -284,20 +285,10 @@ public class AuthController {
             company.getSubscriptionTier().name()
         );
 
-        touchLastSeen(user);
+        userPresenceService.touchNow(user.getEmail());
 
         return ResponseEntity.ok(
-            new AuthResponse(
-                token,
-                user.getEmail(),
-                role,
-                company.getSubscriptionTier().name(),
-                company.getId(),
-                user.getFirstName(),
-                user.getLastName(),
-                user.getAvatarUrl(),
-                linkedCompaniesFor(user)
-            )
+            authResponseFor(user, token, role, company.getSubscriptionTier().name(), company.getId())
         );
     }
 
@@ -327,20 +318,10 @@ public class AuthController {
             company.getSubscriptionTier().name()
         );
 
-        touchLastSeen(user);
+        userPresenceService.touchNow(user.getEmail());
 
         return ResponseEntity.ok(
-            new AuthResponse(
-                newToken,
-                user.getEmail(),
-                role,
-                company.getSubscriptionTier().name(),
-                company.getId(),
-                user.getFirstName(),
-                user.getLastName(),
-                user.getAvatarUrl(),
-                linkedCompaniesFor(user)
-            )
+            authResponseFor(user, newToken, role, company.getSubscriptionTier().name(), company.getId())
         );
     }
 
@@ -363,16 +344,12 @@ public class AuthController {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sesión inválida para el negocio"));
 
         return ResponseEntity.ok(
-            new AuthResponse(
+            authResponseFor(
+                user,
                 token,
-                user.getEmail(),
                 sessionRole(user, mem),
                 mem.getCompany().getSubscriptionTier().name(),
-                companyId,
-                user.getFirstName(),
-                user.getLastName(),
-                user.getAvatarUrl(),
-                linkedCompaniesFor(user)
+                companyId
             )
         );
     }
@@ -400,16 +377,12 @@ public class AuthController {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
 
         return ResponseEntity.ok(
-            new AuthResponse(
+            authResponseFor(
+                user,
                 token,
-                user.getEmail(),
                 sessionRole(user, mem),
                 mem.getCompany().getSubscriptionTier().name(),
-                companyId,
-                user.getFirstName(),
-                user.getLastName(),
-                user.getAvatarUrl(),
-                linkedCompaniesFor(user)
+                companyId
             )
         );
     }
@@ -479,20 +452,22 @@ public class AuthController {
     }
 
     @PostMapping("/heartbeat")
-    public ResponseEntity<?> heartbeat(@RequestHeader("Authorization") String authHeader) {
+    public ResponseEntity<Map<String, Object>> heartbeat(@RequestHeader("Authorization") String authHeader) {
         String token = authHeader.substring(7);
         String email = jwtUtil.extractEmail(token);
         User user = userRepository.findByEmail(email).orElse(null);
         if (user == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Usuario no encontrado");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        touchLastSeen(user);
-        return ResponseEntity.ok().build();
+        java.time.Instant seen = userPresenceService.touchNow(email);
+        return ResponseEntity.ok(Map.of(
+            "userId", user.getId(),
+            "lastSeenAt", seen != null ? seen.toString() : ""
+        ));
     }
 
     private void touchLastSeen(User user) {
-        user.setLastSeenAt(java.time.LocalDateTime.now());
-        userRepository.save(user);
+        userPresenceService.touchNow(user.getEmail());
     }
 
     private static boolean isPasswordStrong(String password) {

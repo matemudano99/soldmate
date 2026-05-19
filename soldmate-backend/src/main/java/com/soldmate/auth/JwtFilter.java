@@ -28,9 +28,11 @@ import java.util.List;
 public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    private final UserPresenceService userPresenceService;
 
-    public JwtFilter(JwtUtil jwtUtil) {
+    public JwtFilter(JwtUtil jwtUtil, UserPresenceService userPresenceService) {
         this.jwtUtil = jwtUtil;
+        this.userPresenceService = userPresenceService;
     }
 
     @Override
@@ -67,6 +69,11 @@ public class JwtFilter extends OncePerRequestFilter {
                     new UsernamePasswordAuthenticationToken(email, null, authorities);
 
             SecurityContextHolder.getContext().setAuthentication(authToken);
+            try {
+                userPresenceService.touchIfNeeded(email);
+            } catch (Exception ignored) {
+                // Presencia es best-effort; no bloquear la petición.
+            }
         }
 
         // Continuamos con el siguiente filtro de la cadena

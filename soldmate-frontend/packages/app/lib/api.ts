@@ -57,6 +57,7 @@ export interface LinkedCompany {
 
 export interface AuthResponse {
   token: string;
+  userId?: number | null;
   email: string;
   role: AppRole;
   tier: "FREE" | "PREMIUM";
@@ -422,12 +423,9 @@ export const authApi = {
     });
     return handleResponse<{ avatarUrl: string }>(res);
   },
-  heartbeat: async (token: string): Promise<void> => {
+  heartbeat: async (token: string): Promise<{ userId: number; lastSeenAt: string }> => {
     const res = await authFetch("/api/v1/auth/heartbeat", token, { method: "POST" });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(text || `Error ${res.status}`);
-    }
+    return handleResponse<{ userId: number; lastSeenAt: string }>(res);
   },
 };
 

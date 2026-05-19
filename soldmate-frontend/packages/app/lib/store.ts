@@ -18,6 +18,7 @@ import type { StateStorage } from "zustand/middleware";
 interface AuthState {
   // Datos del usuario autenticado (null si no ha iniciado sesión)
   token: string | null;
+  userId: number | null;
   email: string | null;
   role: AppRole | null;
   tier: "FREE" | "PREMIUM" | null;
@@ -112,6 +113,7 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
   // Estado inicial: no hay usuario autenticado
   token: null,
+  userId: null,
   email: null,
   role: null,
   tier: null,
@@ -142,6 +144,7 @@ export const useAuthStore = create<AuthState>()(
     setCookie("sm_token", data.token, remember ? 86400 : undefined);
     set({
       token: data.token,
+      userId: data.userId ?? null,
       email: data.email,
       role: normalizeUserRole(data.role),
       tier: data.tier,
@@ -159,6 +162,7 @@ export const useAuthStore = create<AuthState>()(
     setCookie("sm_token", data.token, isRememberLocalStorage() ? 86400 : undefined);
     set({
       token: data.token,
+      userId: data.userId ?? null,
       email: data.email,
       role: normalizeUserRole(data.role),
       tier: data.tier,
@@ -175,6 +179,7 @@ export const useAuthStore = create<AuthState>()(
     setCookie("sm_token", data.token, isRememberLocalStorage() ? 86400 : undefined);
     set({
       token: data.token,
+      userId: data.userId ?? null,
       role: normalizeUserRole(data.role),
       tier: data.tier,
       companyId: data.companyId ?? null,
@@ -192,6 +197,7 @@ export const useAuthStore = create<AuthState>()(
     session?.removeItem("soldmate-auth");
     set({
       token: null,
+      userId: null,
       email: null,
       role: null,
       tier: null,

@@ -59,7 +59,8 @@ public class SchemaMigrationRunner implements ApplicationRunner {
             new MigrationStep("016", "Finance dynamic income channels json", this::migrateFinanceIncomeChannelsJson),
             new MigrationStep("017", "Company income channel name templates for daily finance", this::migrateCompanyIncomeChannelTemplates),
             new MigrationStep("018", "RBAC five roles, user profile fields, vacations, document user link", this::rbacFiveRolesUserProfileVacationsDocuments),
-            new MigrationStep("019", "DEV platform role and dev console support", this::devPlatformRole)
+            new MigrationStep("019", "DEV platform role and dev console support", this::devPlatformRole),
+            new MigrationStep("020", "User presence last_seen_at for online indicators", this::addUserLastSeenAt)
         );
 
         for (MigrationStep step : steps) {
@@ -593,6 +594,10 @@ public class SchemaMigrationRunner implements ApplicationRunner {
     /**
      * Rol DEV en users (no en membresías). Usuario dev de plataforma para consola multi-tenant.
      */
+    private void addUserLastSeenAt() {
+        jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP");
+    }
+
     private void devPlatformRole() {
         String userRoles = "'DEV','OWNER','MANAGER','SUPERVISOR','EMPLOYEE','VIEWER'";
         String membershipRoles = "'OWNER','MANAGER','SUPERVISOR','EMPLOYEE','VIEWER'";

@@ -43,7 +43,8 @@ import {
 } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 import { canManageUsers, roleDisplayLabel } from "app/lib/rbac";
-import { getPresenceStatus, isSameUserEmail } from "app/lib/presence";
+import { getPresenceStatus, isSameUserEmail, isSameUserId } from "app/lib/presence";
+import { usePresenceStore } from "app/lib/presence-store";
 
 interface Person {
   id: number;
@@ -59,10 +60,12 @@ interface Person {
 }
 
 function usePersonPresence(person: Person, active = person.active) {
+  const currentUserId = useAuthStore((s) => s.userId);
   const currentEmail = useAuthStore((s) => s.email);
-  return getPresenceStatus(person.lastSeenAt, active, {
-    isSelf: isSameUserEmail(person.email, currentEmail),
-  });
+  const locallyOnline = usePresenceStore((s) => s.isLocallyOnline(person.id));
+  const isSelf =
+    isSameUserId(person.id, currentUserId) || isSameUserEmail(person.email, currentEmail);
+  return getPresenceStatus(person.lastSeenAt, active, { isSelf, locallyOnline });
 }
 
 const ROLE_FILTERS: Array<"Todos" | UserRole> = [
@@ -605,9 +608,10 @@ export default function PeoplePage() {
   const [showModal, setShowModal] = useState(false);
 
   const { data: users = [], isLoading, isError, refetch } = useQuery({
-    queryKey: ["users"],
+    queryKey: ["users", token],
     queryFn: () => usersApi.getAll(token!),
     enabled: !!token,
+    refetchInterval: 60_000,
   });
 
   const { data: allActivity = [] } = useQuery({

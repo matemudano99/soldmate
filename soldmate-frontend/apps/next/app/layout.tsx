@@ -10,13 +10,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { Toaster } from "sonner";
 import "./globals.css";
-import { useHeartbeat } from "./shared/hooks/use-heartbeat";
+import { HeartbeatRunner } from "./shared/components/heartbeat-runner";
 
 // QueryClient: la instancia de React Query que gestiona el caché
 // Lo creamos dentro del componente para que cada usuario tenga su propio caché
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  useHeartbeat();
   // useState: el QueryClient se crea una sola vez (no en cada render)
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
@@ -47,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body style={{ fontFamily: "'Syne', sans-serif", margin: 0 }} className="antialiased">
         {/* QueryClientProvider: hace disponible React Query en toda la app */}
         <QueryClientProvider client={queryClient}>
+          <HeartbeatRunner />
           {children}
           <Toaster
             position="bottom-right"

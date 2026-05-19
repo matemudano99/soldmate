@@ -59,7 +59,7 @@ public class User {
     private boolean active = true;
 
     @Column(name = "last_seen_at")
-    private java.time.LocalDateTime lastSeenAt;
+    private java.time.Instant lastSeenAt;
 
     /**
      * Rol global del usuario (columna users.role).

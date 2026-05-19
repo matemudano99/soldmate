@@ -34,6 +34,7 @@ import {
   type OperationalAlertDay,
 } from "../../lib/operationalAlerts";
 import type { OperationalAlertKind } from "app/lib/weather";
+import { RecentlyActiveUsers } from "./recently-active-users";
 
 const ALERT_BADGE: Record<
   OperationalAlertKind,
@@ -302,7 +303,9 @@ export default function DashboardPage() {
           </div>
         </SectionCard>
 
-        <SectionCard
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+          <RecentlyActiveUsers />
+          <SectionCard
           title="Alertas operativas"
           subtitle="Próximos 14 días: lluvia, festivo (ref. Málaga) o calor ≥31 °C"
         >
@@ -327,6 +330,7 @@ export default function DashboardPage() {
             </Link>
           </div>
         </SectionCard>
+        </div>
 
         {/* Bottom row */}
         <div className="grid lg:grid-cols-[1.2fr_1fr_1fr] gap-4">
