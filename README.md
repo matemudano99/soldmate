@@ -1,5 +1,5 @@
 Soldmate - ERP para Hostelería
-<img width="515" height="485" alt="soldmate_nobg_ico" src="https://github.com/user-attachments/assets/0e02b6d5-dcdb-4f1e-a5f3-1b44def6addd" />
+<br><img width="100" height="100" alt="soldmate_nobg_ico" src="https://github.com/user-attachments/assets/0e02b6d5-dcdb-4f1e-a5f3-1b44def6addd" />
 
 
 **Soldmate** es el aliado definitivo ("mate") de las ventas ("sold") y la gestión en la hostelería. Es un sistema de gestión empresarial integral, de bajo coste y alta accesibilidad diseñado específicamente para democratizar la tecnología en pequeños y medianos bares, cafeterías y restaurantes.
