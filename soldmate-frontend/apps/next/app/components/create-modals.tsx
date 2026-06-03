@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { X, Loader2, Tag } from "lucide-react";
+import { X, Loader2, Tag, Camera, ImageIcon } from "lucide-react";
 import {
   incidentsApi,
   suppliersApi,
@@ -147,6 +147,8 @@ export function CreateIncidentModal({
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const cameraInputRef = React.useRef<HTMLInputElement>(null);
+  const galleryInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (initialIncident) {
@@ -245,15 +247,48 @@ export function CreateIncidentModal({
       {authToken && !isEdit ? (
         <div>
           <Label>Foto (opcional)</Label>
+          <p className="mb-2 text-[11px] text-gray-400">En móvil puedes usar la cámara o la galería.</p>
           <input
+            ref={cameraInputRef}
             type="file"
             accept="image/*"
-            className="w-full text-xs text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-[#eef1f8] file:px-3 file:py-2 file:font-semibold file:text-[#4f6ef7]"
+            capture="environment"
+            className="sr-only"
             onChange={(ev) => {
               setPhotoFile(ev.target.files?.[0] ?? null);
               setSubmitError(null);
+              ev.target.value = "";
             }}
           />
+          <input
+            ref={galleryInputRef}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(ev) => {
+              setPhotoFile(ev.target.files?.[0] ?? null);
+              setSubmitError(null);
+              ev.target.value = "";
+            }}
+          />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => cameraInputRef.current?.click()}
+              className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl border border-[#4f6ef7]/30 bg-[#eef1f8] px-3 py-2.5 text-sm font-semibold text-[#4f6ef7] hover:bg-[#e0e7ff] transition-colors"
+            >
+              <Camera size={16} />
+              Tomar foto
+            </button>
+            <button
+              type="button"
+              onClick={() => galleryInputRef.current?.click()}
+              className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-[#1e2040] hover:bg-gray-50 transition-colors"
+            >
+              <ImageIcon size={16} />
+              Galería
+            </button>
+          </div>
           {previewUrl ? (
             <img src={previewUrl} alt="" className="mt-2 max-h-36 w-full rounded-xl border border-gray-100 object-contain bg-gray-50" />
           ) : null}

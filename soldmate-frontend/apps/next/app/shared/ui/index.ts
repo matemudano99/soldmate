@@ -1,5 +1,6 @@
 export { WebErpNavbar } from "./web-erp-navbar";
 export { ErpPageShell } from "./erp-page-shell";
+export { MobileBottomNav } from "./mobile-bottom-nav";
 export { AppTopHeader } from "./app-top-header";
 export { PageListSearchField } from "./page-list-search";
 export { UserProfileMenu } from "./user-profile-menu";

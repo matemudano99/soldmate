@@ -5,26 +5,21 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import {
-  LayoutDashboard, Users, CreditCard, BarChart2,
-  FileText, Calendar, Power, PanelLeftOpen, X,
-  Wrench, Truck, Package, Activity, ChevronLeft, Building2, Database, Monitor
+  Building2,
+  Calendar,
+  ChevronLeft,
+  Database,
+  Power,
+  PanelLeftOpen,
+  Pin,
+  X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useAuthStore } from "app/lib/store";
+import { ERP_NAV_MAIN, MOBILE_DASHBOARD_HREF } from "app/lib/erp-nav-main";
+import { useMobileNavPins } from "app/hooks/use-mobile-nav-pins";
 import { HelpCenterPopover } from "../shared/ui/alerts-help-popovers";
 import { canAccessBusinessSettings, canAccessDevConsole, isNavbarHrefVisible, roleDisplayLabel } from "app/lib/rbac";
-
-const NAV_MAIN = [
-  { href: "/dashboard",  label: "Dashboard",    Icon: LayoutDashboard },
-  { href: "/inventory",  label: "Inventario",   Icon: Package         },
-  { href: "/activity",   label: "Actividad",    Icon: Activity        },
-  { href: "/people",     label: "Usuarios",     Icon: Users           },
-  { href: "/incidents",  label: "Incidencias",  Icon: Wrench          },
-  { href: "/suppliers",  label: "Proveedores",  Icon: Truck           },
-  { href: "/finances",   label: "Finanzas",     Icon: CreditCard      },
-  { href: "/tpv",        label: "TPV",          Icon: Monitor         },
-  { href: "/documents",  label: "Documentos",    Icon: FileText        },
-  { href: "/calendar",   label: "Calendario",   Icon: Calendar        },
-] as const;
 
 const LS_NAV_COLLAPSED = "sm_navbar_collapsed";
 
@@ -70,6 +65,7 @@ export function WebErpNavbar() {
   const lastName = useAuthStore((s) => s.lastName);
   const email = useAuthStore((s) => s.email);
   const role = useAuthStore((s) => s.role);
+  const { isPinned, togglePin } = useMobileNavPins(role);
 
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
   const displayName = fullName || email || "Usuario";
@@ -81,9 +77,22 @@ export function WebErpNavbar() {
   };
 
   function isActive(href: string) {
-    if (href === "/dashboard") return pathname === "/dashboard" || pathname === "/";
+    if (href === MOBILE_DASHBOARD_HREF) return pathname === MOBILE_DASHBOARD_HREF || pathname === "/";
     return pathname === href || pathname.startsWith(href + "/");
   }
+
+  const handleTogglePin = (e: React.MouseEvent, href: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const result = togglePin(href);
+    if (!result.ok) {
+      if (result.reason === "max") {
+        toast.error("Máximo 4 accesos fijados en la barra inferior");
+      }
+      return;
+    }
+    toast.success(result.pinned ? "Fijado en barra inferior" : "Desfijado de la barra inferior");
+  };
 
   const collapseLabel = collapsed ? "Expandir menu" : "Colapsar menu";
 
@@ -112,126 +121,146 @@ export function WebErpNavbar() {
           collapsed ? "w-[76px]" : "w-[220px]"
         } ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
-      {/* Logo */}
-      <div className={`px-4 pt-5 pb-4 flex items-center ${collapsed ? "justify-center" : "gap-2"}`}>
-        <Link 
-          href="/dashboard" 
-          onClick={(e) => {
-            if (collapsed) {
-              e.preventDefault();
-              toggleCollapse();
-            }
-          }}
-          title={collapsed ? "Expandir menú" : "Soldmate"}
-          className={`flex items-center hover:opacity-90 transition-opacity ${collapsed ? "justify-center" : "gap-2 flex-1"}`}
-        >
-          <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center shadow-[0_4px_12px_rgba(79,110,247,0.15)] hover:shadow-md transition-shadow overflow-hidden">
-            <Image src="/logo.png" alt="Soldmate" width={36} height={36} className="w-full h-full object-contain p-0.5" />
-          </div>
-          {!collapsed ? (
-            <span className="font-bold text-[#1e2040] text-base tracking-tight">Soldmate</span>
-          ) : null}
-        </Link>
-        {!collapsed && (
-          <button
-            type="button"
-            onClick={toggleCollapse}
-            title={collapseLabel}
-            className="hidden md:inline-flex items-center justify-center text-gray-400 hover:text-[#1e2040] transition-colors ml-auto"
+        <div className={`px-4 pt-5 pb-4 flex items-center ${collapsed ? "justify-center" : "gap-2"}`}>
+          <Link
+            href={MOBILE_DASHBOARD_HREF}
+            onClick={(e) => {
+              if (collapsed) {
+                e.preventDefault();
+                toggleCollapse();
+              }
+            }}
+            title={collapsed ? "Expandir menú" : "Soldmate"}
+            className={`flex items-center hover:opacity-90 transition-opacity ${collapsed ? "justify-center" : "gap-2 flex-1"}`}
           >
-            <ChevronLeft size={18} />
-          </button>
-        )}
-      </div>
-
-      {!collapsed ? (
-        <div className="px-4 pb-2">
-          <div className="h-px bg-gray-100" />
+            <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center shadow-[0_4px_12px_rgba(79,110,247,0.15)] hover:shadow-md transition-shadow overflow-hidden">
+              <Image src="/logo.png" alt="Soldmate" width={36} height={36} className="w-full h-full object-contain p-0.5" />
+            </div>
+            {!collapsed ? (
+              <span className="font-bold text-[#1e2040] text-base tracking-tight">Soldmate</span>
+            ) : null}
+          </Link>
+          {!collapsed && (
+            <button
+              type="button"
+              onClick={toggleCollapse}
+              title={collapseLabel}
+              className="hidden md:inline-flex items-center justify-center text-gray-400 hover:text-[#1e2040] transition-colors ml-auto"
+            >
+              <ChevronLeft size={18} />
+            </button>
+          )}
         </div>
-      ) : null}
 
-      {/* Nav */}
-      <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto pt-2">
-        {NAV_MAIN.filter(({ href }) => isNavbarHrefVisible(href, role)).map(({ href, label, Icon }) => {
-          const active = isActive(href);
-          return (
+        {!collapsed ? (
+          <div className="px-4 pb-2">
+            <div className="h-px bg-gray-100" />
+          </div>
+        ) : null}
+
+        <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto pt-2">
+          {ERP_NAV_MAIN.filter(({ href }) => isNavbarHrefVisible(href, role)).map(({ href, label, Icon }) => {
+            const active = isActive(href);
+            const pinned = isPinned(href);
+            const showPin = !collapsed && href !== MOBILE_DASHBOARD_HREF;
+
+            return (
+              <div
+                key={href}
+                className={`relative flex items-center rounded-xl ${active ? "bg-[#f0f3ff]" : ""}`}
+              >
+                <Link
+                  href={href}
+                  onClick={() => setMobileOpen(false)}
+                  className={`relative flex flex-1 min-w-0 items-center ${collapsed ? "justify-center" : "gap-3"} px-3 py-2.5 rounded-xl transition-colors ${
+                    active
+                      ? "text-[#4f6ef7]"
+                      : "text-[#9095a0] hover:bg-gray-50 hover:text-gray-600"
+                  }`}
+                >
+                  {active && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-[#4f6ef7] rounded-r-full" />
+                  )}
+                  <Icon size={16} strokeWidth={active ? 2.2 : 1.8} />
+                  {!collapsed ? <span className="text-sm font-medium truncate">{label}</span> : null}
+                </Link>
+                {showPin ? (
+                  <button
+                    type="button"
+                    onClick={(e) => handleTogglePin(e, href)}
+                    title={pinned ? "Quitar de barra inferior" : "Fijar en barra inferior"}
+                    aria-label={pinned ? "Desfijar" : "Fijar"}
+                    aria-pressed={pinned}
+                    className={`mr-2 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg transition-colors md:hidden ${
+                      pinned
+                        ? "text-[#4f6ef7] bg-[#eef1f8]"
+                        : "text-gray-400 hover:bg-gray-50 hover:text-[#4f6ef7]"
+                    }`}
+                  >
+                    <Pin size={15} className={pinned ? "fill-current" : ""} />
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
+        </nav>
+
+        <div className="px-3 pb-5 pt-3 border-t border-gray-50 space-y-0.5">
+          {canAccessDevConsole(role) ? (
             <Link
-              key={href}
-              href={href}
+              href="/dev-console"
               onClick={() => setMobileOpen(false)}
               className={`relative flex items-center ${collapsed ? "justify-center" : "gap-3"} px-3 py-2.5 rounded-xl transition-colors ${
-                active
+                pathname.startsWith("/dev-console")
+                  ? "bg-violet-50 text-violet-700"
+                  : "text-[#9095a0] hover:bg-gray-50 hover:text-gray-600"
+              }`}
+              title="Consola DEV"
+            >
+              {pathname.startsWith("/dev-console") && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-violet-600 rounded-r-full" />
+              )}
+              <Database size={16} strokeWidth={pathname.startsWith("/dev-console") ? 2.2 : 1.8} />
+              {!collapsed ? <span className="text-sm font-medium">Consola DEV</span> : null}
+            </Link>
+          ) : null}
+          {canAccessBusinessSettings(role) ? (
+            <Link
+              href="/business-settings"
+              onClick={() => setMobileOpen(false)}
+              className={`relative flex items-center ${collapsed ? "justify-center" : "gap-3"} px-3 py-2.5 rounded-xl transition-colors ${
+                pathname.startsWith("/business-settings")
                   ? "bg-[#f0f3ff] text-[#4f6ef7]"
                   : "text-[#9095a0] hover:bg-gray-50 hover:text-gray-600"
               }`}
+              title="Configuración del negocio"
             >
-              {active && (
+              {pathname.startsWith("/business-settings") && (
                 <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-[#4f6ef7] rounded-r-full" />
               )}
-              <Icon size={16} strokeWidth={active ? 2.2 : 1.8} />
-              {!collapsed ? <span className="text-sm font-medium">{label}</span> : null}
+              <Building2 size={16} strokeWidth={pathname.startsWith("/business-settings") ? 2.2 : 1.8} />
+              {!collapsed ? <span className="text-sm font-medium">Configuración del negocio</span> : null}
             </Link>
-          );
-        })}
-      </nav>
-
-      {/* Bottom */}
-      <div className="px-3 pb-5 pt-3 border-t border-gray-50 space-y-0.5">
-        {canAccessDevConsole(role) ? (
-          <Link
-            href="/dev-console"
-            onClick={() => setMobileOpen(false)}
-            className={`relative flex items-center ${collapsed ? "justify-center" : "gap-3"} px-3 py-2.5 rounded-xl transition-colors ${
-              pathname.startsWith("/dev-console")
-                ? "bg-violet-50 text-violet-700"
-                : "text-[#9095a0] hover:bg-gray-50 hover:text-gray-600"
-            }`}
-            title="Consola DEV"
-          >
-            {pathname.startsWith("/dev-console") && (
-              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-violet-600 rounded-r-full" />
-            )}
-            <Database size={16} strokeWidth={pathname.startsWith("/dev-console") ? 2.2 : 1.8} />
-            {!collapsed ? <span className="text-sm font-medium">Consola DEV</span> : null}
-          </Link>
-        ) : null}
-        {canAccessBusinessSettings(role) ? (
-          <Link
-            href="/business-settings"
-            onClick={() => setMobileOpen(false)}
-            className={`relative flex items-center ${collapsed ? "justify-center" : "gap-3"} px-3 py-2.5 rounded-xl transition-colors ${
-              pathname.startsWith("/business-settings")
-                ? "bg-[#f0f3ff] text-[#4f6ef7]"
-                : "text-[#9095a0] hover:bg-gray-50 hover:text-gray-600"
-            }`}
-            title="Configuración del negocio"
-          >
-            {pathname.startsWith("/business-settings") && (
-              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-[#4f6ef7] rounded-r-full" />
-            )}
-            <Building2 size={16} strokeWidth={pathname.startsWith("/business-settings") ? 2.2 : 1.8} />
-            {!collapsed ? <span className="text-sm font-medium">Configuración del negocio</span> : null}
-          </Link>
-        ) : null}
-        <HelpCenterPopover compact={collapsed} />
-
-        <div className={`pt-3 flex items-center px-3 ${collapsed ? "justify-center" : "gap-2"}`}>
-          <button
-            onClick={handleLogout}
-            title="Cerrar sesión"
-            className="w-9 h-9 rounded-full border-2 border-gray-200 flex items-center justify-center text-gray-400 hover:border-red-200 hover:text-red-400 transition-colors"
-          >
-            <Power size={14} />
-          </button>
-          {!collapsed ? (
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-[#1e2040] truncate">{displayName}</p>
-              <p className="text-[10px] text-gray-400">{roleLabel}</p>
-            </div>
           ) : null}
+          <HelpCenterPopover compact={collapsed} />
+
+          <div className={`pt-3 flex items-center px-3 ${collapsed ? "justify-center" : "gap-2"}`}>
+            <button
+              onClick={handleLogout}
+              title="Cerrar sesión"
+              className="w-9 h-9 rounded-full border-2 border-gray-200 flex items-center justify-center text-gray-400 hover:border-red-200 hover:text-red-400 transition-colors"
+            >
+              <Power size={14} />
+            </button>
+            {!collapsed ? (
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-[#1e2040] truncate">{displayName}</p>
+                <p className="text-[10px] text-gray-400">{roleLabel}</p>
+              </div>
+            ) : null}
+          </div>
         </div>
-      </div>
-    </aside>
+      </aside>
     </>
   );
 }
