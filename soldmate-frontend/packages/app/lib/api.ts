@@ -631,6 +631,8 @@ export const usersApi = {
   },
 };
 
+export type VacationStatus = "PENDING" | "APPROVED" | "REJECTED";
+
 export interface VacationResponse {
   id: number;
   userId: number;
@@ -639,6 +641,10 @@ export interface VacationResponse {
   startDate: string;
   endDate: string;
   notes: string | null;
+  status: VacationStatus;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  decisionNote: string | null;
   createdAt: string;
 }
 
@@ -659,6 +665,64 @@ export const vacationsApi = {
       body: JSON.stringify(body),
     });
     return handleResponse<VacationResponse>(res);
+  },
+  decide: async (
+    token: string,
+    id: number,
+    status: Exclude<VacationStatus, "PENDING">,
+    note?: string | null,
+  ): Promise<VacationResponse> => {
+    const res = await authFetch(`/api/v1/vacations/${id}/decision`, token, {
+      method: "PUT",
+      body: JSON.stringify({ status, note: note ?? null }),
+    });
+    return handleResponse<VacationResponse>(res);
+  },
+};
+
+// ─── Turnos (planificación de cobertura) ─────────────────────────────────────
+
+export interface ShiftResponse {
+  id: number;
+  shiftDate: string;
+  shiftName: string;
+  staffRequired: number;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface ShiftInput {
+  shiftDate: string;
+  shiftName: string;
+  staffRequired?: number | null;
+  notes?: string | null;
+}
+
+export const shiftsApi = {
+  list: async (token: string, from?: string, to?: string): Promise<ShiftResponse[]> => {
+    const qs = from && to ? `?from=${from}&to=${to}` : "";
+    const res = await authFetch(`/api/v1/shifts${qs}`, token);
+    return handleResponse<ShiftResponse[]>(res);
+  },
+  create: async (token: string, body: ShiftInput): Promise<ShiftResponse> => {
+    const res = await authFetch("/api/v1/shifts", token, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return handleResponse<ShiftResponse>(res);
+  },
+  update: async (token: string, id: number, body: ShiftInput): Promise<ShiftResponse> => {
+    const res = await authFetch(`/api/v1/shifts/${id}`, token, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+    return handleResponse<ShiftResponse>(res);
+  },
+  remove: async (token: string, id: number): Promise<void> => {
+    const res = await authFetch(`/api/v1/shifts/${id}`, token, { method: "DELETE" });
+    if (!res.ok) {
+      throw new Error(await res.text().catch(() => "No se pudo eliminar el turno"));
+    }
   },
 };
 

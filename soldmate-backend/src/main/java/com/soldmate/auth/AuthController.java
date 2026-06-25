@@ -438,9 +438,12 @@ public class AuthController {
         Long companyId = jwtUtil.extractCompanyId(token);
 
         try {
+            String previousAvatarUrl = user.getAvatarUrl();
             String avatarUrl = storageService.upload(photo, companyId, ".jpg", "incidents", "avatars");
             user.setAvatarUrl(avatarUrl);
             userRepository.save(user);
+            // Borrado best-effort del avatar anterior para no acumular ficheros huérfanos.
+            storageService.delete(previousAvatarUrl);
             return ResponseEntity.ok(Map.of("avatarUrl", avatarUrl));
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

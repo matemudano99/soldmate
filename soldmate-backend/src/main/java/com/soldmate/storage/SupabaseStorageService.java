@@ -109,6 +109,64 @@ public class SupabaseStorageService {
         return baseUrl + "/storage/v1/object/public/" + bucket + "/" + objectPath;
     }
 
+    /**
+     * Borra un objeto de Supabase Storage a partir de su URL pública (la que devuelve {@link #upload}).
+     *
+     * Best-effort: si la URL no es reconocible, no hay clave configurada o la API responde error,
+     * se registra un warning pero NO se lanza excepción, para no bloquear el borrado del metadato
+     * en la base de datos. Llamar preferiblemente tras el commit (AfterCommitRunner).
+     *
+     * @param publicUrl URL pública del objeto; si es null/blank no hace nada.
+     */
+    public void delete(String publicUrl) {
+        if (publicUrl == null || publicUrl.isBlank()) {
+            return;
+        }
+        String baseUrl = normalize(supabaseUrl);
+        if (baseUrl.isBlank()) {
+            log.warn("No se puede borrar de Supabase Storage: SOLDMATE_SUPABASE_URL vacía. url={}", publicUrl);
+            return;
+        }
+
+        final String marker = "/storage/v1/object/public/";
+        int idx = publicUrl.indexOf(marker);
+        if (idx < 0) {
+            log.warn("URL de Storage no reconocida, no se borra el objeto: {}", publicUrl);
+            return;
+        }
+        // bucket/objectPath (sin el segmento "public/")
+        String bucketAndPath = publicUrl.substring(idx + marker.length());
+        String deleteUrl = baseUrl + "/storage/v1/object/" + bucketAndPath;
+
+        final String authKey;
+        try {
+            authKey = resolveStorageKey();
+        } catch (RuntimeException e) {
+            log.warn("No se puede borrar de Supabase Storage (clave no configurada): {}", e.getMessage());
+            return;
+        }
+
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(deleteUrl))
+            .header("Authorization", "Bearer " + authKey)
+            .header("apikey", authKey)
+            .DELETE()
+            .build();
+
+        try {
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200 && response.statusCode() != 204) {
+                log.warn("Supabase delete devolvió status={}, url={}, body={}",
+                    response.statusCode(), deleteUrl, response.body());
+            }
+        } catch (IOException e) {
+            log.warn("Error borrando objeto de Supabase Storage: {}", deleteUrl, e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Borrado de objeto de Supabase Storage interrumpido: {}", deleteUrl);
+        }
+    }
+
     private String resolveStorageKey() {
         String service = supabaseServiceKey != null ? supabaseServiceKey.trim() : "";
         if (!service.isBlank() && !service.equals("placeholder-key")) {

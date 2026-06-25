@@ -2,9 +2,9 @@
 
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Palmtree, Plus } from "lucide-react";
+import { Check, Loader2, Palmtree, Plus, X } from "lucide-react";
 import { AppTopHeader, ErpPageShell, notify } from "../shared/ui";
-import { vacationsApi, type VacationCreateInput, type VacationResponse } from "app/lib/api";
+import { vacationsApi, type VacationCreateInput, type VacationResponse, type VacationStatus } from "app/lib/api";
 import { useAuthStore } from "app/lib/store";
 import { canPostVacationRequest, roleDisplayLabel } from "app/lib/rbac";
 
@@ -15,11 +15,27 @@ function formatRange(v: VacationResponse): string {
   return `${a.toLocaleDateString("es-ES", opts)} → ${b.toLocaleDateString("es-ES", opts)}`;
 }
 
+const STATUS_META: Record<VacationStatus, { label: string; cls: string }> = {
+  PENDING: { label: "Pendiente", cls: "bg-amber-50 text-amber-700 border-amber-200" },
+  APPROVED: { label: "Aprobada", cls: "bg-green-50 text-green-700 border-green-200" },
+  REJECTED: { label: "Rechazada", cls: "bg-red-50 text-red-700 border-red-200" },
+};
+
+function StatusBadge({ status }: { status: VacationStatus }) {
+  const meta = STATUS_META[status] ?? STATUS_META.PENDING;
+  return (
+    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${meta.cls}`}>
+      {meta.label}
+    </span>
+  );
+}
+
 export default function TimeOffPage() {
   const token = useAuthStore((s) => s.token);
   const role = useAuthStore((s) => s.role);
   const queryClient = useQueryClient();
   const canCreate = canPostVacationRequest(role);
+  const canDecide = role === "OWNER" || role === "MANAGER" || role === "DEV";
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -39,6 +55,16 @@ export default function TimeOffPage() {
       setNotes("");
     },
     onError: (e: Error) => notify.error(e.message ?? "No se pudo registrar"),
+  });
+
+  const decideMut = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: "APPROVED" | "REJECTED" }) =>
+      vacationsApi.decide(token!, id, status),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["vacations"] });
+      notify.success(vars.status === "APPROVED" ? "Solicitud aprobada" : "Solicitud rechazada");
+    },
+    onError: (e: Error) => notify.error(e.message ?? "No se pudo actualizar"),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -66,9 +92,9 @@ export default function TimeOffPage() {
             <div>
               <h1 className="text-2xl font-bold text-[#1e2040]">Vacaciones</h1>
               <p className="text-sm text-gray-500 mt-1">
-                Registro interno (MVP). {role === "OWNER" || role === "MANAGER" || role === "DEV"
-                  ? "Ves todas las solicitudes de la empresa."
-                  : "Ves tus propias solicitudes."}{" "}
+                {role === "OWNER" || role === "MANAGER" || role === "DEV"
+                  ? "Ves todas las solicitudes de la empresa y puedes aprobarlas o rechazarlas."
+                  : "Ves tus propias solicitudes y su estado de aprobación."}{" "}
                 Tu rol: {roleDisplayLabel(role)}.
               </p>
             </div>
@@ -157,16 +183,47 @@ export default function TimeOffPage() {
                   className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
                 >
                   <div>
-                    <p className="text-sm font-medium text-[#1e2040]">{formatRange(v)}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-medium text-[#1e2040]">{formatRange(v)}</p>
+                      <StatusBadge status={v.status} />
+                    </div>
                     <p className="text-xs text-gray-500 mt-0.5">
                       {v.userFullName}{" "}
                       <span className="text-gray-400">({v.userEmail})</span>
                     </p>
                     {v.notes ? <p className="text-xs text-gray-600 mt-2 whitespace-pre-wrap">{v.notes}</p> : null}
+                    {v.status !== "PENDING" && v.decidedBy ? (
+                      <p className="text-[10px] text-gray-400 mt-1">
+                        {v.status === "APPROVED" ? "Aprobada" : "Rechazada"} por {v.decidedBy}
+                        {v.decidedAt ? ` · ${new Date(v.decidedAt).toLocaleDateString("es-ES")}` : ""}
+                      </p>
+                    ) : null}
                   </div>
-                  <p className="text-[10px] text-gray-400 sm:text-right shrink-0">
-                    Alta: {new Date(v.createdAt).toLocaleString("es-ES")}
-                  </p>
+                  <div className="flex flex-col items-start sm:items-end gap-2 shrink-0">
+                    {canDecide && v.status === "PENDING" ? (
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => decideMut.mutate({ id: v.id, status: "APPROVED" })}
+                          disabled={decideMut.isPending}
+                          className="inline-flex items-center gap-1 rounded-lg bg-green-600 text-white px-2.5 py-1.5 text-xs font-semibold hover:bg-green-700 disabled:opacity-60"
+                        >
+                          <Check size={14} /> Aprobar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => decideMut.mutate({ id: v.id, status: "REJECTED" })}
+                          disabled={decideMut.isPending}
+                          className="inline-flex items-center gap-1 rounded-lg border border-red-200 text-red-600 px-2.5 py-1.5 text-xs font-semibold hover:bg-red-50 disabled:opacity-60"
+                        >
+                          <X size={14} /> Rechazar
+                        </button>
+                      </div>
+                    ) : null}
+                    <p className="text-[10px] text-gray-400 sm:text-right">
+                      Alta: {new Date(v.createdAt).toLocaleString("es-ES")}
+                    </p>
+                  </div>
                 </li>
               ))}
             </ul>

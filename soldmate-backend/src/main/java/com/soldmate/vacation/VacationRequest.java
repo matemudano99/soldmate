@@ -36,6 +36,22 @@ public class VacationRequest {
     @Column(length = 500)
     private String notes;
 
+    public enum Status { PENDING, APPROVED, REJECTED }
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private Status status = Status.PENDING;
+
+    /** Email de quien aprobó/rechazó (OWNER/MANAGER). Null mientras está pendiente. */
+    @Column(name = "decided_by", length = 255)
+    private String decidedBy;
+
+    @Column(name = "decided_at")
+    private LocalDateTime decidedAt;
+
+    @Column(name = "decision_note", length = 500)
+    private String decisionNote;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -43,6 +59,9 @@ public class VacationRequest {
     void onCreate() {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
+        }
+        if (status == null) {
+            status = Status.PENDING;
         }
     }
 }

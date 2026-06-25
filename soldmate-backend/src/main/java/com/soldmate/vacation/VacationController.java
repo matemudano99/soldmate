@@ -5,6 +5,7 @@ import com.soldmate.auth.User;
 import com.soldmate.auth.UserRepository;
 import com.soldmate.company.Company;
 import com.soldmate.company.CompanyRepository;
+import com.soldmate.notifications.NotificationWriterService;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,11 +14,13 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * MVP vacaciones: registro y listado. Sin flujo de aprobación.
- * OWNER y MANAGER ven todas las solicitudes de la empresa; el resto solo las propias.
+ * Vacaciones: registro, listado y aprobación.
+ * OWNER y MANAGER ven todas las solicitudes de la empresa y pueden aprobar/rechazar;
+ * el resto solo ven (y crean) las propias.
  */
 @RestController
 @RequestMapping("/api/v1/vacations")
@@ -27,15 +30,18 @@ public class VacationController {
     private final UserRepository userRepository;
     private final CompanyRepository companyRepository;
     private final JwtUtil jwtUtil;
+    private final NotificationWriterService notificationWriterService;
 
     public VacationController(VacationRequestRepository vacationRequestRepository,
                               UserRepository userRepository,
                               CompanyRepository companyRepository,
-                              JwtUtil jwtUtil) {
+                              JwtUtil jwtUtil,
+                              NotificationWriterService notificationWriterService) {
         this.vacationRequestRepository = vacationRequestRepository;
         this.userRepository = userRepository;
         this.companyRepository = companyRepository;
         this.jwtUtil = jwtUtil;
+        this.notificationWriterService = notificationWriterService;
     }
 
     public record VacationResponse(
@@ -46,6 +52,10 @@ public class VacationController {
         String startDate,
         String endDate,
         String notes,
+        String status,
+        String decidedBy,
+        String decidedAt,
+        String decisionNote,
         String createdAt
     ) {
         static VacationResponse from(VacationRequest v) {
@@ -59,6 +69,10 @@ public class VacationController {
                 v.getStartDate().toString(),
                 v.getEndDate().toString(),
                 v.getNotes(),
+                v.getStatus() != null ? v.getStatus().name() : VacationRequest.Status.PENDING.name(),
+                v.getDecidedBy(),
+                v.getDecidedAt() != null ? v.getDecidedAt().toString() : null,
+                v.getDecisionNote(),
                 v.getCreatedAt().toString()
             );
         }
@@ -68,6 +82,11 @@ public class VacationController {
         @NotNull LocalDate startDate,
         @NotNull LocalDate endDate,
         String notes
+    ) {}
+
+    public record DecisionRequest(
+        @NotNull VacationRequest.Status status,
+        String note
     ) {}
 
     @GetMapping
@@ -115,5 +134,45 @@ public class VacationController {
         v.setNotes(req.notes() != null && !req.notes().isBlank() ? req.notes().trim() : null);
         v = vacationRequestRepository.save(v);
         return ResponseEntity.status(HttpStatus.CREATED).body(VacationResponse.from(v));
+    }
+
+    @PutMapping("/{id}/decision")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
+    public ResponseEntity<VacationResponse> decide(
+        @RequestHeader("Authorization") String authHeader,
+        @PathVariable Long id,
+        @RequestBody DecisionRequest req
+    ) {
+        if (req.status() == null || req.status() == VacationRequest.Status.PENDING) {
+            return ResponseEntity.badRequest().build();
+        }
+        String token = authHeader.substring(7);
+        Long companyId = jwtUtil.extractCompanyId(token);
+        String approverEmail = jwtUtil.extractEmail(token);
+
+        VacationRequest v = vacationRequestRepository.findByIdAndCompany_Id(id, companyId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Solicitud no encontrada"));
+
+        v.setStatus(req.status());
+        v.setDecidedBy(approverEmail);
+        v.setDecidedAt(LocalDateTime.now());
+        v.setDecisionNote(req.note() != null && !req.note().isBlank() ? req.note().trim() : null);
+        v = vacationRequestRepository.save(v);
+
+        // Aviso al equipo (las notificaciones son por empresa). Best-effort.
+        try {
+            String verb = req.status() == VacationRequest.Status.APPROVED ? "aprobada" : "rechazada";
+            String who = VacationResponse.from(v).userFullName();
+            notificationWriterService.createForCompany(
+                companyId,
+                "INFO",
+                "Vacaciones " + verb,
+                who + ": " + v.getStartDate() + " → " + v.getEndDate()
+            );
+        } catch (Exception ignored) {
+            // no bloquear la respuesta por un fallo de notificación
+        }
+
+        return ResponseEntity.ok(VacationResponse.from(v));
     }
 }

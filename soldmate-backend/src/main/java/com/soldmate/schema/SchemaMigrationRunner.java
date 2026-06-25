@@ -60,7 +60,8 @@ public class SchemaMigrationRunner implements ApplicationRunner {
             new MigrationStep("017", "Company income channel name templates for daily finance", this::migrateCompanyIncomeChannelTemplates),
             new MigrationStep("018", "RBAC five roles, user profile fields, vacations, document user link", this::rbacFiveRolesUserProfileVacationsDocuments),
             new MigrationStep("019", "DEV platform role and dev console support", this::devPlatformRole),
-            new MigrationStep("020", "User presence last_seen_at for online indicators", this::addUserLastSeenAt)
+            new MigrationStep("020", "User presence last_seen_at for online indicators", this::addUserLastSeenAt),
+            new MigrationStep("021", "Vacation approval workflow: status and decision fields", this::addVacationApprovalColumns)
         );
 
         for (MigrationStep step : steps) {
@@ -596,6 +597,17 @@ public class SchemaMigrationRunner implements ApplicationRunner {
      */
     private void addUserLastSeenAt() {
         jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP");
+    }
+
+    private void addVacationApprovalColumns() {
+        jdbcTemplate.execute("ALTER TABLE vacation_requests ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'PENDING'");
+        jdbcTemplate.execute("ALTER TABLE vacation_requests ADD COLUMN IF NOT EXISTS decided_by VARCHAR(255)");
+        jdbcTemplate.execute("ALTER TABLE vacation_requests ADD COLUMN IF NOT EXISTS decided_at TIMESTAMP");
+        jdbcTemplate.execute("ALTER TABLE vacation_requests ADD COLUMN IF NOT EXISTS decision_note VARCHAR(500)");
+        addConstraintIfMissing(
+            "vacation_requests_status_chk",
+            "ALTER TABLE vacation_requests ADD CONSTRAINT vacation_requests_status_chk CHECK (status IN ('PENDING','APPROVED','REJECTED'))"
+        );
     }
 
     private void devPlatformRole() {
