@@ -145,12 +145,16 @@ public class DocumentService {
         return doc;
     }
 
-    /** Elimina el registro de Postgres (el fichero en Supabase queda huérfano; bórralo desde el dashboard si es necesario). */
+    /** Elimina el registro de Postgres y, tras el commit, el fichero asociado en Supabase Storage. */
     public void delete(Long companyId, Long documentId) {
         Document doc = documentRepository.findByIdAndCompanyId(documentId, companyId)
             .orElseThrow(() -> new RuntimeException("Documento no encontrado"));
+        String fileUrl = doc.getFileUrl();
+        String docName = doc.getName();
         documentRepository.delete(doc);
-        activityLogger.log(companyId, null, "DOCUMENT", "ELIMINADO", doc.getName());
+        activityLogger.log(companyId, null, "DOCUMENT", "ELIMINADO", docName);
+        // Borrado best-effort del binario tras confirmar la transacción (evita ficheros huérfanos).
+        afterCommitRunner.runAfterCommit(() -> storageService.delete(fileUrl));
     }
 
     // ─── Estadísticas ─────────────────────────────────────────────────────────

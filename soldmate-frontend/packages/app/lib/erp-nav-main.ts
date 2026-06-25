@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Activity,
   Calendar,
+  CalendarClock,
   CreditCard,
   FileText,
   LayoutDashboard,
@@ -30,6 +31,7 @@ export const ERP_NAV_MAIN: ErpNavItem[] = [
   { href: "/tpv", label: "TPV", Icon: Monitor },
   { href: "/documents", label: "Documentos", Icon: FileText },
   { href: "/calendar", label: "Calendario", Icon: Calendar },
+  { href: "/shifts", label: "Turnos", Icon: CalendarClock },
 ];
 
 export const MOBILE_DASHBOARD_HREF = "/dashboard";

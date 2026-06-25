@@ -176,8 +176,12 @@ public class IncidentService {
     public void deleteIncident(Long companyId, Long incidentId) {
         Incident incident = incidentRepository.findByIdAndCompanyId(incidentId, companyId)
             .orElseThrow(() -> new RuntimeException("Incidencia no encontrada"));
+        String photoUrl = incident.getPhotoUrl();
+        String title = incident.getTitle();
         incidentRepository.delete(incident);
-        activityLogger.log(companyId, null, "INCIDENT", "ELIMINADO", incident.getTitle());
+        activityLogger.log(companyId, null, "INCIDENT", "ELIMINADO", title);
+        // Borrado best-effort de la foto tras el commit (evita ficheros huérfanos en Storage).
+        afterCommitRunner.runAfterCommit(() -> storageService.delete(photoUrl));
     }
 
     /** Tras commit: notificación en hilo del pool {@code soldmateAsyncExecutor} (no bloquea la respuesta). */
