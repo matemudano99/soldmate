@@ -61,7 +61,18 @@ public class SchemaMigrationRunner implements ApplicationRunner {
             new MigrationStep("018", "RBAC five roles, user profile fields, vacations, document user link", this::rbacFiveRolesUserProfileVacationsDocuments),
             new MigrationStep("019", "DEV platform role and dev console support", this::devPlatformRole),
             new MigrationStep("020", "User presence last_seen_at for online indicators", this::addUserLastSeenAt),
-            new MigrationStep("021", "Vacation approval workflow: status and decision fields", this::addVacationApprovalColumns)
+            new MigrationStep("021", "Vacation approval workflow: status and decision fields", this::addVacationApprovalColumns),
+            new MigrationStep("022", "TPV POS: catalog, orders, lines and payments", this::createTpvTables),
+            new MigrationStep("023", "TPV sala: mesas, modificadores y datos de cliente", this::createTpvSalaTables),
+            new MigrationStep("024", "TPV: variantes de artículo (tamaños Simple/Doble)", this::createMenuItemVariants),
+            new MigrationStep("025", "TPV clientes: fichero de clientes y vínculo comanda→cliente", this::createTpvCustomers),
+            new MigrationStep("026", "TPV: marca de cocina por artículo (ticket de cocina)", this::addMenuItemKitchenFlag),
+            new MigrationStep("027", "TPV: disponibilidad de artículo (agotado) y auto-agotar por stock", this::addMenuItemAvailability),
+            new MigrationStep("028", "TPV: grupos de combinados aplicables por artículo", this::addMenuItemModifierGroups),
+            new MigrationStep("029", "TPV: línea de quita (sin X) en combinados", this::addOrderLineRemoval),
+            new MigrationStep("030", "TPV: arqueo de caja (apertura, movimientos y cierre)", this::createTpvCashTables),
+            new MigrationStep("031", "TPV: KDS de cocina (estado de comanda y de línea)", this::createTpvKitchenState),
+            new MigrationStep("032", "TPV: descuentos por línea y de ticket", this::addTpvDiscounts)
         );
 
         for (MigrationStep step : steps) {
@@ -607,6 +618,319 @@ public class SchemaMigrationRunner implements ApplicationRunner {
         addConstraintIfMissing(
             "vacation_requests_status_chk",
             "ALTER TABLE vacation_requests ADD CONSTRAINT vacation_requests_status_chk CHECK (status IN ('PENDING','APPROVED','REJECTED'))"
+        );
+    }
+
+    private void createTpvTables() {
+        jdbcTemplate.execute("""
+            CREATE TABLE IF NOT EXISTS tpv_menu_categories (
+              id BIGSERIAL PRIMARY KEY,
+              company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+              name VARCHAR(120) NOT NULL,
+              sort_order INT NOT NULL DEFAULT 0,
+              color VARCHAR(16),
+              active BOOLEAN NOT NULL DEFAULT TRUE,
+              created_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+            """);
+
+        jdbcTemplate.execute("""
+            CREATE TABLE IF NOT EXISTS tpv_menu_items (
+              id BIGSERIAL PRIMARY KEY,
+              company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+              category_id BIGINT NOT NULL REFERENCES tpv_menu_categories(id),
+              name VARCHAR(160) NOT NULL,
+              price NUMERIC(12,2) NOT NULL DEFAULT 0,
+              vat_rate NUMERIC(5,2) NOT NULL DEFAULT 10.00,
+              sells_as_product_id BIGINT,
+              active BOOLEAN NOT NULL DEFAULT TRUE,
+              sort_order INT NOT NULL DEFAULT 0,
+              created_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+            """);
+
+        jdbcTemplate.execute("""
+            CREATE TABLE IF NOT EXISTS tpv_menu_item_ingredients (
+              id BIGSERIAL PRIMARY KEY,
+              company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+              menu_item_id BIGINT NOT NULL REFERENCES tpv_menu_items(id) ON DELETE CASCADE,
+              product_id BIGINT NOT NULL REFERENCES products(id),
+              quantity NUMERIC(10,3) NOT NULL DEFAULT 0
+            )
+            """);
+
+        jdbcTemplate.execute("""
+            CREATE TABLE IF NOT EXISTS tpv_orders (
+              id BIGSERIAL PRIMARY KEY,
+              company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+              status VARCHAR(16) NOT NULL DEFAULT 'OPEN',
+              channel VARCHAR(16) NOT NULL DEFAULT 'DINE_IN',
+              business_day DATE NOT NULL,
+              opened_by VARCHAR(255),
+              opened_at TIMESTAMP NOT NULL DEFAULT NOW(),
+              closed_at TIMESTAMP,
+              subtotal NUMERIC(12,2) NOT NULL DEFAULT 0,
+              tax_total NUMERIC(12,2) NOT NULL DEFAULT 0,
+              total NUMERIC(12,2) NOT NULL DEFAULT 0,
+              note VARCHAR(500),
+              version BIGINT
+            )
+            """);
+
+        jdbcTemplate.execute("""
+            CREATE TABLE IF NOT EXISTS tpv_order_lines (
+              id BIGSERIAL PRIMARY KEY,
+              company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+              order_id BIGINT NOT NULL REFERENCES tpv_orders(id) ON DELETE CASCADE,
+              menu_item_id BIGINT,
+              name_snapshot VARCHAR(160) NOT NULL,
+              qty NUMERIC(10,3) NOT NULL DEFAULT 1,
+              unit_price NUMERIC(12,2) NOT NULL DEFAULT 0,
+              vat_rate NUMERIC(5,2) NOT NULL DEFAULT 10.00,
+              line_total NUMERIC(12,2) NOT NULL DEFAULT 0,
+              note VARCHAR(200),
+              voided BOOLEAN NOT NULL DEFAULT FALSE
+            )
+            """);
+
+        jdbcTemplate.execute("""
+            CREATE TABLE IF NOT EXISTS tpv_payments (
+              id BIGSERIAL PRIMARY KEY,
+              company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+              order_id BIGINT NOT NULL REFERENCES tpv_orders(id) ON DELETE CASCADE,
+              method VARCHAR(20) NOT NULL DEFAULT 'CASH',
+              amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+              tip NUMERIC(12,2) NOT NULL DEFAULT 0,
+              change_given NUMERIC(12,2) NOT NULL DEFAULT 0,
+              platform VARCHAR(32),
+              created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+              created_by VARCHAR(255)
+            )
+            """);
+
+        // Índices por tenant / consultas del cierre Z
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_tpv_menu_categories_company ON tpv_menu_categories(company_id, sort_order)");
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_tpv_menu_items_company_cat ON tpv_menu_items(company_id, category_id)");
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_tpv_ingredients_item ON tpv_menu_item_ingredients(company_id, menu_item_id)");
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_tpv_orders_company_day ON tpv_orders(company_id, business_day)");
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_tpv_order_lines_order ON tpv_order_lines(company_id, order_id)");
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_tpv_payments_order ON tpv_payments(company_id, order_id)");
+
+        // CHECK de enums (Java los persiste como texto)
+        addConstraintIfMissing(
+            "tpv_orders_status_chk",
+            "ALTER TABLE tpv_orders ADD CONSTRAINT tpv_orders_status_chk CHECK (status IN ('OPEN','IN_PROGRESS','SERVED','BILLED','PAID','CLOSED','VOID'))"
+        );
+        addConstraintIfMissing(
+            "tpv_orders_channel_chk",
+            "ALTER TABLE tpv_orders ADD CONSTRAINT tpv_orders_channel_chk CHECK (channel IN ('DINE_IN','TAKEAWAY','DELIVERY'))"
+        );
+        addConstraintIfMissing(
+            "tpv_payments_method_chk",
+            "ALTER TABLE tpv_payments ADD CONSTRAINT tpv_payments_method_chk CHECK (method IN ('CASH','CARD','TRANSFER','OTHER','DELIVERY_PLATFORM'))"
+        );
+    }
+
+    /**
+     * Fase 2 del TPV: gestión de sala (mesas con plano editable), modificadores/combinados
+     * (líneas hijas de una línea padre) y datos de cliente para pedidos a domicilio/recoger.
+     */
+    private void createTpvSalaTables() {
+        jdbcTemplate.execute("""
+            CREATE TABLE IF NOT EXISTS tpv_tables (
+              id BIGSERIAL PRIMARY KEY,
+              company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+              label VARCHAR(60) NOT NULL,
+              zone VARCHAR(60) NOT NULL DEFAULT 'Salón',
+              seats INT NOT NULL DEFAULT 4,
+              pos_x INT NOT NULL DEFAULT 40,
+              pos_y INT NOT NULL DEFAULT 40,
+              width INT NOT NULL DEFAULT 90,
+              height INT NOT NULL DEFAULT 90,
+              shape VARCHAR(12) NOT NULL DEFAULT 'RECT',
+              sort_order INT NOT NULL DEFAULT 0,
+              active BOOLEAN NOT NULL DEFAULT TRUE,
+              created_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+            """);
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_tpv_tables_company ON tpv_tables(company_id, zone, sort_order)");
+        addConstraintIfMissing(
+            "tpv_tables_shape_chk",
+            "ALTER TABLE tpv_tables ADD CONSTRAINT tpv_tables_shape_chk CHECK (shape IN ('RECT','ROUND'))"
+        );
+
+        // Comanda → mesa y datos de cliente (para llevar / domicilio)
+        jdbcTemplate.execute("ALTER TABLE tpv_orders ADD COLUMN IF NOT EXISTS table_id BIGINT REFERENCES tpv_tables(id) ON DELETE SET NULL");
+        jdbcTemplate.execute("ALTER TABLE tpv_orders ADD COLUMN IF NOT EXISTS customer_name VARCHAR(160)");
+        jdbcTemplate.execute("ALTER TABLE tpv_orders ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(40)");
+        jdbcTemplate.execute("ALTER TABLE tpv_orders ADD COLUMN IF NOT EXISTS customer_address VARCHAR(300)");
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_tpv_orders_company_table ON tpv_orders(company_id, table_id)");
+
+        // Modificador/combinado: línea hija apuntando a su línea padre
+        jdbcTemplate.execute("ALTER TABLE tpv_order_lines ADD COLUMN IF NOT EXISTS parent_line_id BIGINT");
+
+        // Marcas de carta: categorías de modificadores y artículos que admiten combinados
+        jdbcTemplate.execute("ALTER TABLE tpv_menu_categories ADD COLUMN IF NOT EXISTS is_modifier_group BOOLEAN NOT NULL DEFAULT FALSE");
+        jdbcTemplate.execute("ALTER TABLE tpv_menu_items ADD COLUMN IF NOT EXISTS allows_modifiers BOOLEAN NOT NULL DEFAULT FALSE");
+    }
+
+    /**
+     * Variantes de tamaño de un artículo (p. ej. una hamburguesa con Simple/Doble como un único producto).
+     * Se guardan como JSON en el propio artículo: [{"label":"Simple","price":10.90},{"label":"Doble","price":12.90}].
+     */
+    private void createMenuItemVariants() {
+        jdbcTemplate.execute("ALTER TABLE tpv_menu_items ADD COLUMN IF NOT EXISTS variants_json TEXT");
+    }
+
+    /**
+     * Fichero de clientes del TPV (para pedidos a domicilio/recoger: autocompletado y datos de
+     * facturación) y vínculo opcional comanda→cliente.
+     */
+    private void createTpvCustomers() {
+        jdbcTemplate.execute("""
+            CREATE TABLE IF NOT EXISTS tpv_customers (
+              id BIGSERIAL PRIMARY KEY,
+              company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+              name VARCHAR(160) NOT NULL,
+              phone VARCHAR(40),
+              email VARCHAR(255),
+              address VARCHAR(300),
+              city VARCHAR(120),
+              postal_code VARCHAR(16),
+              tax_id VARCHAR(32),
+              notes TEXT,
+              created_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+            """);
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_tpv_customers_company ON tpv_customers(company_id)");
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_tpv_customers_company_phone ON tpv_customers(company_id, phone)");
+
+        jdbcTemplate.execute("ALTER TABLE tpv_orders ADD COLUMN IF NOT EXISTS customer_id BIGINT REFERENCES tpv_customers(id) ON DELETE SET NULL");
+    }
+
+    /**
+     * Marca por artículo de si debe imprimirse en el ticket de cocina. Preconfigura como cocina los
+     * artículos de categorías que no son modificadores ni bebidas (el resto se ajusta desde la carta).
+     */
+    private void addMenuItemKitchenFlag() {
+        jdbcTemplate.execute("ALTER TABLE tpv_menu_items ADD COLUMN IF NOT EXISTS kitchen BOOLEAN NOT NULL DEFAULT FALSE");
+        jdbcTemplate.execute("""
+            UPDATE tpv_menu_items i SET kitchen = TRUE
+              FROM tpv_menu_categories c
+              WHERE i.category_id = c.id
+                AND c.is_modifier_group = FALSE
+                AND lower(c.name) NOT LIKE 'bebida%'
+            """);
+    }
+
+    /**
+     * Disponibilidad por artículo: {@code available} (agotado manual con un toque) y {@code auto_sold_out}
+     * (se considera agotado cuando su stock vinculado llega a 0).
+     */
+    private void addMenuItemAvailability() {
+        jdbcTemplate.execute("ALTER TABLE tpv_menu_items ADD COLUMN IF NOT EXISTS available BOOLEAN NOT NULL DEFAULT TRUE");
+        jdbcTemplate.execute("ALTER TABLE tpv_menu_items ADD COLUMN IF NOT EXISTS auto_sold_out BOOLEAN NOT NULL DEFAULT FALSE");
+    }
+
+    /**
+     * Qué grupos de combinados (categorías de modificadores) aplican a cada artículo, como JSON array
+     * de ids de categoría. NULL/vacío = aplican todos los grupos (comportamiento anterior).
+     */
+    private void addMenuItemModifierGroups() {
+        jdbcTemplate.execute("ALTER TABLE tpv_menu_items ADD COLUMN IF NOT EXISTS modifier_groups_json TEXT");
+    }
+
+    /** Marca de línea "de quita" (p. ej. "Sin cebolla"): combinado sin precio que solo informa a cocina. */
+    private void addOrderLineRemoval() {
+        jdbcTemplate.execute("ALTER TABLE tpv_order_lines ADD COLUMN IF NOT EXISTS removal BOOLEAN NOT NULL DEFAULT FALSE");
+    }
+
+    /** Arqueo de caja: sesión (apertura con fondo, cierre con conteo y descuadre) y movimientos de efectivo. */
+    private void createTpvCashTables() {
+        jdbcTemplate.execute("""
+            CREATE TABLE IF NOT EXISTS tpv_cash_sessions (
+              id BIGSERIAL PRIMARY KEY,
+              company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+              business_day DATE NOT NULL,
+              status VARCHAR(12) NOT NULL DEFAULT 'OPEN',
+              opening_float NUMERIC(12,2) NOT NULL DEFAULT 0,
+              opened_at TIMESTAMP NOT NULL DEFAULT NOW(),
+              opened_by VARCHAR(255),
+              counted_cash NUMERIC(12,2),
+              expected_cash NUMERIC(12,2),
+              difference NUMERIC(12,2),
+              closed_at TIMESTAMP,
+              closed_by VARCHAR(255),
+              note VARCHAR(500)
+            )
+            """);
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_tpv_cash_sessions_company ON tpv_cash_sessions(company_id, status)");
+        addConstraintIfMissing(
+            "tpv_cash_sessions_status_chk",
+            "ALTER TABLE tpv_cash_sessions ADD CONSTRAINT tpv_cash_sessions_status_chk CHECK (status IN ('OPEN','CLOSED'))"
+        );
+
+        jdbcTemplate.execute("""
+            CREATE TABLE IF NOT EXISTS tpv_cash_movements (
+              id BIGSERIAL PRIMARY KEY,
+              company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+              session_id BIGINT NOT NULL REFERENCES tpv_cash_sessions(id) ON DELETE CASCADE,
+              type VARCHAR(8) NOT NULL,
+              amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+              reason VARCHAR(200),
+              created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+              created_by VARCHAR(255)
+            )
+            """);
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_tpv_cash_movements_session ON tpv_cash_movements(company_id, session_id)");
+        addConstraintIfMissing(
+            "tpv_cash_movements_type_chk",
+            "ALTER TABLE tpv_cash_movements ADD CONSTRAINT tpv_cash_movements_type_chk CHECK (type IN ('IN','OUT'))"
+        );
+    }
+
+    /**
+     * KDS de cocina: estado de la comanda en cocina ({@code kitchen_status}) y, por línea, si va a cocina
+     * ({@code kitchen}, snapshot para que el tablero no consulte la carta) y si está marcada como hecha.
+     */
+    private void createTpvKitchenState() {
+        jdbcTemplate.execute("ALTER TABLE tpv_orders ADD COLUMN IF NOT EXISTS kitchen_status VARCHAR(12) NOT NULL DEFAULT 'NONE'");
+        jdbcTemplate.execute("ALTER TABLE tpv_order_lines ADD COLUMN IF NOT EXISTS kitchen BOOLEAN NOT NULL DEFAULT FALSE");
+        jdbcTemplate.execute("ALTER TABLE tpv_order_lines ADD COLUMN IF NOT EXISTS kitchen_done BOOLEAN NOT NULL DEFAULT FALSE");
+        addConstraintIfMissing(
+            "tpv_orders_kitchen_status_chk",
+            "ALTER TABLE tpv_orders ADD CONSTRAINT tpv_orders_kitchen_status_chk CHECK (kitchen_status IN ('NONE','PENDING','PREPARING','READY','SERVED'))"
+        );
+        jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_tpv_orders_kitchen ON tpv_orders(company_id, kitchen_status)");
+
+        // Backfill: marca como de cocina las líneas cuyo artículo es de cocina (padres) y sus combinados (hijas).
+        jdbcTemplate.execute("""
+            UPDATE tpv_order_lines l SET kitchen = TRUE
+              FROM tpv_menu_items i
+              WHERE l.menu_item_id = i.id AND i.kitchen = TRUE AND l.parent_line_id IS NULL
+            """);
+        jdbcTemplate.execute("""
+            UPDATE tpv_order_lines c SET kitchen = TRUE
+              FROM tpv_order_lines p
+              WHERE c.parent_line_id = p.id AND p.kitchen = TRUE
+            """);
+        // Las comandas abiertas con platos de cocina entran al tablero como pendientes.
+        jdbcTemplate.execute("""
+            UPDATE tpv_orders o SET kitchen_status = 'PENDING'
+              WHERE o.status = 'OPEN'
+                AND EXISTS (SELECT 1 FROM tpv_order_lines l WHERE l.order_id = o.id AND l.kitchen = TRUE AND l.voided = FALSE)
+            """);
+    }
+
+    /** Descuentos: porcentaje por línea (100 = invitar) y descuento de ticket (% o importe) con motivo. */
+    private void addTpvDiscounts() {
+        jdbcTemplate.execute("ALTER TABLE tpv_order_lines ADD COLUMN IF NOT EXISTS discount_pct NUMERIC(5,2) NOT NULL DEFAULT 0");
+        jdbcTemplate.execute("ALTER TABLE tpv_orders ADD COLUMN IF NOT EXISTS discount_type VARCHAR(10) NOT NULL DEFAULT 'NONE'");
+        jdbcTemplate.execute("ALTER TABLE tpv_orders ADD COLUMN IF NOT EXISTS discount_value NUMERIC(12,2) NOT NULL DEFAULT 0");
+        jdbcTemplate.execute("ALTER TABLE tpv_orders ADD COLUMN IF NOT EXISTS discount_reason VARCHAR(200)");
+        addConstraintIfMissing(
+            "tpv_orders_discount_type_chk",
+            "ALTER TABLE tpv_orders ADD CONSTRAINT tpv_orders_discount_type_chk CHECK (discount_type IN ('NONE','PERCENT','AMOUNT'))"
         );
     }
 

@@ -726,6 +726,471 @@ export const shiftsApi = {
   },
 };
 
+// ─── TPV (POS de gestión) ────────────────────────────────────────────────────
+
+export interface TpvCategory {
+  id: number;
+  name: string;
+  sortOrder: number;
+  color: string | null;
+  active: boolean;
+  isModifierGroup: boolean;
+}
+
+export interface TpvRecipeLine {
+  productId: number;
+  quantity: number;
+}
+
+export interface TpvItemVariant {
+  index: number;
+  label: string;
+  price: number;
+}
+
+export interface TpvItem {
+  id: number;
+  categoryId: number;
+  name: string;
+  price: number;
+  vatRate: number;
+  sellsAsProductId: number | null;
+  active: boolean;
+  allowsModifiers: boolean;
+  kitchen: boolean;
+  available: boolean;
+  autoSoldOut: boolean;
+  soldOut: boolean;
+  variants: TpvItemVariant[];
+  modifierGroupIds: number[];
+  recipe: TpvRecipeLine[];
+}
+
+export interface TpvModifierLine {
+  menuItemId: number;
+  qty: number;
+  removed?: boolean;
+}
+
+export interface TpvOrderLine {
+  id: number;
+  menuItemId: number | null;
+  parentLineId: number | null;
+  removal: boolean;
+  name: string;
+  qty: number;
+  discountPct?: number;
+  unitPrice: number;
+  vatRate: number;
+  lineTotal: number;
+  note: string | null;
+  voided: boolean;
+}
+
+export interface TpvOrderPayment {
+  id: number;
+  method: string;
+  amount: number;
+  tip: number;
+  platform: string | null;
+  createdAt: string;
+}
+
+export type TpvChannel = "DINE_IN" | "TAKEAWAY" | "DELIVERY";
+
+export interface TpvOrder {
+  id: number;
+  status: "OPEN" | "IN_PROGRESS" | "SERVED" | "BILLED" | "PAID" | "CLOSED" | "VOID";
+  channel: TpvChannel;
+  businessDay: string;
+  tableId: number | null;
+  customerId: number | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  customerAddress: string | null;
+  subtotal: number;
+  taxTotal: number;
+  total: number;
+  discountType: "NONE" | "PERCENT" | "AMOUNT";
+  discountValue: number;
+  discountReason: string | null;
+  discountTotal: number;
+  note: string | null;
+  lines: TpvOrderLine[];
+  payments: TpvOrderPayment[];
+}
+
+export interface TpvTable {
+  id: number;
+  label: string;
+  zone: string;
+  seats: number;
+  posX: number;
+  posY: number;
+  width: number;
+  height: number;
+  shape: "RECT" | "ROUND";
+  sortOrder: number;
+  active: boolean;
+  openOrderId: number | null;
+  openTotal: number | null;
+}
+
+export interface TpvTableInput {
+  label?: string;
+  zone?: string;
+  seats?: number;
+  posX?: number;
+  posY?: number;
+  width?: number;
+  height?: number;
+  shape?: "RECT" | "ROUND";
+  sortOrder?: number;
+  active?: boolean;
+}
+
+export interface TpvCustomerInfo {
+  tableId?: number | null;
+  customerId?: number | null;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  customerAddress?: string | null;
+}
+
+export type TpvPaymentMethod = "CASH" | "CARD" | "TRANSFER" | "OTHER" | "DELIVERY_PLATFORM";
+
+export interface TpvDayReport {
+  businessDay: string;
+  totalSales: number;
+  totalTips: number;
+  paymentCount: number;
+  byFinanceChannel: { name: string; amount: number }[];
+}
+
+export const tpvApi = {
+  // Catálogo
+  listCategories: async (token: string): Promise<TpvCategory[]> =>
+    handleResponse<TpvCategory[]>(await authFetch("/api/v1/tpv/menu/categories", token)),
+  createCategory: async (token: string, body: { name: string; color?: string | null; sortOrder?: number; isModifierGroup?: boolean }): Promise<TpvCategory> =>
+    handleResponse<TpvCategory>(await authFetch("/api/v1/tpv/menu/categories", token, { method: "POST", body: JSON.stringify(body) })),
+  updateCategory: async (token: string, id: number, body: { name?: string; color?: string | null; sortOrder?: number; isModifierGroup?: boolean }): Promise<TpvCategory> =>
+    handleResponse<TpvCategory>(await authFetch(`/api/v1/tpv/menu/categories/${id}`, token, { method: "PUT", body: JSON.stringify(body) })),
+  deleteCategory: async (token: string, id: number): Promise<void> => {
+    const res = await authFetch(`/api/v1/tpv/menu/categories/${id}`, token, { method: "DELETE" });
+    if (!res.ok) throw new Error(await res.text().catch(() => "No se pudo eliminar la categoría"));
+  },
+  listItems: async (token: string, categoryId?: number): Promise<TpvItem[]> =>
+    handleResponse<TpvItem[]>(await authFetch(`/api/v1/tpv/menu/items${categoryId ? `?categoryId=${categoryId}` : ""}`, token)),
+  createItem: async (
+    token: string,
+    body: { categoryId: number; name: string; price: number; vatRate?: number; sellsAsProductId?: number | null; allowsModifiers?: boolean; kitchen?: boolean; autoSoldOut?: boolean; variants?: { label: string; price: number }[]; modifierGroupIds?: number[]; recipe?: TpvRecipeLine[] },
+  ): Promise<TpvItem> =>
+    handleResponse<TpvItem>(await authFetch("/api/v1/tpv/menu/items", token, { method: "POST", body: JSON.stringify(body) })),
+  updateItem: async (
+    token: string,
+    id: number,
+    body: { categoryId: number; name: string; price: number; vatRate?: number; sellsAsProductId?: number | null; allowsModifiers?: boolean; kitchen?: boolean; autoSoldOut?: boolean; variants?: { label: string; price: number }[]; modifierGroupIds?: number[]; recipe?: TpvRecipeLine[] },
+  ): Promise<TpvItem> =>
+    handleResponse<TpvItem>(await authFetch(`/api/v1/tpv/menu/items/${id}`, token, { method: "PUT", body: JSON.stringify(body) })),
+  setItemAvailability: async (token: string, id: number, available: boolean): Promise<TpvItem> =>
+    handleResponse<TpvItem>(await authFetch(`/api/v1/tpv/menu/items/${id}/availability`, token, { method: "POST", body: JSON.stringify({ available }) })),
+  deleteItem: async (token: string, id: number): Promise<void> => {
+    const res = await authFetch(`/api/v1/tpv/menu/items/${id}`, token, { method: "DELETE" });
+    if (!res.ok) throw new Error(await res.text().catch(() => "No se pudo eliminar"));
+  },
+
+  // Comandas
+  createOrder: async (
+    token: string,
+    body?: { channel?: TpvChannel; note?: string } & TpvCustomerInfo,
+  ): Promise<TpvOrder> =>
+    handleResponse<TpvOrder>(await authFetch("/api/v1/tpv/orders", token, { method: "POST", body: JSON.stringify(body ?? {}) })),
+  getOrder: async (token: string, id: number): Promise<TpvOrder> =>
+    handleResponse<TpvOrder>(await authFetch(`/api/v1/tpv/orders/${id}`, token)),
+  listOpen: async (token: string): Promise<TpvOrder[]> =>
+    handleResponse<TpvOrder[]>(await authFetch("/api/v1/tpv/orders/open", token)),
+  orderByTable: async (token: string, tableId: number): Promise<TpvOrder | null> => {
+    const res = await authFetch(`/api/v1/tpv/orders/by-table/${tableId}`, token);
+    if (res.status === 204) return null;
+    return handleResponse<TpvOrder>(res);
+  },
+  patchOrder: async (token: string, orderId: number, body: { note?: string } & TpvCustomerInfo): Promise<TpvOrder> =>
+    handleResponse<TpvOrder>(await authFetch(`/api/v1/tpv/orders/${orderId}`, token, { method: "PATCH", body: JSON.stringify(body) })),
+  addLine: async (
+    token: string,
+    orderId: number,
+    body: { menuItemId: number; qty?: number; note?: string; modifiers?: TpvModifierLine[]; variantIndex?: number },
+  ): Promise<TpvOrder> =>
+    handleResponse<TpvOrder>(await authFetch(`/api/v1/tpv/orders/${orderId}/lines`, token, { method: "POST", body: JSON.stringify(body) })),
+  setLineQty: async (token: string, orderId: number, lineId: number, qty: number): Promise<TpvOrder> =>
+    handleResponse<TpvOrder>(await authFetch(`/api/v1/tpv/orders/${orderId}/lines/${lineId}/qty`, token, { method: "POST", body: JSON.stringify({ qty }) })),
+  setLineModifiers: async (token: string, orderId: number, lineId: number, modifiers: TpvModifierLine[], note?: string): Promise<TpvOrder> =>
+    handleResponse<TpvOrder>(await authFetch(`/api/v1/tpv/orders/${orderId}/lines/${lineId}/modifiers`, token, { method: "POST", body: JSON.stringify({ modifiers, note }) })),
+  setLineDiscount: async (token: string, orderId: number, lineId: number, pct: number): Promise<TpvOrder> =>
+    handleResponse<TpvOrder>(await authFetch(`/api/v1/tpv/orders/${orderId}/lines/${lineId}/discount`, token, { method: "POST", body: JSON.stringify({ pct }) })),
+  setOrderDiscount: async (token: string, orderId: number, body: { type: "NONE" | "PERCENT" | "AMOUNT"; value: number; reason?: string }): Promise<TpvOrder> =>
+    handleResponse<TpvOrder>(await authFetch(`/api/v1/tpv/orders/${orderId}/discount`, token, { method: "POST", body: JSON.stringify(body) })),
+  voidLine: async (token: string, orderId: number, lineId: number): Promise<TpvOrder> =>
+    handleResponse<TpvOrder>(await authFetch(`/api/v1/tpv/orders/${orderId}/lines/${lineId}/void`, token, { method: "POST" })),
+  pay: async (
+    token: string,
+    orderId: number,
+    body: { method: TpvPaymentMethod; amount: number; tip?: number; platform?: string },
+  ): Promise<TpvOrder> =>
+    handleResponse<TpvOrder>(await authFetch(`/api/v1/tpv/orders/${orderId}/payments`, token, { method: "POST", body: JSON.stringify(body) })),
+
+  // Informes / cierre
+  xReport: async (token: string, date?: string): Promise<TpvDayReport> =>
+    handleResponse<TpvDayReport>(await authFetch(`/api/v1/tpv/reports/x${date ? `?date=${date}` : ""}`, token)),
+  zClose: async (token: string, date?: string): Promise<TpvDayReport> =>
+    handleResponse<TpvDayReport>(await authFetch(`/api/v1/tpv/reports/z${date ? `?date=${date}` : ""}`, token, { method: "POST" })),
+};
+
+// ─── TPV · Mesas (plano de sala) ─────────────────────────────────────────────
+
+export const tpvTablesApi = {
+  list: async (token: string): Promise<TpvTable[]> =>
+    handleResponse<TpvTable[]>(await authFetch("/api/v1/tpv/tables", token)),
+  create: async (token: string, body: TpvTableInput): Promise<TpvTable> =>
+    handleResponse<TpvTable>(await authFetch("/api/v1/tpv/tables", token, { method: "POST", body: JSON.stringify(body) })),
+  update: async (token: string, id: number, body: TpvTableInput): Promise<TpvTable> =>
+    handleResponse<TpvTable>(await authFetch(`/api/v1/tpv/tables/${id}`, token, { method: "PUT", body: JSON.stringify(body) })),
+  remove: async (token: string, id: number): Promise<void> => {
+    const res = await authFetch(`/api/v1/tpv/tables/${id}`, token, { method: "DELETE" });
+    if (!res.ok) throw new Error(await res.text().catch(() => "No se pudo eliminar la mesa"));
+  },
+  seedDefault: async (token: string): Promise<TpvTable[]> =>
+    handleResponse<TpvTable[]>(await authFetch("/api/v1/tpv/tables/seed-default", token, { method: "POST" })),
+};
+
+// ─── TPV · Historial de ventas y recibos ─────────────────────────────────────
+
+export interface TpvSaleSummary {
+  id: number;
+  businessDay: string;
+  closedAt: string | null;
+  channel: TpvChannel;
+  tableLabel: string | null;
+  customerName: string | null;
+  total: number;
+  tips: number;
+  paymentMethods: string[];
+}
+
+export interface TpvReceiptCompany {
+  name: string;
+  taxId: string | null;
+  addressLine: string | null;
+  city: string | null;
+  postalCode: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
+export interface TpvReceiptLine {
+  name: string;
+  qty: number;
+  unitPrice: number;
+  lineTotal: number;
+  modifier: boolean;
+  kitchen: boolean;
+  removal: boolean;
+  discountPct?: number;
+  note: string | null;
+}
+
+export interface TpvTaxRow {
+  vatRate: number;
+  base: number;
+  tax: number;
+  total: number;
+}
+
+export interface TpvReceiptPayment {
+  method: string;
+  amount: number;
+  tip: number;
+  change: number;
+  platform: string | null;
+  createdAt: string | null;
+}
+
+export interface TpvReceipt {
+  company: TpvReceiptCompany;
+  orderId: number;
+  number: string;
+  businessDay: string;
+  openedAt: string | null;
+  closedAt: string | null;
+  channel: TpvChannel;
+  tableLabel: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  customerAddress: string | null;
+  customerTaxId: string | null;
+  customerEmail: string | null;
+  openedBy: string | null;
+  note: string | null;
+  lines: TpvReceiptLine[];
+  taxBreakdown: TpvTaxRow[];
+  subtotal: number;
+  taxTotal: number;
+  total: number;
+  discountTotal: number;
+  discountReason: string | null;
+  payments: TpvReceiptPayment[];
+  totalPaid: number;
+  totalTips: number;
+}
+
+export interface TpvDashboard {
+  from: string;
+  to: string;
+  totalSales: number;
+  ticketCount: number;
+  avgTicket: number;
+  totalTips: number;
+  byChannel: { channel: TpvChannel; total: number; count: number }[];
+  byPaymentMethod: { method: string; total: number }[];
+  topProducts: { name: string; qty: number; total: number }[];
+  byHour: { hour: number; total: number; count: number }[];
+  byDay: { day: string; total: number; count: number }[];
+}
+
+export const tpvSalesApi = {
+  list: async (token: string, from: string, to: string): Promise<TpvSaleSummary[]> =>
+    handleResponse<TpvSaleSummary[]>(await authFetch(`/api/v1/tpv/sales?from=${from}&to=${to}`, token)),
+  dashboard: async (token: string, from: string, to: string): Promise<TpvDashboard> =>
+    handleResponse<TpvDashboard>(await authFetch(`/api/v1/tpv/sales/dashboard?from=${from}&to=${to}`, token)),
+  receipt: async (token: string, orderId: number): Promise<TpvReceipt> =>
+    handleResponse<TpvReceipt>(await authFetch(`/api/v1/tpv/sales/${orderId}/receipt`, token)),
+};
+
+// ─── TPV · Clientes ──────────────────────────────────────────────────────────
+
+export interface TpvCustomer {
+  id: number;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  city: string | null;
+  postalCode: string | null;
+  taxId: string | null;
+  notes: string | null;
+}
+
+export interface TpvCustomerInput {
+  name: string;
+  phone: string;
+  email?: string | null;
+  address?: string | null;
+  city?: string | null;
+  postalCode?: string | null;
+  taxId?: string | null;
+  notes?: string | null;
+}
+
+// ─── TPV · KDS de cocina ─────────────────────────────────────────────────────
+
+export type TpvKitchenStatus = "PENDING" | "PREPARING" | "READY";
+
+export interface TpvKitchenLine {
+  id: number;
+  name: string;
+  qty: number;
+  modifier: boolean;
+  removal: boolean;
+  done: boolean;
+  note: string | null;
+}
+
+export interface TpvKitchenOrder {
+  orderId: number;
+  number: string;
+  channel: TpvChannel;
+  tableLabel: string | null;
+  customerName: string | null;
+  status: TpvKitchenStatus;
+  openedAt: string | null;
+  lines: TpvKitchenLine[];
+}
+
+export const tpvKitchenApi = {
+  board: async (token: string): Promise<TpvKitchenOrder[]> =>
+    handleResponse<TpvKitchenOrder[]>(await authFetch("/api/v1/tpv/kitchen/board", token)),
+  setOrderStatus: async (token: string, orderId: number, status: TpvKitchenStatus | "SERVED"): Promise<TpvKitchenOrder> =>
+    handleResponse<TpvKitchenOrder>(await authFetch(`/api/v1/tpv/kitchen/orders/${orderId}/status`, token, { method: "POST", body: JSON.stringify({ status }) })),
+  setLineDone: async (token: string, orderId: number, lineId: number, done: boolean): Promise<TpvKitchenOrder> =>
+    handleResponse<TpvKitchenOrder>(await authFetch(`/api/v1/tpv/kitchen/orders/${orderId}/lines/${lineId}/done`, token, { method: "POST", body: JSON.stringify({ done }) })),
+};
+
+// ─── TPV · Arqueo de caja ────────────────────────────────────────────────────
+
+export interface TpvCashMovementDto {
+  id: number;
+  type: "IN" | "OUT";
+  amount: number;
+  reason: string | null;
+  createdAt: string | null;
+}
+
+export interface TpvCashState {
+  open: boolean;
+  sessionId: number | null;
+  businessDay: string | null;
+  openedBy: string | null;
+  openedAt: string | null;
+  openingFloat: number;
+  cashSales: number;
+  movementsIn: number;
+  movementsOut: number;
+  expectedCash: number;
+  movements: TpvCashMovementDto[];
+}
+
+export interface TpvCashCloseResult {
+  sessionId: number;
+  businessDay: string;
+  openingFloat: number;
+  cashSales: number;
+  movementsIn: number;
+  movementsOut: number;
+  expectedCash: number;
+  countedCash: number;
+  difference: number;
+}
+
+export const tpvCashApi = {
+  current: async (token: string): Promise<TpvCashState> =>
+    handleResponse<TpvCashState>(await authFetch("/api/v1/tpv/cash/current", token)),
+  open: async (token: string, openingFloat: number): Promise<TpvCashState> =>
+    handleResponse<TpvCashState>(await authFetch("/api/v1/tpv/cash/open", token, { method: "POST", body: JSON.stringify({ openingFloat }) })),
+  movement: async (token: string, body: { type: "IN" | "OUT"; amount: number; reason?: string }): Promise<TpvCashState> =>
+    handleResponse<TpvCashState>(await authFetch("/api/v1/tpv/cash/movement", token, { method: "POST", body: JSON.stringify(body) })),
+  close: async (token: string, body: { countedCash: number; note?: string }): Promise<TpvCashCloseResult> =>
+    handleResponse<TpvCashCloseResult>(await authFetch("/api/v1/tpv/cash/close", token, { method: "POST", body: JSON.stringify(body) })),
+};
+
+export const tpvCustomersApi = {
+  list: async (token: string): Promise<TpvCustomer[]> =>
+    handleResponse<TpvCustomer[]>(await authFetch("/api/v1/tpv/customers", token)),
+  search: async (token: string, q: string): Promise<TpvCustomer[]> =>
+    handleResponse<TpvCustomer[]>(await authFetch(`/api/v1/tpv/customers/search?q=${encodeURIComponent(q)}`, token)),
+  get: async (token: string, id: number): Promise<TpvCustomer> =>
+    handleResponse<TpvCustomer>(await authFetch(`/api/v1/tpv/customers/${id}`, token)),
+  orders: async (token: string, id: number): Promise<TpvSaleSummary[]> =>
+    handleResponse<TpvSaleSummary[]>(await authFetch(`/api/v1/tpv/customers/${id}/orders`, token)),
+  create: async (token: string, body: TpvCustomerInput): Promise<TpvCustomer> =>
+    handleResponse<TpvCustomer>(await authFetch("/api/v1/tpv/customers", token, { method: "POST", body: JSON.stringify(body) })),
+  update: async (token: string, id: number, body: TpvCustomerInput): Promise<TpvCustomer> =>
+    handleResponse<TpvCustomer>(await authFetch(`/api/v1/tpv/customers/${id}`, token, { method: "PUT", body: JSON.stringify(body) })),
+  remove: async (token: string, id: number): Promise<void> => {
+    const res = await authFetch(`/api/v1/tpv/customers/${id}`, token, { method: "DELETE" });
+    if (!res.ok) throw new Error(await res.text().catch(() => "No se pudo eliminar el cliente"));
+  },
+};
+
 // ─── Consola DEV (multi-tenant) ──────────────────────────────────────────────
 
 export interface DevMembershipLink {

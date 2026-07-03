@@ -1,0 +1,15 @@
+package com.soldmate.tpv;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface MenuCategoryRepository extends JpaRepository<MenuCategory, Long> {
+
+    List<MenuCategory> findByCompany_IdOrderBySortOrderAscNameAsc(Long companyId);
+
+    Optional<MenuCategory> findByIdAndCompany_Id(Long id, Long companyId);
+
+    boolean existsByCompany_IdAndNameIgnoreCase(Long companyId, String name);
+}
