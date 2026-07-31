@@ -41,6 +41,31 @@
                     <excludes><exclude><groupId>org.projectlombok</groupId><artifactId>lombok</artifactId></exclude></excludes>
                 </configuration>
             </plugin>
+            <!--
+                Expone la ruta de cada dependencia como propiedad (p. ej. ${org.mockito:mockito-core:jar})
+                para poder cargar Mockito como agente Java en los tests.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals><goal>properties</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!--
+                Mockito debe declararse como agente: a partir de futuras versiones del JDK ya no
+                podrá auto-adjuntarse (el inline-mock-maker dejaría de funcionar). -Xshare:off evita
+                además el aviso de CDS al añadir el agente al classpath de arranque.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>-javaagent:${org.mockito:mockito-core:jar} -Xshare:off</argLine>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>
